@@ -1,6 +1,6 @@
 ---
 title: "Project build and deployment actions"
-description: "Accepts editable outcome-based Build and Deploy actions alongside command buttons, conservative nonblocking discovery, exit-based results, and a default project-setting skill. Retains host Browser access without restoring Mew Port."
+description: "Accepts editable outcome-based Build and Deploy actions alongside command buttons, conservative nonblocking discovery, exit-based results, and a default project-setting skill. ADR 0164 extends output discovery while retaining the Mew Port removal."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
@@ -19,7 +19,7 @@ Add Build and Deploy controls alongside existing command buttons. Store stable a
 
 Discover only commands supported by project evidence. Offer read-only defaults when no configuration exists, and merge discoveries only on explicit persistence. Preserve custom edits and explicit empty configurations. Unsupported or damaged configuration exposes a warning and project-bound agent assistance; it does not gate project operations.
 
-Run finite action processes with recorded exit codes and bounded output. Resolve commands on the server by action ID, pin the actual project root, and authorize all result reads. Successful runs expose validated artifact downloads and optional navigation through the existing host Browser. This extends result entry without superseding [ADR 0160](0160-remove-mew-port.md): no port proxy, listener discovery, or automatic localhost interception returns.
+Run finite action processes with recorded exit codes and bounded output. Resolve commands on the server by action ID, pin the actual project root, and authorize all result reads. Successful runs expose validated artifact downloads and optional navigation through the existing host Browser. [ADR 0164](0164-build-result-files.md) extends this with conservative output discovery and complete ZIP downloads. This extends result entry without superseding [ADR 0160](0160-remove-mew-port.md): no port proxy, listener discovery, or automatic localhost interception returns.
 
 Register `mew-project-setting` through the existing managed default skill library. It configures essential Mew actions and documentation from the user's concept and defaults to TDD. User requirements and other skills can replace concrete nonessential guidance. Normal disablement, removal, restoration, and project overrides remain effective, including in generated setup prompts.
 

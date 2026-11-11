@@ -1841,6 +1841,10 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     return appResourceUrl(`/api/project-actions/artifacts?${projectActionsQuery(project, path, workspacePath)}&runId=${encodeURIComponent(runId)}&artifactPath=${encodeURIComponent(artifactPath)}`)
   }
 
+  function projectActionArchiveUrl(project: string, runId: string, path = '', workspacePath?: string): string {
+    return appResourceUrl(`/api/project-actions/archive?${projectActionsQuery(project, path, workspacePath)}&runId=${encodeURIComponent(runId)}`)
+  }
+
   function fetchTermButtons(): Promise<{ buttons: TermButton[] }> {
     return mewFetch('/api/term-buttons').then(json<{ buttons: TermButton[] }>)
   }
@@ -2245,6 +2249,7 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     discoverProjectActions,
     runProjectAction,
     projectActionArtifactUrl,
+    projectActionArchiveUrl,
     fetchTermButtons,
     saveTermButtons,
     fetchIgnoreList,

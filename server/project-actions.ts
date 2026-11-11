@@ -4,7 +4,8 @@ import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import type { ProjectAction, ProjectActionArtifact, ProjectActionRun, ProjectActionsState } from '../shared/project-actions.ts'
 import { assertNotServerDataPath } from './paths.ts'
-import { discoverProjectActions } from './project-actions-discovery.ts'
+import { automaticArtifactPatterns, discoverProjectActions } from './project-actions-discovery.ts'
+import { artifactFingerprint } from './project-actions-archive.ts'
 
 const CONFIG_FILE = 'project-actions.json'
 const MAX_CONFIG_BYTES = 262_144
@@ -13,6 +14,8 @@ const MAX_HISTORY = 20
 const MAX_TOTAL_HISTORY = 200
 const MAX_ARTIFACTS = 100
 const MAX_SCAN_ENTRIES = 10_000
+const MAX_ARCHIVE_FILES = 5_000
+const MAX_ARCHIVE_BYTES = 512 * 1024 * 1024
 
 export class ProjectActionError extends Error {
   readonly status: number
@@ -113,16 +116,19 @@ function artifactFile(root: string, relative: string): string {
   return canonical
 }
 
-function collectArtifacts(root: string, patterns: string[]): ProjectActionArtifact[] {
+interface ArtifactSnapshot extends ProjectActionArtifact { fingerprint: string }
+
+function collectArtifacts(root: string, patterns: string[], limit = MAX_ARTIFACTS): { files: ArtifactSnapshot[]; complete: boolean } {
   const files = new Set<string>()
   let scanned = 0
+  let complete = true
   for (const pattern of patterns) {
     const firstGlob = pattern.search(/[?*[{]/)
     if (firstGlob < 0) { try { artifactFile(root, pattern); files.add(pattern) } catch { /* Missing or protected output. */ }; continue }
     const prefix = pattern.slice(0, firstGlob), slash = prefix.lastIndexOf('/')
     const base = slash < 0 ? '' : prefix.slice(0, slash)
     const queue = [base]
-    while (queue.length && scanned < MAX_SCAN_ENTRIES && files.size < MAX_ARTIFACTS) {
+    while (queue.length && scanned < MAX_SCAN_ENTRIES && files.size < MAX_SCAN_ENTRIES) {
       const directory = queue.pop()!
       if (directory && !allowedArtifact(directory)) continue
       let entries: fs.Dirent[]
@@ -131,17 +137,25 @@ function collectArtifacts(root: string, patterns: string[]): ProjectActionArtifa
         let parent = root
         for (const segment of directory.split('/').filter(Boolean)) { parent = path.join(parent, segment); if (!fs.lstatSync(parent).isDirectory()) throw new Error('Not a directory') }
         entries = fs.readdirSync(parent, { withFileTypes: true })
-      } catch { continue }
+      } catch { complete = false; continue }
       for (const entry of entries) {
-        if (++scanned > MAX_SCAN_ENTRIES || files.size >= MAX_ARTIFACTS) break
+        if (++scanned > MAX_SCAN_ENTRIES || files.size >= MAX_SCAN_ENTRIES) break
         const relative = directory ? `${directory}/${entry.name}` : entry.name
-        if (!allowedArtifact(relative)) continue
+        if (!allowedArtifact(relative) || entry.isSymbolicLink()) { complete = false; continue }
         if (entry.isDirectory()) queue.push(relative)
         else if (entry.isFile() && path.matchesGlob(relative, pattern)) { try { artifactFile(root, relative); files.add(relative) } catch { /* Unsafe or removed output. */ } }
       }
     }
   }
-  return [...files].sort().slice(0, MAX_ARTIFACTS).map(relative => ({ path: relative, name: path.posix.basename(relative) }))
+  const snapshots = [...files].sort((a, b) => Number(path.posix.basename(b) === 'index.html') - Number(path.posix.basename(a) === 'index.html') || a.localeCompare(b))
+    .flatMap(relative => {
+      try {
+        const stat = fs.statSync(artifactFile(root, relative))
+        return [{ path: relative, name: path.posix.basename(relative), size: stat.size, fingerprint: artifactFingerprint(stat) }]
+      } catch { complete = false; return [] }
+    })
+  if (scanned >= MAX_SCAN_ENTRIES || snapshots.length > limit) complete = false
+  return { files: snapshots.slice(0, limit), complete }
 }
 
 export interface ProjectActionRunnerInput { root: string; command: string; onOutput: (chunk: string) => void }
@@ -157,6 +171,7 @@ const shellRunner: ProjectActionRunner = ({ root, command, onOutput }) => new Pr
 
 export class ProjectActionsService {
   private readonly histories = new Map<string, ProjectActionRun[]>()
+  private readonly archiveFiles = new Map<string, Array<{ path: string; size: number; fingerprint: string }>>()
   private readonly runner: ProjectActionRunner
   constructor(options: { runner?: ProjectActionRunner } = {}) { this.runner = options.runner ?? shellRunner }
 
@@ -191,12 +206,25 @@ export class ProjectActionsService {
     const history = this.histories.get(root) ?? []
     if (history.some(run => run.actionId === action.id && run.status === 'running')) throw new ProjectActionError('이미 실행 중인 작업입니다.', 409)
     if ([...this.histories.values()].flat().filter(run => run.status === 'running').length >= 50) throw new ProjectActionError('동시에 실행할 수 있는 작업 수를 초과했습니다.', 409)
+    const automaticPatterns = automaticArtifactPatterns(root, action)
+    const previous = new Map(collectArtifacts(root, automaticPatterns, MAX_SCAN_ENTRIES).files.map(file => [file.path, file.fingerprint]))
     const run: ProjectActionRun = { id: randomUUID(), actionId: action.id, name: action.name, kind: action.kind, status: 'running', startedAt: new Date().toISOString(), output: '', artifacts: [], ...(action.previewUrl ? { previewUrl: action.previewUrl } : {}) }
     history.unshift(run); this.histories.set(root, history); this.trimHistory()
     const append = (chunk: string) => { run.output = (run.output + chunk).slice(-MAX_OUTPUT) }
     void Promise.resolve().then(() => this.runner({ root, command: action.command, onOutput: append })).then(({ exitCode }) => {
       run.exitCode = exitCode; run.status = exitCode === 0 ? 'succeeded' : 'failed'
-      if (run.status === 'succeeded') run.artifacts = collectArtifacts(root, action.artifacts ?? [])
+      if (run.status === 'succeeded') {
+        const automatic = automaticPatterns.length > 0
+        const collected = collectArtifacts(root, automatic ? automaticPatterns : action.artifacts ?? [], automatic ? MAX_SCAN_ENTRIES : MAX_ARTIFACTS)
+        const files = collected.files.filter(file => !automatic || previous.get(file.path) !== file.fingerprint)
+        run.artifacts = files.slice(0, MAX_ARTIFACTS).map(({ fingerprint: _fingerprint, ...file }) => file)
+        const total = files.reduce((sum, file) => sum + (file.size ?? 0), 0)
+        if (automatic && collected.complete && files.length > 0 && files.length === collected.files.length && files.length <= MAX_ARCHIVE_FILES && total <= MAX_ARCHIVE_BYTES) {
+          const directory = automaticPatterns[0].split('/')[0]
+          run.archive = { name: `${directory}.zip`, fileCount: files.length, size: total }
+          this.archiveFiles.set(run.id, files.map(file => ({ path: file.path, size: file.size ?? 0, fingerprint: file.fingerprint })))
+        }
+      }
     }).catch(error => { run.status = 'failed'; run.exitCode = null; append(`\n${error instanceof Error ? error.message : String(error)}`) })
       .finally(() => {
         run.finishedAt = new Date().toISOString()
@@ -213,6 +241,27 @@ export class ProjectActionsService {
     return artifactFile(root, relative)
   }
 
+  archive(directory: string, runId: unknown): { name: string; size: number; files: Array<{ path: string; name: string; size: number; fingerprint: string }>; validate: (relative: string) => string } {
+    const root = rootDirectory(directory), run = (this.histories.get(root) ?? []).find(item => item.id === runId)
+    const paths = run ? this.archiveFiles.get(run.id) : undefined
+    if (!run || run.status !== 'succeeded' || !run.archive || !paths) throw new ProjectActionError('이 실행에서 다운로드할 수 있는 압축 파일이 아닙니다.', 404)
+    let total = 0
+    const prefix = `${run.archive.name.slice(0, -4)}/`
+    const files = paths.map(recorded => {
+      let size: number
+      try {
+        const stat = fs.statSync(artifactFile(root, recorded.path))
+        if (artifactFingerprint(stat) !== recorded.fingerprint) throw new Error('Output changed')
+        size = stat.size; total += size
+      }
+      catch { throw new ProjectActionError('결과 파일이 변경되었거나 더 이상 사용할 수 없습니다.', 404) }
+      if (total > MAX_ARCHIVE_BYTES) throw new ProjectActionError('결과 파일이 압축 파일 크기 제한을 초과합니다.', 413)
+      return { path: recorded.path, name: recorded.path.slice(prefix.length), size, fingerprint: recorded.fingerprint }
+    })
+    const size = 22 + files.reduce((sum, file) => sum + file.size + 92 + 2 * Buffer.byteLength(file.name), 0)
+    return { name: run.archive.name, size, files, validate: relative => artifactFile(root, relative) }
+  }
+
   private trimHistory(): void {
     for (const [root, history] of this.histories) {
       const kept = history.filter((run, index) => index < MAX_HISTORY || run.status === 'running')
@@ -226,6 +275,8 @@ export class ProjectActionsService {
       if (history.length) this.histories.set(root, history)
       else this.histories.delete(root)
     }
+    const retained = new Set([...this.histories.values()].flatMap(history => history.map(run => run.id)))
+    for (const id of this.archiveFiles.keys()) if (!retained.has(id)) this.archiveFiles.delete(id)
   }
 }
 

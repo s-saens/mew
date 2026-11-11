@@ -63,3 +63,23 @@ export function discoverProjectActions(root: string): DiscoveredProjectActions {
   if (!result.actions.length && !result.warnings.length) result.warnings.push('자동으로 구성할 빌드·배포 설정을 찾지 못했습니다. 에이전트로 구성하거나 직접 추가하세요.')
   return result
 }
+
+/** Defaults apply only to recognized package builds whose saved command still matches discovery. */
+export function automaticArtifactPatterns(root: string, action: ProjectAction): string[] {
+  if (action.kind !== 'build' || action.artifacts?.length) return []
+  const discovered = discoverProjectActions(root).actions.find(candidate => candidate.kind === 'build'
+    && /^npm:build(?::(?:debug|release))?$/.test(candidate.id) && candidate.command === action.command)
+  if (!discovered) return []
+  try {
+    const file = path.join(root, 'package.json')
+    if (!regularFile(root, 'package.json') || fs.statSync(file).size > 1_048_576) return []
+    const manifest = JSON.parse(fs.readFileSync(file, 'utf8')) as { scripts?: Record<string, unknown> }
+    const script = manifest.scripts?.[discovered.id.slice(4)]
+    if (typeof script !== 'string') return []
+    // Custom output flags can relocate a build; never report an unrelated default directory.
+    if (/\b(?:vite|react-scripts)\s+build\b/.test(script) && !/--(?:outDir|out-dir|output-path)\b/.test(script)) {
+      return [/\breact-scripts\s+build\b/.test(script) ? 'build/**/*' : 'dist/**/*']
+    }
+  } catch { /* Discovery is optional and never blocks a run. */ }
+  return []
+}

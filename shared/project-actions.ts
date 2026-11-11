@@ -12,6 +12,7 @@ export interface ProjectAction {
 export interface ProjectActionArtifact {
   path: string
   name: string
+  size?: number
 }
 
 export interface ProjectActionRun {
@@ -26,6 +27,7 @@ export interface ProjectActionRun {
   output: string
   previewUrl?: string
   artifacts: ProjectActionArtifact[]
+  archive?: { name: string; fileCount: number; size: number }
 }
 
 export interface ProjectActionsState {

@@ -1,6 +1,6 @@
 ---
 title: "Command Buttons and Scheduled Tasks"
-description: "Explains project Build and Deploy actions, automatic discovery, agent-assisted setup, completion notifications, result links and artifact downloads. Also covers legacy project and terminal command buttons and recurring agent schedules."
+description: "Explains project Build and Deploy actions, automatic output discovery, completion notices, file and ZIP downloads, and Browser links. Also covers project and terminal command buttons and recurring agent schedules."
 updated: "2026-11-11"
 상위파일:
   - "../../.mew/docs/_docs.md"
@@ -20,11 +20,13 @@ Use this guide to turn frequently run commands into buttons or schedule recurrin
 
 1. Open **Build** or **Deploy** beside the project's command button. Choose the named action, such as a debug or release build.
 2. Follow its status in the results dialog. You can close the dialog or switch projects while it runs; Mew announces completion or failure through your notification preferences while the Mew page remains connected. Select the notification to reopen the results.
-3. Open a completed result to view output, open its configured address in Browser, or download an artifact such as an APK. Failed results retain output for diagnosis and retry.
+3. Open a completed result to download its available files, such as an APK, or a complete web build ZIP when offered. The result also provides the execution log and any configured Browser address. Failed results retain output for diagnosis and retry.
 
 Mew offers actions from supported project scripts and Android configuration automatically. **Discover** saves supported new actions while keeping your existing settings. Use **Add** or **Edit** to change names, variants, commands, result URLs, and output paths. Advanced settings are also available in the project's `.mew/project-actions.json`; the [action contract](../../.mew/docs/features/terminals-agents-automation/project-build-deploy-actions.md#configuration-and-api) defines its format.
 
-If Mew cannot determine the setup, use **Set up with agent** to investigate the project and complete it in a normal agent conversation. Missing tools, invalid settings, and failed actions leave the project available for editing. Deployment needs an established target and credentials; Mew does not invent them. Set up result URLs and output files from the project's actual settings. Browser links use the existing host Browser permission and do not expose a port publicly.
+Mew detects new or changed files in the default output folders for supported Vite and Create React App builds. A complete detected folder can also be downloaded as a ZIP when it meets the size and file limits. Custom output paths and other build systems may need output paths added in **Edit**. The ZIP contains files to use with your project's usual hosting or distribution process; it does not automatically run a website in Mew.
+
+If Mew cannot determine the setup or find a result, use **Set up with agent** to investigate the project and complete it in a normal agent conversation. Missing tools, invalid settings, and failed actions leave the project available for editing. Deployment needs an established target and credentials; Mew does not invent them. Set up result URLs and output files from the project's actual settings. Browser links open configured addresses under the existing host Browser permission and do not expose a port publicly.
 
 These actions run commands expected to finish. Use the existing command buttons for interactive or long-running development servers. Recent results and their output survive closing the dialog but are cleared when the Mew server restarts. Configuring an action does not run it.
 

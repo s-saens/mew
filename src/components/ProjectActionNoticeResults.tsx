@@ -15,7 +15,7 @@ export function ProjectActionNoticeResults({ noticeKey, onClose }: { noticeKey: 
   return <DialogFrame labelledBy={title} onClose={onClose} className="max-h-[90dvh] max-w-lg overflow-y-auto max-sm:max-w-[calc(100vw-16px)]">
     <div className="p-3">
       <header className="flex items-center gap-2"><h2 id={title} className="flex-1 text-sm font-medium">{copy.results}</h2><PanelCloseButton aria-label={copy.close} onClick={onClose} /></header>
-      <ProjectActionsResults runs={[result.run]} copy={copy} onPreview={browser} artifactUrl={result.store.artifactUrl} showHeading={false} />
+      <ProjectActionsResults runs={[result.run]} copy={copy} onPreview={browser} artifactUrl={result.store.artifactUrl} archiveUrl={result.store.archiveUrl} showHeading={false} />
     </div>
   </DialogFrame>
 }

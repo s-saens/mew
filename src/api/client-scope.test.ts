@@ -88,6 +88,25 @@ test('workspace clients capture independent roots for file, Git, task, resource 
   assert.throws(() => a.resourceUrl('/api/raw?mewWorkspacePath=/other'), /범위/)
 })
 
+test('project action archive download retains project and workspace scope through resource mapping', async t => {
+  installGlobals(t)
+  const api = await fixture()
+  const mapped: string[] = []
+  api.configureAppRuntime({ resourceUrl(url) { mapped.push(url); return url } })
+  const client = api.createWorkspaceClient({ workspacePath: '/worktrees/a', projectPath: '/projects/a' })
+  const archiveUrl = Reflect.get(client, 'projectActionArchiveUrl')
+  assert.equal(typeof archiveUrl, 'function')
+  const url = new URL(archiveUrl('.workspace', 'run id', 'apps/mobile', '/worktrees/a'), 'https://device.test')
+  assert.equal(url.pathname, '/api/project-actions/archive')
+  assert.equal(url.searchParams.get('project'), '.workspace')
+  assert.equal(url.searchParams.get('path'), 'apps/mobile')
+  assert.equal(url.searchParams.get('workspacePath'), '/worktrees/a')
+  assert.equal(url.searchParams.get('runId'), 'run id')
+  assert.equal(url.searchParams.get('mewWorkspacePath'), '/worktrees/a')
+  assert.equal(url.searchParams.get('mewProjectPath'), '/projects/a')
+  assert.equal(mapped.length, 1)
+})
+
 test('explicit workspace reads require advertised scope support while accepting canonical server paths', async t => {
   installGlobals(t)
   const api = await fixture()

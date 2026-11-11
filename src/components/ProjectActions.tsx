@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react'
 import { DialogFrame, HoverTipLayer, LoadingIndicator } from '@mew/ui'
 import { useUiLocale } from '@mew/ui/i18n'
-import { EditPencil, Plus, RefreshDouble } from 'iconoir-react'
+import { EditPencil, Play, Plus, RefreshDouble } from 'iconoir-react'
 import type { ProjectAction } from '../../shared/project-actions'
 import { useWorkspaceApi } from '../api/workspace-api-context'
 import { uuid } from '../utils/uuid'
@@ -25,7 +25,7 @@ export function ProjectActions({ project, directory = '', workspacePath, inline 
   const [portal, setPortal] = useState<HTMLDivElement | null>(null)
   useEffect(() => { if (kind) void store.load() }, [kind, store])
   const actions = state?.actions.filter(action => action.kind === kind) ?? []
-  const runs = recentProjectActionRuns(state?.runs ?? [])
+  const runs = recentProjectActionRuns((state?.runs ?? []).filter(run => run.kind === kind))
   return <>
     <span data-project-actions className={`inline-flex shrink-0 items-center gap-0.5 ${inline ? 'mb-1 w-full border-b border-edge pb-1' : ''}`}>
       {(['build', 'deploy'] as const).map(value => <button type="button" key={value} data-header-menu-trigger data-project-action-trigger={value}
@@ -34,8 +34,8 @@ export function ProjectActions({ project, directory = '', workspacePath, inline 
     </span>
     {kind && <DialogFrame labelledBy={title} onClose={() => setKind(null)} className="max-h-[90dvh] max-w-lg overflow-y-auto max-sm:max-w-[calc(100vw-16px)]">
       <HoverTipLayer portalTarget={portal}><div ref={setPortal} className="p-3" data-project-actions-dialog>
-        <header className="mb-2 flex items-center gap-2">
-          <h2 id={title} className="min-w-0 flex-1 text-sm font-medium">{copy[kind]}</h2>
+        <header className="mb-3 flex items-center gap-2">
+          <h2 id={title} className="min-w-0 flex-1 text-base font-semibold">{copy[kind]}</h2>
           <button type="button" disabled={loading || busy} aria-label={copy.discover} data-tip={copy.discover} onClick={() => void store.discover()}
             className="rounded p-1 text-ink-secondary hover:bg-surface-hover disabled:opacity-40"><RefreshDouble width={16} height={16} aria-hidden="true" /></button>
           <PanelCloseButton aria-label={copy.close} onClick={() => setKind(null)} />
@@ -50,12 +50,12 @@ export function ProjectActions({ project, directory = '', workspacePath, inline 
           {actions.length ? <div className="space-y-1">
             {actions.map(action => {
               const running = state.runs.some(run => run.actionId === action.id && run.status === 'running')
-              return <div key={action.id} className="flex min-w-0 items-center gap-1 rounded bg-surface-raised px-1">
+              return <div key={action.id} className="flex min-w-0 items-center gap-1 rounded-lg border border-edge bg-surface-raised px-1">
                 <button type="button" disabled={busy || running} onClick={() => void store.run(action.id)}
-                  className="min-w-0 flex-1 rounded px-2 py-2 text-left text-sm hover:bg-surface-hover disabled:opacity-50">
-                  <span className="block truncate">{action.name}</span>
+                  className="flex min-w-0 flex-1 items-center gap-2 rounded px-2 py-2 text-left text-sm hover:bg-surface-hover disabled:opacity-50">
+                  <Play width={15} height={15} className="shrink-0 text-ink-secondary" aria-hidden="true" /><span className="block truncate">{action.name}</span>
                 </button>
-                {action.variant && <span className="text-[11px] text-ink-muted">{copy[action.variant]}</span>}
+                {action.variant && <span className="rounded bg-surface px-1.5 py-0.5 text-[11px] text-ink-secondary">{copy[action.variant]}</span>}
                 <button type="button" disabled={busy} aria-label={copy.editName.replace('{name}', action.name)} data-tip={copy.edit}
                   className="shrink-0 rounded p-2 text-ink-secondary hover:bg-surface-hover disabled:opacity-40" onClick={() => setEditing({ action, isNew: false })}>
                   <EditPencil width={14} height={14} aria-hidden="true" />
@@ -74,7 +74,10 @@ export function ProjectActions({ project, directory = '', workspacePath, inline 
           </div>
           {state.needsAgent && <p className="mt-2 text-xs text-ink-secondary">{copy.agent}</p>}
         </>}
-        <ProjectActionsResults runs={runs} copy={copy} onPreview={browser} artifactUrl={store.artifactUrl} />
+        <ProjectActionsResults runs={runs} copy={copy} onPreview={browser} artifactUrl={store.artifactUrl} archiveUrl={store.archiveUrl} canConfigure={run => !!state?.actions.some(item => item.id === run.actionId)} onConfigure={run => {
+          const action = state?.actions.find(item => item.id === run.actionId)
+          if (action) setEditing({ action, isNew: false })
+        }} />
       </div></HoverTipLayer>
     </DialogFrame>}
     {editing && state && <ProjectActionsEditor key={editing.action.id} action={editing.action} isNew={editing.isNew} copy={copy}

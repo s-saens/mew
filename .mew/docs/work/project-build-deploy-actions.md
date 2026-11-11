@@ -1,6 +1,6 @@
 ---
 title: "Project build/deploy actions and default setup skill"
-description: "Records implementation of named project actions, nonblocking discovery and agent setup, result access, and the bundled project-setting skill. Distinguishes focused local verification from runtime application and deployment."
+description: "Records implementation of named project actions and the setup skill, followed by automatic web build result files, complete ZIP downloads, and result-interface improvements. Distinguishes local verification from runtime application and deployment."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
@@ -35,3 +35,15 @@ Broader browser checks retain two separate failures: the image-preview backdrop 
 All verification is local. No deployment, launcher execution, server start/stop/restart, or push was performed. The required build updates served frontend assets; new backend APIs and defaults still require user-owned runtime application.
 
 Automatic detection covers explicit supported scripts and Android wrapper projects; unknown frameworks, credentials, and deployment targets need user or agent setup. A configured Browser address does not prove service readiness. Finite action processes do not supervise interactive development servers. Recent run history and output are bounded in server memory; background push and durable job recovery are outside this implementation. Browser fixtures use synthetic projects and mocked actions; actual hosting-provider deployment and physical-device APK installation are not verified.
+
+## Follow-up: build result files and presentation
+
+The original Node discovery provided build commands without output paths, so a successful result could show only its log. This follow-up discovers new or changed files from supported Vite and Create React App default output directories, retains explicit output patterns and Android APK support, and offers a complete bounded ZIP when all eligible output files are new or changed. The result interface presents available files, paths for duplicate names, archive access, run status, and guidance when no result is found. The [current contract](../features/terminals-agents-automation/project-build-deploy-actions.md#runs-and-results) owns limits and authorization; [ADR 0164](../decisions/0164-build-result-files.md) records the choice.
+
+Configured HTTP(S) addresses still open in the host Browser when permitted. A downloaded web build is not automatically served or visually previewed; existing raw-file and Browser security boundaries prevent treating a static output folder as an executable app. Custom output locations and unsupported build systems may need explicit output patterns or agent setup. Run history and the archive manifest remain process-local. Individual downloads read the current file at the recorded path; ZIP requests also reject changed file metadata instead of silently including a different build. The metadata check is not a content hash or immutable snapshot.
+
+### Follow-up local verification
+
+`npm run build` passed, including TypeScript project builds; Vite reported its existing large-chunk warning. `npm run lint` passed with existing warnings. The focused backend and command-button suites passed 30 tests, including 511 ZIP entries, Unicode paths, CRC checks, Python `zipfile` validation, workspace authorization, scan limits, and changed or replaced result files. The scoped client, action state, and browser UI suites passed 16 tests. The result dialog was also inspected in light and dark themes at desktop and 320 px widths using the browser fixture.
+
+`npm run check:docs` checked 790 descriptions without errors but failed on 39 existing missing links elsewhere in the working tree. A targeted link check found no errors in the five changed documents. These checks and the build are local; no deployment, launcher execution, server lifecycle operation, or push was performed. The user must apply the backend changes to a running instance.

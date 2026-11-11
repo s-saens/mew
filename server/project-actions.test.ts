@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { ProjectActionsService, normalizeProjectActions } from './project-actions.ts'
+import { projectActionArchive } from './project-actions-archive.ts'
 
 function fixture(t: test.TestContext) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-project-actions-'))
@@ -116,7 +117,7 @@ test('successful runs expose only recorded regular artifacts and reject secrets,
   const started = service.run(root, 'build')
   assert.throws(() => service.artifact(root, started.id, 'dist/app.apk'))
   const run = await finished(service, root)
-  assert.deepEqual(run.artifacts, [{ path: 'dist/app.apk', name: 'app.apk' }])
+  assert.deepEqual(run.artifacts, [{ path: 'dist/app.apk', name: 'app.apk', size: 3 }])
   assert.equal(service.artifact(root, run.id, 'dist/app.apk'), path.join(root, 'dist/app.apk'))
   for (const invalid of ['../escape.apk', '/etc/passwd', 'dist/../dist/app.apk', 'dist/escape.apk', 'dist/.env', '.mew/accounts.json', 'dist/missing.apk']) {
     assert.throws(() => service.artifact(root, run.id, invalid), Error, invalid)
@@ -125,6 +126,99 @@ test('successful runs expose only recorded regular artifacts and reject secrets,
   fs.unlinkSync(path.join(root, 'dist/app.apk'))
   fs.symlinkSync(path.join(outside.root, 'escape.apk'), path.join(root, 'dist/app.apk'))
   assert.throws(() => service.artifact(root, run.id, 'dist/app.apk'))
+})
+
+test('known Node builds expose newly generated output files, including for previously saved actions', async t => {
+  const { root, write } = fixture(t), outside = fixture(t)
+  write('package.json', { scripts: { build: 'vite build' } })
+  write('dist/old.js', 'previous build')
+  write('dist/replaced.js', 'old')
+  outside.write('secret.js', 'outside')
+  const service = new ProjectActionsService({ runner: async () => {
+    write('dist/index.html', '<html>app</html>'); write('dist/assets/app.js', 'code'); write('dist/replaced.js', 'updated')
+    write('dist/.env', 'secret'); write('dist/accounts.json', 'secret')
+    fs.symlinkSync(path.join(outside.root, 'secret.js'), path.join(root, 'dist/escape.js'))
+    return { exitCode: 0 }
+  } })
+  service.save(root, [{ ...build, id: 'npm:build', artifacts: [] }])
+  service.run(root, 'npm:build')
+  const run = await finished(service, root)
+  assert.deepEqual(run.artifacts, [
+    { path: 'dist/index.html', name: 'index.html', size: 16 },
+    { path: 'dist/assets/app.js', name: 'app.js', size: 4 },
+    { path: 'dist/replaced.js', name: 'replaced.js', size: 7 },
+  ])
+  assert.equal(service.artifact(root, run.id, 'dist/index.html'), path.join(root, 'dist/index.html'))
+  assert.throws(() => service.artifact(root, run.id, 'dist/old.js'))
+  assert.equal(run.archive, undefined)
+})
+
+test('automatic results do not guess unknown builds, failed runs, or override explicit patterns', async t => {
+  const { root, write } = fixture(t)
+  write('package.json', { scripts: { build: 'custom-compiler' } })
+  const service = new ProjectActionsService({ runner: async () => { write('dist/index.html', 'result'); return { exitCode: 0 } } })
+  service.save(root, [{ ...build, id: 'npm:build' }]); service.run(root, 'npm:build')
+  assert.deepEqual((await finished(service, root)).artifacts, [])
+  write('package.json', { scripts: { build: 'vite build' } })
+  service.save(root, [{ ...build, id: 'npm:build', artifacts: ['release/*.zip'] }])
+  write('release/app.zip', 'archive')
+  service.run(root, 'npm:build')
+  assert.deepEqual((await finished(service, root)).artifacts, [{ path: 'release/app.zip', name: 'app.zip', size: 7 }])
+  const failure = new ProjectActionsService({ runner: async () => { write('dist/new.js', 'failed output'); return { exitCode: 1 } } })
+  failure.save(root, [{ ...build, id: 'npm:build' }]); failure.run(root, 'npm:build')
+  assert.deepEqual((await finished(failure, root)).artifacts, [])
+})
+
+test('manually named actions can use automatic output when their command matches an explicitly detected build', async t => {
+  const { root, write } = fixture(t)
+  write('package.json', { scripts: { build: 'react-scripts build' } })
+  const service = new ProjectActionsService({ runner: async () => { write('build/index.html', 'app'); return { exitCode: 0 } } })
+  const id = '0d514b31-8d83-4b08-9fe3-c75edcc6d620'
+  service.save(root, [{ ...build, id }])
+  service.run(root, id)
+  const run = await finished(service, root)
+  assert.deepEqual(run.artifacts, [{ path: 'build/index.html', name: 'index.html', size: 3 }])
+  assert.deepEqual(run.archive, { name: 'build.zip', fileCount: 1, size: 3 })
+})
+
+test('automatic archives are withheld when the output scan cannot cover the whole directory', async t => {
+  const { root, write } = fixture(t)
+  write('package.json', { scripts: { build: 'vite build' } })
+  const service = new ProjectActionsService({ runner: async () => {
+    fs.mkdirSync(path.join(root, 'dist'))
+    for (let i = 0; i < 10_001; i++) fs.writeFileSync(path.join(root, 'dist', `${i}.js`), '')
+    return { exitCode: 0 }
+  } })
+  service.save(root, [build]); service.run(root, build.id)
+  const run = await finished(service, root)
+  assert.equal(run.status, 'succeeded')
+  assert.equal(run.artifacts.length, 100)
+  assert.equal(run.archive, undefined)
+  assert.throws(() => service.archive(root, run.id))
+})
+
+test('archives reject files overwritten or replaced after the recorded build, including after preflight', async t => {
+  for (const mutation of ['overwrite', 'replace'] as const) {
+    const { root, write } = fixture(t)
+    write('package.json', { scripts: { build: 'vite build' } })
+    const service = new ProjectActionsService({ runner: async () => { write('dist/index.html', 'good'); return { exitCode: 0 } } })
+    service.save(root, [build]); service.run(root, build.id)
+    const run = await finished(service, root)
+    const archive = service.archive(root, run.id)
+    const output = path.join(root, 'dist/index.html')
+    if (mutation === 'overwrite') {
+      fs.writeFileSync(output, 'evil')
+      const future = new Date(Date.now() + 5000)
+      fs.utimesSync(output, future, future)
+    } else {
+      write('replacement', 'evil')
+      fs.renameSync(path.join(root, 'replacement'), output)
+    }
+    assert.throws(() => service.archive(root, run.id))
+    await assert.rejects(async () => {
+      for await (const _chunk of projectActionArchive(archive.files, archive.validate)) { /* Consume to force open. */ }
+    })
+  }
 })
 
 test('validation rejects duplicate IDs, invalid commands, unsafe preview protocols and escaping patterns', () => {

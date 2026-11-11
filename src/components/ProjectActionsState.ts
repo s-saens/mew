@@ -130,6 +130,11 @@ class ProjectActionsStore {
     const scope = this.scope
     return this.api.projectActionArtifactUrl(scope.project, runId, path, scope.directory, scope.workspacePath)
   }
+
+  archiveUrl = (runId: string) => {
+    const scope = this.scope
+    return this.api.projectActionArchiveUrl(scope.project, runId, scope.directory, scope.workspacePath)
+  }
 }
 
 export const projectActionNoticeStore = (key: string) => noticeStores.get(key)

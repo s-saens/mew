@@ -6,6 +6,7 @@ import { assertNotServerDataPath, DEFAULT_PROJECT, pathsForWorkspace, UnsafePath
 import { projectDirectory } from './subprojects.ts'
 import { protectFileResponse } from './file-response.ts'
 import { ProjectActionError, ProjectActionsService, projectActionsService } from './project-actions.ts'
+import { projectActionArchive } from './project-actions-archive.ts'
 
 function failure(res: express.Response, error: unknown): void {
   if (error instanceof ProjectActionError) res.status(error.status).json({ error: error.message })
@@ -74,9 +75,21 @@ export function createProjectActionsRouter(options: { service?: ProjectActionsSe
       const source = fs.createReadStream(file, { fd, autoClose: true })
       fd = undefined
       res.once('close', () => source.destroy())
-      source.once('error', error => { if (res.headersSent) res.destroy(error); else failure(res, error) })
+      source.once('error', error => { if (res.headersSent) res.destroy(error); else { res.removeHeader('Content-Length'); res.removeHeader('Content-Disposition'); failure(res, error) } })
       source.pipe(res)
     } catch (error) { if (fd !== undefined) fs.closeSync(fd); failure(res, error) }
+  })
+  router.get('/archive', (req, res) => {
+    try {
+      const archive = service.archive(requestRoot(req), req.query.runId)
+      protectFileResponse(res)
+      res.attachment(archive.name); res.type('application/zip'); res.setHeader('Content-Length', archive.size)
+      if (req.method === 'HEAD') { res.end(); return }
+      const source = projectActionArchive(archive.files, archive.validate)
+      res.once('close', () => source.destroy())
+      source.once('error', error => { if (res.headersSent) res.destroy(error); else { res.removeHeader('Content-Length'); res.removeHeader('Content-Disposition'); failure(res, error) } })
+      source.pipe(res)
+    } catch (error) { failure(res, error) }
   })
   return router
 }

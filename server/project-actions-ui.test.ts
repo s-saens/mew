@@ -15,11 +15,14 @@ import {CommandButtonMenu} from '${root}/src/components/CommandButtonMenu.tsx';
 import {ProjectActionNoticeHost} from '${root}/src/components/project-action-notice-host.tsx';
 import {WorkspaceApiProvider} from '${root}/src/api/workspace-api-context.tsx';
 import {createWorkspaceClient} from '${root}/src/api/client.ts';
+import {configureAppRuntime} from '${root}/src/runtime/app-runtime.ts';
 import {BrowserContext} from '${root}/src/workspace/workspace-browser-context.ts';
 import {ProjectSetupContext} from '${root}/src/workspace/project-setup-context.ts';
 import {ProjectCreationAgentDialog} from '${root}/src/components/ProjectCreationAgentDialog.tsx';
 import {onMewcatNotice,focusMewcatNotice} from '${root}/src/utils/mewcat-notifications.ts';
-localStorage.setItem('mew:locale','en');window.notices=[];window.previews=[];
+localStorage.setItem('mew:locale','en');window.notices=[];window.previews=[];window.prepared=[];window.downloads=[];
+HTMLAnchorElement.prototype.click=function(){window.downloads.push({href:this.href,name:this.download})};
+configureAppRuntime({transport:{fetch:(...args)=>fetch(...args),socket:()=>{throw Error('Unexpected socket')},close(){}},resourceUrl:url=>url,prepareResourceUrl:async url=>{window.prepared.push(url);return url},releaseResourceUrl(){}});
 onMewcatNotice(notice=>window.notices.push(notice));window.openNotice=()=>focusMewcatNotice(window.notices.at(-1));
 const client=createWorkspaceClient({workspacePath:'/fixture/project',projectPath:'/fixture/project'});
 function Fixture(){const [visible,setVisible]=useState(true),[setup,setSetup]=useState(null);window.setActionsVisible=setVisible;return <ProjectSetupContext.Provider value={setSetup}><button onClick={()=>setVisible(!visible)}>Toggle actions</button>{visible&&<CommandButtonMenu project=".workspace" directory="apps/mobile" workspacePath="/fixture/project"/>}<ProjectActionNoticeHost enabled/>{setup&&<ProjectCreationAgentDialog {...setup} onClose={()=>{setup.onClose?.();setSetup(null)}}/>}</ProjectSetupContext.Provider>}
@@ -57,7 +60,7 @@ test('build and deploy actions support scoped runs, completion notices, previews
       { id: 'release', name: 'Release build', kind: 'build', variant: 'release', command: './gradlew assembleRelease' },
       { id: 'deploy', name: 'Preview deployment', kind: 'deploy', command: 'npm run deploy', previewUrl: 'http://localhost:4173' },
     ]
-    let runs: Record<string, unknown>[] = [], failSave = false, failLoad = false
+    let runs: Record<string, unknown>[] = [{ id: 'run-empty', actionId: 'release', name: 'Release build', kind: 'build', status: 'succeeded', startedAt: '2026-01-01T00:00:00.000Z', finishedAt: '2026-01-01T00:01:00.000Z', output: 'Done', artifacts: [] }], failSave = false, failLoad = false
     const state = () => ({ projectRoot: '/fixture/project/apps/mobile', actions, runs, warnings: [], needsAgent: false })
     await page.route('http://mew-actions.test/**', async route => {
       const request = route.request(), url = new URL(request.url())
@@ -84,6 +87,13 @@ test('build and deploy actions support scoped runs, completion notices, previews
     await page.getByRole('button', { name: 'Build', exact: true }).click()
     let dialog = page.getByRole('dialog', { name: 'Build', exact: true })
     await dialog.getByRole('button', { name: 'Debug build', exact: true }).waitFor()
+    await dialog.getByText('No files or preview available for this run.', { exact: true }).waitFor()
+    if (process.env.MEW_PROJECT_ACTION_SCREENSHOTS) {
+      await fs.mkdir(process.env.MEW_PROJECT_ACTION_SCREENSHOTS, { recursive: true })
+      await dialog.screenshot({ path: path.join(process.env.MEW_PROJECT_ACTION_SCREENSHOTS, `project-actions-empty-${width}-${dark ? 'dark' : 'light'}.png`) })
+    }
+    await dialog.getByRole('button', { name: 'Configure result for Release build', exact: true }).click()
+    await page.getByRole('dialog', { name: 'Edit action', exact: true }).getByRole('button', { name: 'Cancel', exact: true }).click()
     assert.equal(await dialog.getByText('./gradlew assembleDebug', { exact: true }).count(), 0, 'routine actions hide command syntax')
     const bounds = await dialog.boundingBox(); assert.ok(bounds)
     assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width)
@@ -92,23 +102,43 @@ test('build and deploy actions support scoped runs, completion notices, previews
     await dialog.getByText('Running', { exact: true }).waitFor()
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
     await page.getByRole('button', { name: 'Toggle actions', exact: true }).click()
-    runs = [{ ...runs[0], status: 'succeeded', finishedAt: new Date().toISOString(), exitCode: 0, output: 'BUILD SUCCESSFUL', previewUrl: 'http://localhost:4173', artifacts: [{ path: 'app/build/outputs/apk/debug/app-debug.apk', name: 'app-debug.apk' }] }]
+    runs = [{ ...runs[0], status: 'succeeded', finishedAt: new Date().toISOString(), exitCode: 0, output: 'BUILD SUCCESSFUL', previewUrl: 'http://localhost:4173', archive: { name: 'dist.zip', fileCount: 6, size: 2097152 }, artifacts: [{ path: 'app/build/outputs/apk/debug/app-debug.apk', name: 'app-debug.apk', size: 2097152 }, { path: 'debug/app.apk', name: 'app.apk' }, { path: 'release/app.apk', name: 'app.apk' }, { path: 'dist/a.js', name: 'a.js' }, { path: 'dist/b.js', name: 'b.js' }, { path: 'dist/c.js', name: 'c.js' }] }]
     await page.waitForFunction(() => (globalThis as unknown as { notices: unknown[] }).notices.length === 1)
     await page.evaluate(() => (globalThis as unknown as { openNotice: () => void }).openNotice())
     dialog = page.getByRole('dialog', { name: 'Recent results', exact: true })
     await dialog.getByText('Succeeded', { exact: true }).waitFor()
+    await dialog.getByText('Files', { exact: true }).waitFor()
+    await dialog.getByText('app-debug.apk', { exact: true }).waitFor()
+    await dialog.getByText('APK · 2.0 MB', { exact: true }).waitFor()
+    await dialog.getByRole('button', { name: 'Download app.apk (debug/app.apk)', exact: true }).waitFor()
+    await dialog.getByRole('button', { name: 'Download app.apk (release/app.apk)', exact: true }).waitFor()
+    await dialog.getByText('debug/app.apk', { exact: true }).waitFor()
+    await dialog.getByText('More files (3)', { exact: true }).click()
+    await dialog.getByRole('button', { name: 'Download c.js', exact: true }).waitFor()
     if (process.env.MEW_PROJECT_ACTION_SCREENSHOTS) {
       await fs.mkdir(process.env.MEW_PROJECT_ACTION_SCREENSHOTS, { recursive: true })
       await dialog.screenshot({ path: path.join(process.env.MEW_PROJECT_ACTION_SCREENSHOTS, `project-actions-${width}-${dark ? 'dark' : 'light'}.png`) })
     }
     await dialog.getByRole('button', { name: 'Open preview', exact: true }).click()
     assert.deepEqual(await page.evaluate(() => (globalThis as unknown as { previews: string[] }).previews), ['http://localhost:4173'])
-    const download = new URL(await dialog.getByRole('link', { name: 'Download app-debug.apk', exact: true }).getAttribute('href') ?? '', 'http://mew-actions.test')
+    await dialog.getByRole('button', { name: 'Download app-debug.apk', exact: true }).click()
+    await page.waitForFunction(() => (globalThis as unknown as { downloads: unknown[] }).downloads.length === 1)
+    const { downloads, prepared } = await page.evaluate(() => { const fixture = globalThis as unknown as { downloads: { href: string; name: string }[]; prepared: string[] }; return { downloads: fixture.downloads, prepared: fixture.prepared } })
+    assert.equal(downloads[0].name, 'app-debug.apk')
+    assert.equal(new URL(prepared[0], 'http://mew-actions.test').href, downloads[0].href)
+    const download = new URL(downloads[0].href, 'http://mew-actions.test')
     assert.equal(download.pathname, '/api/project-actions/artifacts')
     assert.equal(download.searchParams.get('artifactPath'), 'app/build/outputs/apk/debug/app-debug.apk')
     assert.equal(download.searchParams.get('path'), 'apps/mobile')
     assert.equal(download.searchParams.get('runId'), 'run-debug')
     assert.equal(download.searchParams.get('workspacePath'), '/fixture/project')
+    await dialog.getByRole('button', { name: /Download all files/ }).click()
+    await page.waitForFunction(() => (globalThis as unknown as { downloads: unknown[] }).downloads.length === 2)
+    const archive = new URL(await page.evaluate(() => (globalThis as unknown as { downloads: { href: string }[] }).downloads[1].href))
+    assert.equal(archive.pathname, '/api/project-actions/archive')
+    assert.equal(archive.searchParams.get('runId'), 'run-debug')
+    assert.equal(archive.searchParams.get('path'), 'apps/mobile')
+    assert.equal(archive.searchParams.get('workspacePath'), '/fixture/project')
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
     await page.getByRole('button', { name: 'Toggle actions', exact: true }).click()
     await page.getByRole('button', { name: 'Build', exact: true }).click()
