@@ -158,6 +158,22 @@ function collectArtifacts(root: string, patterns: string[], limit = MAX_ARTIFACT
   return { files: snapshots.slice(0, limit), complete }
 }
 
+// Only standard Flutter and Android Gradle APK output directories are exposed
+// without an action run. Never derive download paths from arbitrary client input.
+function existingApkPatterns(root: string): string[] {
+  const patterns = ['build/app/outputs/flutter-apk/*.apk', 'build/outputs/apk/**/*.apk', 'android/build/outputs/apk/**/*.apk']
+  for (const prefix of ['', 'android/']) {
+    try {
+      const parent = path.join(root, prefix)
+      if (!fs.lstatSync(parent).isDirectory()) continue
+      for (const entry of fs.readdirSync(parent, { withFileTypes: true }).filter(item => item.isDirectory() && !item.name.startsWith('.') && !['node_modules', 'build'].includes(item.name)).slice(0, 50)) {
+        patterns.push(`${prefix}${entry.name}/build/outputs/apk/**/*.apk`)
+      }
+    } catch { /* Missing or unreadable optional Android directories. */ }
+  }
+  return patterns
+}
+
 export interface ProjectActionRunnerInput { root: string; command: string; onOutput: (chunk: string) => void; signal?: AbortSignal; onProcess?: (pid: number) => void }
 export type ProjectActionRunner = (input: ProjectActionRunnerInput) => Promise<{ exitCode: number | null }>
 
@@ -365,6 +381,20 @@ export class ProjectActionsService {
     const root = rootDirectory(directory), run = this.findRun(root, runId)
     if (!run || run.status !== 'succeeded' || typeof relative !== 'string' || !run.artifacts.some(artifact => artifact.path === relative)) throw new ProjectActionError('이 실행에서 다운로드할 수 있는 파일이 아닙니다.', 404)
     return artifactFile(root, relative)
+  }
+
+  availableArtifacts(directory: string): ProjectActionArtifact[] {
+    const root = rootDirectory(directory)
+    return collectArtifacts(root, existingApkPatterns(root)).files.map(({ fingerprint: _fingerprint, ...file }) => file)
+  }
+
+  availableArtifact(directory: string, relative: unknown): string {
+    const root = rootDirectory(directory)
+    if (typeof relative !== 'string' || !allowedArtifact(relative) || !existingApkPatterns(root).some(pattern => path.matchesGlob(relative, pattern))) {
+      throw new ProjectActionError('다운로드할 수 있는 APK 결과 파일이 아닙니다.', 404)
+    }
+    try { return artifactFile(root, relative) }
+    catch { throw new ProjectActionError('결과 파일을 찾을 수 없거나 다운로드할 수 없습니다.', 404) }
   }
 
   archive(directory: string, runId: unknown): { name: string; size: number; files: Array<{ path: string; name: string; size: number; fingerprint: string }>; validate: (relative: string) => string } {

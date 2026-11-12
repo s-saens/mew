@@ -40,7 +40,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><WorkspaceApiPr
       if (id === 'virtual:style') return ''
     },
   }] })
-  const files = ['src/components/ProjectActions.tsx', 'src/components/ProjectActionsEditor.tsx', 'src/components/ProjectActionsResults.tsx', 'src/components/ProjectActionNoticeResults.tsx', 'src/components/CommandButtonMenu.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx']
+  const files = ['src/components/ProjectActions.tsx', 'src/components/ProjectActionsEditor.tsx', 'src/components/ProjectActionsResults.tsx', 'src/components/ProjectActionNoticeResults.tsx', 'src/components/CommandButtonMenu.tsx', 'src/components/ProjectAvailableArtifacts.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx']
   const content = (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8').catch(() => '')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   return { code: bundle.output.find(item => item.type === 'chunk')!.code, css: compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))]) }
@@ -60,13 +60,25 @@ test('build and deploy actions support scoped runs, completion notices, previews
       { id: 'release', name: 'Release build', kind: 'build', variant: 'release', command: './gradlew assembleRelease' },
       { id: 'deploy', name: 'Preview deployment', kind: 'deploy', command: 'npm run deploy', previewUrl: 'http://localhost:4173' },
     ]
-    let runs: Record<string, unknown>[] = [{ id: 'run-empty', actionId: 'release', name: 'Release build', kind: 'build', status: 'succeeded', startedAt: '2026-01-01T00:00:00.000Z', finishedAt: '2026-01-01T00:01:00.000Z', output: 'Done', artifacts: [] }], failSave = false, failLoad = false, commandFailure = true
+    let runs: Record<string, unknown>[] = [{ id: 'run-empty', actionId: 'release', name: 'Release build', kind: 'build', status: 'succeeded', startedAt: '2026-01-01T00:00:00.000Z', finishedAt: '2026-01-01T00:01:00.000Z', output: 'Done', artifacts: [] }], failSave = false, failLoad = false, commandFailure = true, failAvailable = true
+    const available = [
+      { path: 'build/app/outputs/flutter-apk/app-arm64.apk', name: 'flutter-arm64.apk', size: 1024 },
+      { path: 'build/app/outputs/flutter-apk/app-armeabi.apk', name: 'flutter-armeabi.apk', size: 1024 },
+      { path: 'build/app/outputs/flutter-apk/app-debug.apk', name: 'flutter-debug.apk', size: 1024 },
+      { path: 'build/app/outputs/flutter-apk/app-x86.apk', name: 'flutter-x86.apk', size: 1024 },
+      { path: 'build/app/outputs/flutter-apk/app-x86_64.apk', name: 'flutter-x86_64.apk', size: 1024 },
+      { path: 'build/app/outputs/flutter-apk/app-universal.apk', name: 'flutter-universal.apk', size: 1024 },
+    ]
     const state = () => ({ projectRoot: '/fixture/project/apps/mobile', actions, runs, warnings: [], needsAgent: false })
     await page.route('http://mew-actions.test/**', async route => {
       const request = route.request(), url = new URL(request.url())
       if (url.pathname.startsWith('/api/project-actions')) {
         const body = request.method() === 'GET' ? undefined : request.postDataJSON()
         requests.push({ pathname: url.pathname, body, url })
+        if (url.pathname.endsWith('/available-artifacts')) {
+          if (failAvailable) { failAvailable = false; return route.fulfill({ status: 503, json: { error: 'Files unavailable' } }) }
+          return route.fulfill({ json: { artifacts: available } })
+        }
         if (url.pathname.endsWith('/run')) {
           assert.equal(body.id, 'debug')
           runs = [{ id: 'run-debug', actionId: 'debug', name: 'Debug build', kind: 'build', status: 'running', startedAt: new Date().toISOString(), output: 'Compiling…', artifacts: [] }]
@@ -97,11 +109,14 @@ test('build and deploy actions support scoped runs, completion notices, previews
     const failedCommands = page.waitForResponse(response => response.url().includes('/api/cmd-buttons') && response.status() === 503)
     await trigger.click()
     await failedCommands
+    await page.locator('[data-command-menu]').getByText('Could not find build files.').waitFor()
     await page.locator('[data-command-menu]').getByRole('button', { name: 'Build', exact: true }).click()
     commandFailure = false
     let dialog = page.getByRole('dialog', { name: 'Build', exact: true })
     await dialog.getByRole('button', { name: 'Debug build', exact: true }).waitFor()
     await dialog.getByText('No files or preview available for this run.', { exact: true }).waitFor()
+    await dialog.getByText('Found build files', { exact: true }).waitFor()
+    await dialog.getByRole('button', { name: 'Download flutter-debug.apk', exact: true }).waitFor()
     if (process.env.MEW_PROJECT_ACTION_SCREENSHOTS) {
       await fs.mkdir(process.env.MEW_PROJECT_ACTION_SCREENSHOTS, { recursive: true })
       await dialog.screenshot({ path: path.join(process.env.MEW_PROJECT_ACTION_SCREENSHOTS, `project-actions-empty-${width}-${dark ? 'dark' : 'light'}.png`) })
@@ -156,6 +171,37 @@ test('build and deploy actions support scoped runs, completion notices, previews
     assert.equal(archive.searchParams.get('workspacePath'), '/fixture/project')
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
     await page.getByRole('button', { name: 'Toggle actions', exact: true }).click()
+    await trigger.click()
+    const resultMenu = page.locator('[data-command-menu]')
+    await resultMenu.getByText('Found build files', { exact: true }).waitFor()
+    const menuBounds = await resultMenu.boundingBox(); assert.ok(menuBounds)
+    assert.ok(menuBounds.x >= 0 && menuBounds.x + menuBounds.width <= width)
+    assert.equal(await resultMenu.evaluate(el => el.scrollWidth <= el.clientWidth), true)
+    if (width === 320) assert.equal(await resultMenu.evaluate(el => el.scrollHeight > el.clientHeight), true, 'many results remain vertically scrollable')
+    if (process.env.MEW_PROJECT_ACTION_SCREENSHOTS) {
+      await fs.mkdir(process.env.MEW_PROJECT_ACTION_SCREENSHOTS, { recursive: true })
+      await resultMenu.screenshot({ path: path.join(process.env.MEW_PROJECT_ACTION_SCREENSHOTS, `project-artifacts-menu-${width}-${dark ? 'dark' : 'light'}.png`) })
+    }
+    await resultMenu.getByRole('button', { name: 'Add command', exact: true }).scrollIntoViewIfNeeded()
+    if (width === 320 && dark) {
+      available.push({ path: 'build/app/outputs/flutter-apk/app-release.apk', name: 'flutter-release.apk', size: 2048 })
+      await resultMenu.getByRole('button', { name: 'Download flutter-release.apk', exact: true }).waitFor()
+    }
+    await resultMenu.getByRole('button', { name: 'Download flutter-debug.apk', exact: true }).click()
+    await page.waitForFunction(() => (globalThis as unknown as { downloads: unknown[] }).downloads.length === 3)
+    const foundDownload = new URL(await page.evaluate(() => (globalThis as unknown as { downloads: { href: string }[] }).downloads[2].href))
+    assert.equal(foundDownload.pathname, '/api/project-actions/available-artifact')
+    assert.equal(foundDownload.searchParams.get('artifactPath'), 'build/app/outputs/flutter-apk/app-debug.apk')
+    assert.equal(foundDownload.searchParams.get('path'), 'apps/mobile')
+    assert.equal(foundDownload.searchParams.get('workspacePath'), '/fixture/project')
+    await resultMenu.getByRole('button', { name: 'Download app-debug.apk', exact: true }).click()
+    await page.waitForFunction(() => (globalThis as unknown as { downloads: unknown[] }).downloads.length === 4)
+    const menuDownload = new URL(await page.evaluate(() => (globalThis as unknown as { downloads: { href: string }[] }).downloads[3].href))
+    assert.equal(menuDownload.pathname, '/api/project-actions/artifacts')
+    assert.equal(menuDownload.searchParams.get('artifactPath'), 'app/build/outputs/apk/debug/app-debug.apk')
+    assert.equal(menuDownload.searchParams.get('path'), 'apps/mobile')
+    assert.equal(menuDownload.searchParams.get('workspacePath'), '/fixture/project')
+    await trigger.click()
     await openAction('Build')
     dialog = page.getByRole('dialog', { name: 'Build', exact: true })
     await dialog.getByRole('button', { name: 'Edit Debug build', exact: true }).click()
@@ -192,8 +238,10 @@ test('build and deploy actions support scoped runs, completion notices, previews
     await setup.getByText('/fixture/project/apps/mobile', { exact: true }).waitFor()
     await Promise.all([page.waitForResponse(response => response.url().includes('/api/project-actions?')), setup.getByRole('button', { name: 'Close setup', exact: true }).click()])
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    await trigger.click()
+    await page.locator('[data-command-menu]').getByText('Recent build files', { exact: true }).waitFor()
     failLoad = true
-    await openAction('Build')
+    await page.locator('[data-command-menu]').getByRole('button', { name: 'Build', exact: true }).click()
     dialog = page.getByRole('dialog', { name: 'Build', exact: true })
     await dialog.getByText('Actions are unavailable', { exact: true }).waitFor()
     await dialog.getByRole('button', { name: 'Retry', exact: true }).click()

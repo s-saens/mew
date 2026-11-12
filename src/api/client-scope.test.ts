@@ -107,6 +107,29 @@ test('project action archive download retains project and workspace scope throug
   assert.equal(mapped.length, 1)
 })
 
+test('available build artifact requests and downloads keep the selected project scope', async t => {
+  installGlobals(t)
+  const api = await fixture()
+  const calls: URL[] = []
+  api.configureAppRuntime({ transport: {
+    fetch(input) { calls.push(new URL(String(input), 'https://device.test')); return Promise.resolve(Response.json({ artifacts: [] })) },
+    socket() { throw new Error('No socket expected') }, close() {},
+  } })
+  const client = api.createWorkspaceClient({ workspacePath: '/worktrees/a', projectPath: '/projects/a' })
+  await client.fetchAvailableProjectArtifacts('.workspace', 'apps/mobile', '/worktrees/a')
+  const download = new URL(client.availableProjectArtifactUrl('.workspace', 'build/app-debug.apk', 'apps/mobile', '/worktrees/a'), 'https://device.test')
+  assert.equal(calls[0].pathname, '/api/project-actions/available-artifacts')
+  assert.equal(download.pathname, '/api/project-actions/available-artifact')
+  assert.equal(download.searchParams.get('artifactPath'), 'build/app-debug.apk')
+  for (const url of [calls[0], download]) {
+    assert.equal(url.searchParams.get('project'), '.workspace')
+    assert.equal(url.searchParams.get('path'), 'apps/mobile')
+    assert.equal(url.searchParams.get('workspacePath'), '/worktrees/a')
+    assert.equal(url.searchParams.get('mewWorkspacePath'), '/worktrees/a')
+    assert.equal(url.searchParams.get('mewProjectPath'), '/projects/a')
+  }
+})
+
 test('delivery API calls retain their original workspace and do not dispatch work on reads or saves', async t => {
   installGlobals(t)
   const api = await fixture()

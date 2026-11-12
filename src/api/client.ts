@@ -1,5 +1,5 @@
 import type { AgentExecutionOptions } from '../../shared/agent-execution-options'
-import type { ProjectAction, ProjectActionRun, ProjectActionsState } from '../../shared/project-actions'
+import type { ProjectAction, ProjectActionArtifact, ProjectActionRun, ProjectActionsState } from '../../shared/project-actions'
 import type { ProjectPipeline, ProjectPipelineRun, ProjectPipelinesState } from '../../shared/project-pipelines'
 import type { ReleaseProviderRun, ReleaseProvidersState, SaveReleaseConnection } from '../../shared/release-providers'
 import { createDatabasePageMutationScope, databasePageMutations } from '../utils/database-page-mutations'
@@ -1818,6 +1818,14 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     return mewFetch(`/api/project-actions?${projectActionsQuery(project, path, workspacePath)}`).then(json<ProjectActionsState>)
   }
 
+  function fetchAvailableProjectArtifacts(project: string, path = '', workspacePath?: string): Promise<{ artifacts: ProjectActionArtifact[] }> {
+    return mewFetch(`/api/project-actions/available-artifacts?${projectActionsQuery(project, path, workspacePath)}`).then(json<{ artifacts: ProjectActionArtifact[] }>)
+  }
+
+  function availableProjectArtifactUrl(project: string, artifactPath: string, path = '', workspacePath?: string): string {
+    return appResourceUrl(`/api/project-actions/available-artifact?${projectActionsQuery(project, path, workspacePath)}&artifactPath=${encodeURIComponent(artifactPath)}`)
+  }
+
   function saveProjectActions(project: string, actions: ProjectAction[], path = '', workspacePath?: string): Promise<ProjectActionsState> {
     return mewFetch('/api/project-actions', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -2289,6 +2297,8 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     runCmdButton,
     saveCmdButtons,
     fetchProjectActions,
+    fetchAvailableProjectArtifacts,
+    availableProjectArtifactUrl,
     saveProjectActions,
     discoverProjectActions,
     runProjectAction,

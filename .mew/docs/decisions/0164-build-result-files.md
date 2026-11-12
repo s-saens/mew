@@ -1,13 +1,13 @@
 ---
 title: "Discover and download build result files"
-description: "Extends project Build results with conservative web-output discovery, bounded complete ZIP downloads, and clearer result presentation while preserving the Mew Port removal and existing Browser boundary."
+description: "Extends project Build results with conservative web-output discovery and bounded ZIP downloads. ADR 0172 adds separately identified current APK downloads."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
 
 ## Status
 
-Accepted for implementation. Extends [ADR 0163](0163-project-build-deploy-actions.md) without superseding [ADR 0160](0160-remove-mew-port.md). Deployment and server lifecycle operations remain user-owned.
+Accepted for implementation. Extends [ADR 0163](0163-project-build-deploy-actions.md) without superseding [ADR 0160](0160-remove-mew-port.md). [ADR 0172](0172-current-apk-discovery.md) adds a separately identified current-file path. Deployment and server lifecycle operations remain user-owned.
 
 ## Context
 

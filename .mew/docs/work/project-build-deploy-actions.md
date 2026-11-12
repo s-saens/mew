@@ -1,6 +1,6 @@
 ---
 title: "Project build/deploy actions and default setup skill"
-description: "Records implementation of named project actions and the setup skill, followed by automatic web build result files, complete ZIP downloads, and result-interface improvements. Distinguishes local verification from runtime application and deployment."
+description: "Records project actions, result downloads, and follow-up Flutter and current APK discovery, with local verification and runtime application limits."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
@@ -47,3 +47,11 @@ Configured HTTP(S) addresses still open in the host Browser when permitted. A do
 `npm run build` passed, including TypeScript project builds; Vite reported its existing large-chunk warning. `npm run lint` passed with existing warnings. The focused backend and command-button suites passed 30 tests, including 511 ZIP entries, Unicode paths, CRC checks, Python `zipfile` validation, workspace authorization, scan limits, and changed or replaced result files. The scoped client, action state, and browser UI suites passed 16 tests. The result dialog was also inspected in light and dark themes at desktop and 320 px widths using the browser fixture.
 
 `npm run check:docs` checked 790 descriptions without errors but failed on 39 existing missing links elsewhere in the working tree. A targeted link check found no errors in the five changed documents. These checks and the build are local; no deployment, launcher execution, server lifecycle operation, or push was performed. The user must apply the backend changes to a running instance.
+
+## Follow-up: Flutter and existing APK files
+
+A Flutter Android debug build succeeded with no downloadable files because the discovered Gradle pattern searched under `android/`, while the project wrote its APK under the root `build/` directory. Flutter Android discovery now proposes Flutter build actions with matching output patterns. The command menu and Build dialog separately offer APKs currently found in supported output directories, including files from previous or independently run builds. They do not assign those files to a recorded execution. Existing customized action settings remain unchanged. [ADR 0172](../decisions/0172-current-apk-discovery.md) records the separate current-file boundary.
+
+The server service and route tests passed 23 cases, including Flutter output, settings preservation, project and subproject scope, permissions, traversal, symlinks, and missing files. The discovery service also located the existing debug APK in the reported project without executing a build or modifying that project. The final UI, client-scope, and keyboard run passed 18 tests; browser fixtures cover direct downloads, the Build dialog with an empty run result, scope, recovery, and narrow-screen scrolling. The 320 px dark menu and dialog screenshots were inspected with six APKs.
+
+`npm run build` passed with the existing Vite chunk-size warning. `npm run lint` passed with existing unrelated warnings, and changed source files passed scoped lint. `npm run check:docs` validated 809 descriptions but reported 39 existing missing links elsewhere; changed-document links passed separately. Verification is local; the running server must load the new backend code before the new download endpoints are available. No APK installation, deployment, or server lifecycle operation was performed.

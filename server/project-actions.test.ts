@@ -122,6 +122,57 @@ test('Android discovery requires a wrapper and Android plugin evidence; no deplo
   assert.ok(actions.every(action => action.kind === 'build' && action.artifacts?.some(pattern => pattern.endsWith('*.apk'))))
 })
 
+test('Flutter Android projects offer debug and release APK builds with downloadable outputs', async t => {
+  const { root, write } = fixture(t)
+  write('pubspec.yaml', 'name: example\n')
+  const service = new ProjectActionsService({ runner: async () => {
+    write('build/app/outputs/flutter-apk/app-debug.apk', 'debug APK')
+    return { exitCode: 0 }
+  } })
+  assert.equal(service.state(root).needsAgent, true)
+  write('android/app/build.gradle.kts', 'plugins { id("com.android.application") }')
+  const actions = service.state(root).actions
+  assert.deepEqual(actions.map(action => [action.id, action.command, action.artifacts]), [
+    ['flutter:debug', 'flutter build apk --debug', ['build/app/outputs/flutter-apk/*debug*.apk']],
+    ['flutter:release', 'flutter build apk --release', ['build/app/outputs/flutter-apk/*release*.apk']],
+  ])
+  assert.equal(fs.existsSync(path.join(root, '.mew/project-actions.json')), false)
+  const run = await service.wait(root, service.run(root, 'flutter:debug').id)
+  assert.equal(run.status, 'succeeded')
+  assert.deepEqual(run.artifacts, [{ path: 'build/app/outputs/flutter-apk/app-debug.apk', name: 'app-debug.apk', size: 9 }])
+  assert.equal(service.artifact(root, run.id, run.artifacts[0].path), path.join(root, run.artifacts[0].path))
+  const customized = { ...actions[0], command: 'custom build command', artifacts: ['custom/*.apk'] }
+  service.save(root, [customized])
+  assert.deepEqual(service.state(root).actions, [customized])
+  assert.deepEqual(service.discover(root).actions.find(action => action.id === customized.id), customized)
+})
+
+test('existing APK discovery is scoped to standard Flutter and Android outputs and rejects links', t => {
+  const { root, write } = fixture(t), outside = fixture(t)
+  write('build/app/outputs/flutter-apk/app-debug.apk', 'flutter')
+  write('app/build/outputs/apk/debug/app-debug.apk', 'android')
+  write('android/mobile/build/outputs/apk/release/mobile.apk', 'nested')
+  write('random/private.apk', 'private')
+  outside.write('app-release.apk', 'outside')
+  fs.symlinkSync(path.join(outside.root, 'app-release.apk'), path.join(root, 'build/app/outputs/flutter-apk/app-release.apk'))
+  const service = new ProjectActionsService()
+  const artifacts = service.availableArtifacts(root)
+  assert.deepEqual(artifacts.map(item => item.path), [
+    'android/mobile/build/outputs/apk/release/mobile.apk',
+    'app/build/outputs/apk/debug/app-debug.apk',
+    'build/app/outputs/flutter-apk/app-debug.apk',
+  ])
+  assert.equal(service.availableArtifact(root, artifacts[0].path), path.join(root, artifacts[0].path))
+  for (const invalid of ['random/private.apk', '../private.apk', 'build/app/outputs/flutter-apk/app-release.apk', '.mew/config.apk']) {
+    assert.throws(() => service.availableArtifact(root, invalid))
+  }
+  fs.unlinkSync(path.join(root, 'build/app/outputs/flutter-apk/app-debug.apk'))
+  assert.throws(() => service.availableArtifact(root, 'build/app/outputs/flutter-apk/app-debug.apk'))
+  fs.renameSync(path.join(root, 'app/build/outputs/apk'), path.join(root, 'app/build/outputs/previous'))
+  fs.symlinkSync(path.join(outside.root), path.join(root, 'app/build/outputs/apk'))
+  assert.throws(() => service.availableArtifact(root, 'app/build/outputs/apk/app-release.apk'))
+})
+
 test('runs are root scoped, reject duplicates, report actual failure and retain bounded output', async t => {
   const a = fixture(t), b = fixture(t)
   const pending: Array<{ command: string; root: string; output: (chunk: string) => void; resolve: (value: { exitCode: number | null }) => void }> = []

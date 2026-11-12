@@ -24,6 +24,7 @@ import { AUTOMATIC_RETRY_LIMIT } from '../utils/recovery-policy'
 import { ProjectActions, type ProjectActionPanel } from './ProjectActions'
 import { projectActionsCopy } from './project-actions-copy'
 import { projectReleaseCopy } from './project-release-copy'
+import { ProjectAvailableArtifacts } from './ProjectAvailableArtifacts'
 
 const LONG_PRESS_MS = 500
 const MENU_WIDTH = 308
@@ -347,6 +348,7 @@ function ScopedCommandButtonMenu({
         <div data-command-row><button type="button" data-project-action-trigger="deploy" aria-haspopup="dialog" onClick={() => { closeMenu(); setPanel('deploy') }} className="mew-action-menu-item">
           <CloudUpload width={16} height={16} aria-hidden="true" />{actionCopy.deploy}
         </button></div>
+        <ProjectAvailableArtifacts project={project} directory={directory} workspacePath={workspacePath} />
         <div role="separator" className="mew-action-menu-separator" />
       </div>
       {error && <div className="select-text px-3 py-2 text-xs text-danger-strong">{error}</div>}

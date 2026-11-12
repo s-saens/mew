@@ -64,11 +64,14 @@ createRoot(document.getElementById('root')).render(<I18nProvider>
       if (url.pathname.endsWith('/run')) return route.fulfill({ json: { ok: true, session: 'fixture' } })
       return route.fulfill({ json: { buttons: entries.map(button => ({ ...button, session: `${workspacePath}:${button.name}`, running: false })) } })
     }
-    if (['/api/project-pipelines', '/api/release-providers', '/api/project-actions'].includes(url.pathname)) {
+    if (['/api/project-pipelines', '/api/release-providers', '/api/project-actions', '/api/project-actions/available-artifacts'].includes(url.pathname)) {
       const workspacePath = url.searchParams.get('workspacePath')!
       deliveryRoots.push(workspacePath)
       if (url.pathname === '/api/project-pipelines') return route.fulfill({ json: { projectRoot: workspacePath, pipelines: [], runs: [], readiness: {}, warnings: [], needsAgent: true } })
       if (url.pathname === '/api/release-providers') return route.fulfill({ json: { connections: [], runs: [] } })
+      if (url.pathname === '/api/project-actions/available-artifacts') return workspacePath === '/workspace/a'
+        ? route.fulfill({ status: 503, json: { error: 'Files unavailable' } })
+        : route.fulfill({ json: { artifacts: [{ path: 'build/app-debug.apk', name: 'app-debug.apk', size: 100 }] } })
       return route.fulfill({ json: { projectRoot: workspacePath, actions: [], runs: [], warnings: [], needsAgent: true } })
     }
     return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html lang="ko"><meta charset="utf-8"><style>${css}body{margin:12px}button{color:inherit}</style><div id="root"></div><script>${bundle.output.find(item => item.type === 'chunk')!.code}</script></html>` })
@@ -77,17 +80,29 @@ createRoot(document.getElementById('root')).render(<I18nProvider>
   const active = page.getByRole('button', { name: 'A 명령', exact: true }), inactive = page.getByRole('button', { name: 'B 명령', exact: true })
   assert.equal(await active.getAttribute('aria-keyshortcuts'), 'Alt+R Control+E')
   assert.equal(await inactive.getAttribute('aria-keyshortcuts'), null)
+  const activeFilesLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/project-actions/available-artifacts')
+  const activeActionsLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/project-actions')
   await page.keyboard.press('Alt+r')
   const menu = page.locator('[data-command-menu]')
   await menu.getByRole('button', { name: 'Build', exact: true }).waitFor()
   assert.equal(await active.getAttribute('aria-expanded'), 'true')
   assert.equal(await inactive.getAttribute('aria-expanded'), 'false')
   assert.ok(requests.every(request => request.workspacePath === '/workspace/a'))
+  await Promise.all([activeFilesLoaded, activeActionsLoaded])
+  await menu.getByText('빌드 파일을 찾지 못했습니다.').waitFor()
+  assert.equal(await menu.getByRole('button', { name: 'Build 실행', exact: true }).isEnabled(), true, 'artifact discovery failures do not disable commands')
   await page.keyboard.press('Escape')
   await menu.waitFor({ state: 'hidden' })
 
+  deliveryRoots.length = 0
+  const inactiveFilesLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/project-actions/available-artifacts')
+  const inactiveActionsLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/project-actions')
   await inactive.click()
   await menu.getByRole('button', { name: 'Build', exact: true }).waitFor()
+  await menu.getByRole('button', { name: '다운로드 app-debug.apk', exact: true }).waitFor()
+  await Promise.all([inactiveFilesLoaded, inactiveActionsLoaded])
+  assert.deepEqual(deliveryRoots, ['/workspace/b', '/workspace/b'], 'an inactive row finds files in its own workspace')
+  deliveryRoots.length = 0
   assert.equal(requests.at(-1)?.workspacePath, '/workspace/b')
   const providersLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/release-providers')
   const actionsLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/project-actions')
@@ -144,15 +159,17 @@ createRoot(document.getElementById('root')).render(<I18nProvider>
   })
   await bottomTrigger.click()
   await menu.getByRole('status', { name: '불러오는 중…', exact: true }).waitFor()
+  await menu.getByRole('button', { name: '다운로드 app-debug.apk', exact: true }).waitFor()
+  const settleLayout = () => menu.evaluate(el => new Promise<void>(resolve => {
+    const view = el.ownerDocument.defaultView!
+    view.requestAnimationFrame(() => view.requestAnimationFrame(() => resolve()))
+  }))
+  await settleLayout()
   const loadingBox = await menu.boundingBox(), triggerBox = await bottomTrigger.boundingBox()
   assert.ok(loadingBox && triggerBox)
   assert.ok(loadingBox.y >= 8 && loadingBox.y + loadingBox.height <= triggerBox.y, 'the bottom-row loading menu flips above its trigger')
   releaseBottom()
   await menu.getByRole('button', { name: 'Bottom 0', exact: true }).waitFor()
-  const settleLayout = () => menu.evaluate(el => new Promise<void>(resolve => {
-    const view = el.ownerDocument.defaultView!
-    view.requestAnimationFrame(() => view.requestAnimationFrame(() => resolve()))
-  }))
   await settleLayout()
   const loadedBox = await menu.boundingBox()
   assert.ok(loadedBox && loadedBox.height > loadingBox.height)

@@ -1,6 +1,6 @@
 ---
 title: "Project build and deployment actions"
-description: "Editable project Build and Deploy actions opened from the command menu, conservative discovery, nonblocking setup, run results, notifications, Browser links, and scoped file/ZIP downloads. Defines actions reused by publishing pipelines."
+description: "Project Build and Deploy actions, Flutter and Android APK discovery, current-file and recorded-run downloads, notifications, and scoped results. Defines actions reused by publishing pipelines."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
@@ -15,7 +15,7 @@ Controls target the selected row's actual project directory, including a subproj
 
 ### Discovery and recovery
 
-When no action configuration exists, read-only discovery offers supported actions from explicit package scripts and Android Gradle wrapper configuration. Node projects use their package manager evidence; Android projects offer debug and release APK builds only with Android project evidence. Do not infer an unknown deployment target, credentials, or URL. Discovery does not execute scripts or install a toolchain.
+When no action configuration exists, read-only discovery offers supported actions from explicit package scripts, Flutter Android projects, and Android Gradle wrapper configuration. Node projects use their package manager evidence; Flutter and Android projects offer debug and release APK builds only with Android project evidence. Flutter actions use `flutter build apk` and the standard Flutter APK output directory. Do not infer an unknown deployment target, credentials, or URL. Discovery does not execute scripts or install a toolchain.
 
 Explicit discovery can persist newly detected actions while preserving existing action IDs and user edits. An explicitly saved empty list remains empty until the user requests discovery. Invalid configuration and unreadable or unsupported manifests produce scoped warnings and an agent-assisted setup path. Do not overwrite malformed configuration through discovery. Failed setup, missing tools, or action execution must not prevent creating, opening, or modifying the project.
 
@@ -39,7 +39,9 @@ For a package build whose saved command exactly matches a discovered command, Me
 
 When the complete detected output consists of new or changed files, Mew also offers a ZIP containing the whole output directory's eligible files, provided scanning completed and the output contains at most 5,000 files and 512 MiB. A partial scan, protected entry, unchanged file, or exceeded limit prevents offering the ZIP. The ZIP retains paths relative to the output directory. If no result files or address are available, the result view offers setup guidance; a successful command does not guarantee that Mew can identify its output.
 
-Artifact and ZIP downloads require a recorded successful run, the recorded project-relative paths, and fresh realpath and regular-file checks. Reject traversal, symlinks, files outside the project, protected metadata, and server data. An individual download reads the current file at its recorded path, not an immutable copy from completion. A ZIP manifest also records each file's device, inode, size, modification time, and change time. ZIP requests recheck that metadata before responding and again when opening each file; a changed, replaced, removed, or unsafe file rejects the download, or aborts a stream already in progress. These checks use metadata rather than a content hash. Do not treat an arbitrary download path as permission to read a file. Output, ZIP manifests, and recent run history are bounded in server memory; server restart does not preserve them.
+The command menu and Build dialog also offer APKs currently found in standard Flutter and Android Gradle output locations, including files created by a command outside an action. Label them as found files: their presence does not establish which run produced them or that a build succeeded. A saved custom action is not overwritten. Current-file discovery is bounded and does not inspect arbitrary project paths.
+
+Recorded artifact and ZIP downloads require a recorded successful run and recorded project-relative paths. Current APK downloads are restricted to the supported output locations and revalidate the path on every request. Both require fresh realpath and regular-file checks. Reject traversal, symlinks, files outside the project, protected metadata, and server data. An individual download reads the current file at its path, not an immutable copy from completion. A ZIP manifest also records each file's device, inode, size, modification time, and change time. ZIP requests recheck that metadata before responding and again when opening each file; a changed, replaced, removed, or unsafe file rejects the download, or aborts a stream already in progress. These checks use metadata rather than a content hash. Do not treat an arbitrary download path as permission to read a file. Output and ZIP manifests are bounded; current-file discovery does not depend on run history.
 
 ## Configuration and API
 
@@ -70,6 +72,8 @@ The project-owned `.mew/project-actions.json` file is separate from `.mew/cmd-bu
 | `POST /discover` | Merge supported discoveries without replacing existing IDs or malformed configuration |
 | `POST /run` with `{id}` | Resolve and execute the configured action; return its run |
 | `GET /artifacts?runId=...&artifactPath=...` | Download a recorded artifact after authorization and boundary checks |
+| `GET /available-artifacts` | List current APK files in supported output locations for the selected project |
+| `GET /available-artifact?artifactPath=...` | Download a currently available APK after revalidating its supported location and file boundaries |
 | `GET` or `HEAD /archive?runId=...` | Download or inspect the recorded complete automatic output as a ZIP after authorization and fresh path and metadata checks; changed files reject the request |
 
 Project, directory `path`, and optional `workspacePath` retain the command button scope. Explicit workspace transport follows the [workspace session contract](../../development/workspace-sessions.md); `artifactPath` must not replace the directory `path`.

@@ -1,6 +1,6 @@
 ---
 title: "Command Buttons and Scheduled Tasks"
-description: "Explains the unified project command menu, results and publishing, Build/Deploy actions, provider connections, terminal command buttons, and recurring agent schedules."
+description: "Explains the project command menu, direct APK downloads, results and publishing, Build/Deploy actions, provider connections, and recurring agent schedules."
 updated: "2026-11-11"
 상위파일:
   - "../../.mew/docs/_docs.md"
@@ -35,7 +35,9 @@ Pipeline history survives a server restart. An unfinished run is marked interrup
 2. Follow its status in the results dialog. You can close the dialog or switch projects while it runs; Mew announces completion or failure through your notification preferences while the Mew page remains connected. Select the notification to reopen the results.
 3. Open a completed result to download its available files, such as an APK, or a complete web build ZIP when offered. The result also provides the execution log and any configured Browser address. Failed results retain output for diagnosis and retry.
 
-Mew offers actions from supported project scripts and Android configuration automatically. **Discover** saves supported new actions while keeping your existing settings. Use **Add** or **Edit** to change names, variants, commands, result URLs, and output paths. Advanced settings are also available in the project's `.mew/project-actions.json`; the [action contract](../../.mew/docs/features/terminals-agents-automation/project-build-deploy-actions.md#configuration-and-api) defines its format.
+The command menu and Build dialog can also show APK files found in standard Flutter and Android output folders. Download one directly from the list. These are files currently on disk; Mew cannot infer which run produced them, and a later build can replace them.
+
+Mew offers actions from supported project scripts, Flutter Android projects, and Android configuration automatically. **Discover** saves supported new actions while keeping your existing settings. Use **Add** or **Edit** to change names, variants, commands, result URLs, and output paths. Advanced settings are also available in the project's `.mew/project-actions.json`; the [action contract](../../.mew/docs/features/terminals-agents-automation/project-build-deploy-actions.md#configuration-and-api) defines its format.
 
 Mew detects new or changed files in the default output folders for supported Vite and Create React App builds. A complete detected folder can also be downloaded as a ZIP when it meets the size and file limits. Custom output paths and other build systems may need output paths added in **Edit**. The ZIP contains files to use with your project's usual hosting or distribution process; it does not automatically run a website in Mew.
 

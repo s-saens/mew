@@ -14,6 +14,23 @@ function failure(res: express.Response, error: unknown): void {
   else res.status(400).json({ error: '빌드·배포 설정이나 결과를 처리할 수 없습니다. 프로젝트 폴더와 파일 권한을 확인하세요.' })
 }
 
+function download(res: express.Response, resolveFile: () => string): void {
+  let fd: number | undefined
+  try {
+    const file = resolveFile()
+    fd = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0))
+    const stat = fs.fstatSync(fd)
+    if (!stat.isFile()) throw new ProjectActionError('일반 결과 파일만 다운로드할 수 있습니다.', 403)
+    protectFileResponse(res)
+    res.attachment(path.basename(file)); res.type('application/octet-stream'); res.setHeader('Content-Length', stat.size)
+    const source = fs.createReadStream(file, { fd, autoClose: true })
+    fd = undefined
+    res.once('close', () => source.destroy())
+    source.once('error', error => { if (res.headersSent) res.destroy(error); else { res.removeHeader('Content-Length'); res.removeHeader('Content-Disposition'); failure(res, error) } })
+    source.pipe(res)
+  } catch (error) { if (fd !== undefined) fs.closeSync(fd); failure(res, error) }
+}
+
 export function createProjectActionsRouter(options: { service?: ProjectActionsService } = {}) {
   const router = express.Router(), service = options.service ?? projectActionsService
   router.use(requireRole('owner', 'manager'), requireFeature('terminal'), requestWorkspace)
@@ -35,20 +52,14 @@ export function createProjectActionsRouter(options: { service?: ProjectActionsSe
     catch (error) { failure(res, error) }
   })
   router.get('/artifacts', (req, res) => {
-    let fd: number | undefined
-    try {
-      const file = service.artifact(requestRoot(req), req.query.runId, req.query.artifactPath)
-      fd = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0))
-      const stat = fs.fstatSync(fd)
-      if (!stat.isFile()) throw new ProjectActionError('일반 결과 파일만 다운로드할 수 있습니다.', 403)
-      protectFileResponse(res)
-      res.attachment(path.basename(file)); res.type('application/octet-stream'); res.setHeader('Content-Length', stat.size)
-      const source = fs.createReadStream(file, { fd, autoClose: true })
-      fd = undefined
-      res.once('close', () => source.destroy())
-      source.once('error', error => { if (res.headersSent) res.destroy(error); else { res.removeHeader('Content-Length'); res.removeHeader('Content-Disposition'); failure(res, error) } })
-      source.pipe(res)
-    } catch (error) { if (fd !== undefined) fs.closeSync(fd); failure(res, error) }
+    download(res, () => service.artifact(requestRoot(req), req.query.runId, req.query.artifactPath))
+  })
+  router.get('/available-artifacts', (req, res) => {
+    try { res.json({ artifacts: service.availableArtifacts(requestRoot(req)) }) }
+    catch (error) { failure(res, error) }
+  })
+  router.get('/available-artifact', (req, res) => {
+    download(res, () => service.availableArtifact(requestRoot(req), req.query.artifactPath))
   })
   router.get('/archive', (req, res) => {
     try {

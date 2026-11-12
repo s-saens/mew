@@ -55,11 +55,26 @@ function androidActions(root: string, result: DiscoveredProjectActions): void {
   }
 }
 
+function flutterActions(root: string, result: DiscoveredProjectActions): boolean {
+  if (!regularFile(root, 'pubspec.yaml')) return false
+  const gradle = ['android/app/build.gradle', 'android/app/build.gradle.kts'].find(file => regularFile(root, file))
+  if (!gradle) return false
+  try {
+    const file = path.join(root, gradle)
+    if (fs.statSync(file).size > 1_048_576 || !/com\.android\.application/.test(fs.readFileSync(file, 'utf8'))) return false
+  } catch { return false }
+  for (const variant of ['debug', 'release'] as const) {
+    result.actions.push({ id: `flutter:${variant}`, name: variant === 'debug' ? 'Flutter debug APK' : 'Flutter release APK', kind: 'build', variant,
+      command: `flutter build apk --${variant}`, artifacts: [`build/app/outputs/flutter-apk/*${variant}*.apk`] })
+  }
+  return true
+}
+
 /** Read-only inference: scripts and known Android tasks are never executed here. */
 export function discoverProjectActions(root: string): DiscoveredProjectActions {
   const result: DiscoveredProjectActions = { actions: [], warnings: [] }
   packageActions(root, result)
-  androidActions(root, result)
+  if (!flutterActions(root, result)) androidActions(root, result)
   if (!result.actions.length && !result.warnings.length) result.warnings.push('자동으로 구성할 빌드·배포 설정을 찾지 못했습니다. 에이전트로 구성하거나 직접 추가하세요.')
   return result
 }

@@ -32,6 +32,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
     let releaseLoad: (() => void) | undefined
     await page.route('http://mew-command-recovery.test/**', async route => {
       const url = new URL(route.request().url())
+      if (url.pathname === '/api/project-actions/available-artifacts') return route.fulfill({ json: { artifacts: [] } })
+      if (url.pathname === '/api/project-actions') return route.fulfill({ json: { projectRoot: '/fixture', actions: [], runs: [], warnings: [], needsAgent: false } })
       if (url.pathname === '/api/cmd-buttons') {
         reads++
         if (releaseLoad) await new Promise<void>(resolve => { releaseLoad = resolve })

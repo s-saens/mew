@@ -13,6 +13,7 @@ import { ProjectActionsResults } from './ProjectActionsResults'
 import { projectActionsStore, recentProjectActionRuns, type ProjectActionsScope } from './ProjectActionsState'
 import { projectActionsCopy } from './project-actions-copy'
 import { ProjectReleaseDialog } from './ProjectReleaseDialog'
+import { ProjectAvailableArtifacts } from './ProjectAvailableArtifacts'
 
 export type ProjectActionPanel = ProjectAction['kind'] | 'release' | null
 
@@ -73,6 +74,7 @@ export function ProjectActions({ project, directory = '', workspacePath, panel, 
           </div>
           {state.needsAgent && <p className="mt-2 text-xs text-ink-secondary">{copy.agent}</p>}
         </>}
+        {kind === 'build' && <ProjectAvailableArtifacts project={project} directory={directory} workspacePath={workspacePath} placement="dialog" />}
         <ProjectActionsResults runs={runs} copy={copy} onPreview={browser} artifactUrl={store.artifactUrl} archiveUrl={store.archiveUrl} canConfigure={run => !!state?.actions.some(item => item.id === run.actionId)} onConfigure={run => {
           const action = state?.actions.find(item => item.id === run.actionId)
           if (action) setEditing({ action, isNew: false })

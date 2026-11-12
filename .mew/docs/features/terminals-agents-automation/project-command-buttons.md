@@ -8,7 +8,7 @@ updated: "2026-11-11"
 status_hash: "11b4825abce468fc30154b3c9ff1e214231099d5c6effbd50778959e7f752969"
 files: ["src/components/CommandButtonMenu.tsx", "src/components/SessionTerminalPopup.tsx", "server/cmdButtons.ts"]
 commits: []
-description: "Contract for the unified project command menu, including results/publishing and Build/Deploy entry, command execution, recovery, shortcuts, reordering, and root-isolated sessions."
+description: "Contract for the unified project command menu, including delivery actions, current APK downloads, command execution, recovery, shortcuts, reordering, and root-isolated sessions."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -24,6 +24,7 @@ description: "Contract for the unified project command menu, including results/p
 - When the project sidebar is closed or on mobile, place a ▶ button immediately to the right of the project title in the top bar. When the desktop project sidebar is open, ▶ on each project row opens the same command menu. Existing dropdown items provide per-project command registration, editing, execution, stopping, and a dedicated terminal popup.
 - ▶ on an inactive project row handles only that project's commands and does not switch the current project. Fetch, save, and run requests and polling stay pinned to the target project, and the server rechecks the path and existing permissions. If the current project uses a worktree, its row uses the selected actual working root. Root project command sessions are identified by actual folder path and command name, isolating them from commands with the same name in other roots.
 - Put Results & release, Build, and Deploy at the top of this same menu, above the saved command rows. Opening one closes the dropdown and opens its existing project-scoped dialog. The entries stay available when command metadata is loading or cannot be read; selecting one does not execute any command or deployment. Do not render separate action buttons beside ▶.
+- Show eligible APKs currently found in standard build output locations in this menu with direct download controls. Identify them as found files rather than results of a specific run; their scope and download checks follow the [build action contract](project-build-deploy-actions.md#runs-and-results).
 - Pressing the button does not open the file explorer or a separate task panel. Close the list by pressing outside it, pressing Esc, or using Back.
 - When the project or hamburger dropdown is open, a single click or tap on ▶ closes the existing menu and opens the command list immediately. Pressing another top bar menu button from the command list switches menus the same way.
 - Close the dropdown first when opening the edit dialog by pressing Add Command or right-clicking or long-pressing a command name. The menu must not remain above the edit dialog and obscure input, and closing the edit dialog with Cancel, Esc, or Back must not reopen the list.

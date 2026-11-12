@@ -70,6 +70,21 @@ test('project action HTTP routes isolate roots, persist edits, use stored comman
   assert.match(download.headers.get('content-disposition')!, /attachment/)
   assert.equal((await request(a, 'GET', { runId: run.id, artifactPath: 'dist/app.apk' }, '/artifacts')).status, 404)
   assert.equal((await request(b, 'GET', { runId: run.id, artifactPath: '../a/dist/app.apk' }, '/artifacts')).status, 404)
+
+  // APKs created by ordinary command buttons or earlier server sessions have no run ID.
+  fs.mkdirSync(path.join(b, 'build/app/outputs/flutter-apk'), { recursive: true })
+  fs.writeFileSync(path.join(b, 'build/app/outputs/flutter-apk/app-debug.apk'), 'existing APK')
+  fs.symlinkSync(path.join(b, 'dist/app.apk'), path.join(b, 'build/app/outputs/flutter-apk/link.apk'))
+  const list = await request(b, 'GET', {}, '/available-artifacts')
+  assert.deepEqual(await list.json(), { artifacts: [{ path: 'build/app/outputs/flutter-apk/app-debug.apk', name: 'app-debug.apk', size: 12 }] })
+  const existing = await request(b, 'GET', { artifactPath: 'build/app/outputs/flutter-apk/app-debug.apk' }, '/available-artifact')
+  assert.equal(existing.status, 200); assert.equal(await existing.text(), 'existing APK')
+  assert.match(existing.headers.get('content-disposition')!, /attachment/)
+  for (const artifactPath of ['dist/app.apk', '../a/dist/app.apk', 'build/app/outputs/flutter-apk/link.apk']) {
+    assert.notEqual((await request(b, 'GET', { artifactPath }, '/available-artifact')).status, 200)
+  }
+  assert.deepEqual(await (await request(a, 'GET', {}, '/available-artifacts')).json(), { artifacts: [] })
+  assert.notEqual((await request(a, 'GET', { artifactPath: 'build/app/outputs/flutter-apk/app-debug.apk' }, '/available-artifact')).status, 200)
   assert.equal(readActiveWorkspace(email), a)
   assert.equal((await stateJson(await request(a))).runs.length, 0)
 
@@ -79,6 +94,12 @@ test('project action HTTP routes isolate roots, persist edits, use stored comman
   assert.equal((await stateJson(nested)).projectRoot, path.join(b, 'mobile'))
   assert.equal((await stateJson(await request(b))).actions[0].name, 'Build')
   fs.mkdirSync(path.join(b, 'mobile/dist'), { recursive: true }); fs.writeFileSync(path.join(b, 'mobile/dist/mobile.apk'), 'mobile APK')
+  fs.mkdirSync(path.join(b, 'mobile/app/build/outputs/apk/debug'), { recursive: true })
+  fs.writeFileSync(path.join(b, 'mobile/app/build/outputs/apk/debug/mobile.apk'), 'nested APK')
+  const nestedExisting = await request(b, 'GET', { path: 'mobile' }, '/available-artifacts')
+  assert.deepEqual(await nestedExisting.json(), { artifacts: [{ path: 'app/build/outputs/apk/debug/mobile.apk', name: 'mobile.apk', size: 10 }] })
+  const nestedExistingDownload = await request(b, 'GET', { path: 'mobile', artifactPath: 'app/build/outputs/apk/debug/mobile.apk' }, '/available-artifact')
+  assert.equal(nestedExistingDownload.status, 200); assert.equal(await nestedExistingDownload.text(), 'nested APK')
   const nestedStarted = await request(b, 'POST', { path: 'mobile', id: 'build' }, '/run')
   const nestedRun = (await nestedStarted.json() as { run: ProjectActionRun }).run
   finish({ exitCode: 0 }); await new Promise(resolve => setImmediate(resolve))
@@ -94,7 +115,7 @@ test('project action HTTP routes isolate roots, persist edits, use stored comman
   assert.equal((await request(b, 'PUT', { actions: [{ ...action, name: '' }] })).status, 400)
 
   setFeature(email, 'terminal', false)
-  for (const [method, endpoint] of [['GET', ''], ['PUT', ''], ['POST', '/run'], ['POST', '/discover'], ['GET', '/artifacts']]) assert.equal((await request(b, method, { id: 'build' }, endpoint)).status, 403)
+  for (const [method, endpoint] of [['GET', ''], ['PUT', ''], ['POST', '/run'], ['POST', '/discover'], ['GET', '/artifacts'], ['GET', '/available-artifacts'], ['GET', '/available-artifact']]) assert.equal((await request(b, method, { id: 'build' }, endpoint)).status, 403)
   setFeature(email, 'terminal', true)
   for (const denied of ['member', 'guest'] as const) {
     role = denied
