@@ -70,6 +70,7 @@ import { ASSET_DIR, isLocalAssetPath, isTemporaryAssetPath, moveAssetIntoProject
 import { DATA_DIR } from './dataDir.ts'
 import { createTmuxManager, createTmuxRouter } from '@mew/tmux-term/server'
 import { CmdButtonError, commandSessionName, normalizeCmdButtons, oneShotCommand, readCmdButtons, writeCmdButtons } from './cmdButtons.ts'
+import { addCommandPreviewUrls } from './command-preview-urls.ts'
 import { createProjectActionsRouter } from './project-actions-routes.ts'
 import { createProjectPipelinesRouter } from './project-pipelines-routes.ts'
 import { createReleaseProvidersRouter } from './release-providers-routes.ts'
@@ -2798,7 +2799,7 @@ export function createApiApp() {
       projectDirectory(project, directory) // 경로·폴더 검증
       const running = new Set((await tmuxManager.list()).map((s) => s.name))
       const buttons = commandButtonStates(project, directory as string, readCmdButtons(project, directory as string), running)
-      res.json({ buttons })
+      res.json({ buttons: await addCommandPreviewUrls(buttons, (session, timeout) => tmuxManager.capture(session, 120, timeout)) })
     } catch (err) {
       handleError(res, err)
     }

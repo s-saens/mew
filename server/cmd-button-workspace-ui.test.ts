@@ -12,8 +12,10 @@ test('root command menus pin reads, execution, editing and ordering while only t
 import React from 'react';import {createRoot} from 'react-dom/client';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 import {CommandButtonMenu} from '${root}/src/components/CommandButtonMenu.tsx';
+import {BrowserContext} from '${root}/src/workspace/workspace-browser-context.ts';
+window.browserRequests=[];
 localStorage.setItem('mew:locale','ko');
-createRoot(document.getElementById('root')).render(<I18nProvider>
+createRoot(document.getElementById('root')).render(<BrowserContext.Provider value={url=>window.browserRequests.push(url)}><I18nProvider>
   <CommandButtonMenu project=".workspace" workspacePath="/workspace/a" title="A 명령"/>
   <CommandButtonMenu project=".workspace" workspacePath="/workspace/b" title="B 명령" shortcutEnabled={false}/>
   <div id="project-scroll" style={{position:'fixed',top:80,bottom:8,left:12,width:300,overflowY:'auto'}}>
@@ -21,7 +23,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider>
     <CommandButtonMenu project=".workspace" workspacePath="/workspace/c" title="C 명령" shortcutEnabled={false}/>
     <div style={{height:200}}/>
   </div>
-</I18nProvider>);`
+</I18nProvider></BrowserContext.Provider>);`
   const bundle = await build({ input: 'virtual:command-scopes.tsx', write: false, platform: 'browser', onwarn(warning, warn) { if (warning.code !== 'MODULE_LEVEL_DIRECTIVE') warn(warning) }, output: { format: 'iife', codeSplitting: false }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
     name: 'command-scopes-fixture',
     resolveId(id) {
@@ -46,6 +48,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider>
   page.on('pageerror', error => errors.push(error.message))
   const requests: Array<{ method: string; workspacePath: string; name?: string }> = []
   const deliveryRoots: string[] = []
+  let previewActive = true
   let entries = [{ name: 'Build', command: 'echo build' }, { name: 'Test', command: 'echo test' }]
   let releaseBottom!: () => void
   const bottomResponse = new Promise<void>(resolve => { releaseBottom = resolve })
@@ -62,7 +65,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider>
       }
       if (method === 'PUT') entries = body.buttons
       if (url.pathname.endsWith('/run')) return route.fulfill({ json: { ok: true, session: 'fixture' } })
-      return route.fulfill({ json: { buttons: entries.map(button => ({ ...button, session: `${workspacePath}:${button.name}`, running: false })) } })
+      return route.fulfill({ json: { buttons: entries.map(button => ({ ...button, session: `${workspacePath}:${button.name}`, running: previewActive && workspacePath === '/workspace/b' && button.name === 'Build', previewUrls: previewActive && workspacePath === '/workspace/b' && button.name === 'Build' ? ['http://localhost:4321/'] : [] })) } })
     }
     if (['/api/project-pipelines', '/api/release-providers', '/api/project-actions', '/api/project-actions/available-artifacts'].includes(url.pathname)) {
       const workspacePath = url.searchParams.get('workspacePath')!
@@ -88,6 +91,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider>
   assert.equal(await active.getAttribute('aria-expanded'), 'true')
   assert.equal(await inactive.getAttribute('aria-expanded'), 'false')
   assert.ok(requests.every(request => request.workspacePath === '/workspace/a'))
+  assert.equal(await menu.locator('[data-command-preview]').count(), 0, 'another project’s web address is not shown')
   await Promise.all([activeFilesLoaded, activeActionsLoaded])
   await menu.getByText('빌드 파일을 찾지 못했습니다.').waitFor()
   assert.equal(await menu.getByRole('button', { name: 'Build 실행', exact: true }).isEnabled(), true, 'artifact discovery failures do not disable commands')
@@ -104,6 +108,15 @@ createRoot(document.getElementById('root')).render(<I18nProvider>
   assert.deepEqual(deliveryRoots, ['/workspace/b', '/workspace/b'], 'an inactive row finds files in its own workspace')
   deliveryRoots.length = 0
   assert.equal(requests.at(-1)?.workspacePath, '/workspace/b')
+  await menu.getByRole('button', { name: '웹 미리보기 · Build · http://localhost:4321/', exact: true }).click()
+  assert.deepEqual(await page.locator('#root').evaluate(el => (el.ownerDocument.defaultView as unknown as { browserRequests: string[] }).browserRequests), ['http://localhost:4321/'])
+  previewActive = false
+  const reopenedFiles = page.waitForResponse(response => new URL(response.url()).pathname === '/api/project-actions/available-artifacts')
+  const reopenedActions = page.waitForResponse(response => new URL(response.url()).pathname === '/api/project-actions')
+  await inactive.click()
+  await menu.getByRole('button', { name: 'Build', exact: true }).waitFor()
+  await Promise.all([reopenedFiles, reopenedActions])
+  deliveryRoots.length = 0
   const providersLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/release-providers')
   const actionsLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/project-actions')
   await menu.getByRole('button', { name: '결과·출시', exact: true }).click()

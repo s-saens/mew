@@ -53,8 +53,8 @@ export interface TmuxManager {
   sendKey: (name: string, key: 'Escape') => Promise<void>
   /** 인증 코드처럼 서버가 별도로 검증한 한 줄을 현재 pane에 리터럴로 입력하고 제출한다. */
   sendInput: (name: string, input: string) => Promise<void>
-  /** 화면에 보이는 최근 pane 내용을 텍스트로 회수한다. 서버가 만든 고정 진단 세션에서만 쓴다. */
-  capture: (name: string, lines?: number) => Promise<string>
+  /** Capture recent pane text from a validated server-selected session. */
+  capture: (name: string, lines?: number, timeout?: number) => Promise<string>
 }
 
 async function listTmuxSessions(): Promise<TmuxSession[]> {
@@ -162,13 +162,13 @@ export function createTmuxManager({ cwd }: TmuxManagerOptions): TmuxManager {
       await run(['send-keys', '-t', name, 'Enter'])
     },
 
-    async capture(name, lines = 200) {
+    async capture(name, lines = 200, timeout) {
       assertValidName(name)
       // 음수 시작 줄로 최근 출력만 제한한다. 호출자는 이 값을 사용자 입력으로 받지 않는다.
       const start = -Math.min(Math.max(lines, 1), 500)
       // -J로 pane 폭 때문에 접힌 만 줄을 다시 이어 붙인다. 긴 OAuth URL이 중간에서
       // 끊기면 호스트 allowlist 검사를 통과해도 브라우저가 열 수 없다.
-      return run(['capture-pane', '-p', '-J', '-t', name, '-S', String(start)])
+      return run(['capture-pane', '-p', '-J', '-t', name, '-S', String(start)], timeout)
     },
   }
   return manager

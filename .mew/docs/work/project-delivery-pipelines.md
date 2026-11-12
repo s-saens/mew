@@ -1,6 +1,6 @@
 ---
 title: "Project delivery pipelines implementation"
-description: "Records implementation and local verification of the delivery screen, pipelines, provider adapters, and unified command-menu entry points, separately from live deployment and later CI/CD capabilities."
+description: "Records delivery pipelines, unified command-menu entry points, and command-output web links, with local checks and runtime application limits."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
@@ -30,3 +30,9 @@ No deployment, launcher execution, or application server lifecycle operation is 
 The separate results, build, and deploy controls crowded project rows. Their entries now share the triangle command menu; choosing one closes the menu and opens the corresponding dialog for that project's root. Command-list loading errors do not block these entries. Command shortcuts, focus behavior, and ordering remain available. [ADR 0171](../decisions/0171-unified-project-command-menu.md) records the entry-point decision.
 
 Local browser tests passed for the delivery and action dialogs, command navigation, recovery, and inactive-project scope. Keyboard unit tests passed, and light/dark screenshots at desktop and narrow widths were inspected. `npm run build` and `npm run lint` passed; lint reported existing warnings, and the final scope-test edit passed targeted oxlint. `git diff --check` passed. The broader overlay check still fails on the previously recorded image-preview backdrop assertion in `server/overlay-layers-ui.test.ts`; it fails before reaching that test's command-menu checks. The full documentation check reports existing missing links elsewhere in the working tree; changed-document links were checked separately. No deployment or application server lifecycle operation was performed.
+
+## Command web links
+
+Web development commands often print their local address, but the menu offered no way to open it. The menu now presents supported addresses found in each running command session's recent output and opens them in the host Browser. Captures are bounded and failures leave command controls available. A reported address is a hint: a surviving session can contain stale output, and Browser permissions and blocked Mew ports still apply. [ADR 0173](../decisions/0173-command-web-links.md) records the choice and the retained Mew Port removal.
+
+Local regression checks passed for address filtering and normalization, capture limits and failures, project isolation, Browser permission, command shortcuts, and responsive menu operation. `npm run build` and `npm run lint` passed with existing warnings; changed production files also passed scoped lint. The documentation check validated 810 descriptions but found 39 existing missing links elsewhere; changed-document links passed separately. No development server, Mew server lifecycle operation, or deployment was run to validate a live application; the user must apply the server changes to the running instance.

@@ -12,7 +12,7 @@ import { setFeature } from './access-policy.ts'
 import { WORKSPACE_PROJECT } from './paths.ts'
 import { readActiveWorkspace, writeActiveWorkspace } from './userUiState.ts'
 
-type Button = { name: string; command: string; session: string; running: boolean }
+type Button = { name: string; command: string; session: string; running: boolean; previewUrls: string[] }
 
 test('project command scopes read, save and run their own root without changing the active workspace', async t => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-command-workspaces-'))
@@ -51,6 +51,7 @@ test('project command scopes read, save and run their own root without changing 
     return (await response.json() as { buttons: Button[] }).buttons
   }
   const list = t.mock.method(tmuxManager, 'list', async () => [] as Array<{ name: string; windows: number; attached: boolean; createdAt: number }>)
+  const capture = t.mock.method(tmuxManager, 'capture', async (session: string) => session.endsWith('unknown') ? '' : 'Local: http://localhost:5173/')
   const runs: Array<{ session: string; command: string; cwd: string | undefined }> = []
   t.mock.method(tmuxManager, 'runCommand', async (session: string, command: string, cwd?: string) => { runs.push({ session, command, cwd }) })
   const [active, other] = await Promise.all([read(), read(roots[1])])
@@ -73,6 +74,10 @@ test('project command scopes read, save and run their own root without changing 
   t.mock.method(tmuxManager, 'listPanePids', async () => [])
   writeActiveWorkspace(email, roots[1])
   assert.deepEqual((await read()).map(button => [button.session, button.running]), [[other[0].session, true]], 'current header and scoped row share running state')
+  assert.deepEqual((await read(roots[0]))[0].previewUrls, [], 'another project cannot inherit a running command address')
+  assert.deepEqual((await read(roots[1]))[0].previewUrls, ['http://localhost:5173/'], 'the selected project receives its own command output address')
+  capture.mock.mockImplementation(async () => { throw new Error('capture failed') })
+  assert.deepEqual((await read(roots[1]))[0].previewUrls, [], 'capture failures do not prevent loading the command menu')
 
   let entered!: () => void, release!: () => void
   const pending = new Promise<void>(resolve => { entered = resolve })

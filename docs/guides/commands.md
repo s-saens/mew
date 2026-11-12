@@ -1,6 +1,6 @@
 ---
 title: "Command Buttons and Scheduled Tasks"
-description: "Explains the project command menu, direct APK downloads, results and publishing, Build/Deploy actions, provider connections, and recurring agent schedules."
+description: "Explains the project command menu, command web links, APK downloads, results and publishing, Build/Deploy actions, provider connections, and recurring agent schedules."
 updated: "2026-11-11"
 상위파일:
   - "../../.mew/docs/_docs.md"
@@ -59,6 +59,8 @@ These have similar names but are separate features. The top bar's ▶ is for **p
 ## Top Bar Project ▶ Button (.mew/cmd-button.json)
 
 Click ▶ in the top bar to open a dropdown of the current project's commands. On desktop, if the [project sidebar](projects.md#프로젝트-탭) is open, use ▶ in each project row. Clicking ▶ for another project keeps the current project, document, and layout in place and opens only that project's command list. Commands defined in each project's `.mew/cmd-button.json` run directly in tmux (terminal feature permission required). For a subproject not in the list, open that project first, then use ▶. Project switching follows owner/manager permissions.
+
+If a running command prints a supported local web address, its **web preview** button appears beneath the command. Select it to open the address in Mew's Browser; Browser permission is required. A reported address can remain in terminal output after the server stops, so opening it does not guarantee a connection. Mew's own reserved ports remain blocked by the Browser.
 
 Use **Alt+R** to open the current project's command menu (the existing **Ctrl+E** shortcut remains available). If the sidebar is open, it uses ▶ in the current project's row. Focus moves to the first command. Within the menu, press **1–9** to run the command at that displayed position immediately. The numeric keypad is also supported. A running command is rerun just as when clicking its name; use ■ to stop it. Use arrow keys to move between rows and buttons, and Enter to select. Closing with **Esc** returns focus to the ▶ button and keeps the project sidebar open. **Alt+1–9** for switching projects continues to work as before.
 

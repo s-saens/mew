@@ -1,6 +1,6 @@
 import { useWorkspaceApi } from '../api/workspace-api-context'
 import { ActionMenuSurface, canAutoFocusInput, getFixedPopupLayout, HoverTipLayer, LoadingIndicator, MenuReorderHandle, useDragReorder, type DragItemProps } from '@mew/ui'
-import { CloudUpload, Eye, Hammer, RefreshDouble } from 'iconoir-react'
+import { CloudUpload, Eye, Globe, Hammer, RefreshDouble } from 'iconoir-react'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 // 프로젝트 탭의 ▶ 아이콘 버튼 = 명령어 버튼. 누르면 그 프로젝트의 <프로젝트>/.mew/cmd-button.json 에
@@ -25,6 +25,7 @@ import { ProjectActions, type ProjectActionPanel } from './ProjectActions'
 import { projectActionsCopy } from './project-actions-copy'
 import { projectReleaseCopy } from './project-release-copy'
 import { ProjectAvailableArtifacts } from './ProjectAvailableArtifacts'
+import { useWorkspaceBrowser } from '../workspace/workspace-browser-context'
 
 const LONG_PRESS_MS = 500
 const MENU_WIDTH = 308
@@ -72,6 +73,7 @@ function ScopedCommandButtonMenu({
   triggerRef,
 }: CommandButtonMenuProps) {
   const { fetchCmdButtons, runCmdButton, killTmuxSession, saveCmdButtons } = useWorkspaceApi()
+  const browser = useWorkspaceBrowser()
   const locale = useUiLocale(), actionCopy = projectActionsCopy(locale), releaseCopy = projectReleaseCopy(locale)
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const open = alwaysOpen || (controlledOpen ?? uncontrolledOpen)
@@ -359,7 +361,7 @@ function ScopedCommandButtonMenu({
       {((buttons === null && !loadError) || recovering) && <div role="status" aria-label={uiText("불러오는 중…")} className="flex items-center px-3 py-2 text-ink-muted"><LoadingIndicator size={16} /></div>}
       {buttons !== null && (
         list.map((b, i) => (
-          <CmdRow key={b.name} button={b} shortcut={i < 9 ? String(i + 1) : undefined} dragProps={list.length > 1 ? drag.getItemProps(i) : undefined} dragging={drag.dragIndex === i} onMove={direction => reorder(i, i + direction)} onConsumeClick={drag.consumeClick} busy={busyName === b.name || metadataUnavailable} onRun={() => run(b)} onStop={() => stop(b)} onOpenSession={() => { setPopup(b); setOpen(false) }} onEdit={() => startEditing({ index: i, name: b.name, command: b.command, oneShot: b.oneShot })} />
+          <CmdRow key={b.name} button={b} shortcut={i < 9 ? String(i + 1) : undefined} dragProps={list.length > 1 ? drag.getItemProps(i) : undefined} dragging={drag.dragIndex === i} onMove={direction => reorder(i, i + direction)} onConsumeClick={drag.consumeClick} busy={busyName === b.name || metadataUnavailable} onRun={() => run(b)} onStop={() => stop(b)} onOpenSession={() => { setPopup(b); setOpen(false) }} onPreview={browser ? url => { closeMenu(); browser(url) } : null} onEdit={() => startEditing({ index: i, name: b.name, command: b.command, oneShot: b.oneShot })} />
         ))
       )}
       {buttons !== null && list.length === 0 && !error && !metadataUnavailable && <div className="px-3 py-2 text-xs text-ink-muted">{uiText("아직 명령이 없습니다.")}</div>}
@@ -454,6 +456,7 @@ function CmdRow({
   onRun,
   onStop,
   onOpenSession,
+  onPreview,
   onEdit,
 }: {
   button: CmdButtonState
@@ -467,9 +470,11 @@ function CmdRow({
   /** 실행 중일 때 재생 버튼이 하는 일 — 이 명령의 세션 종료 */
   onStop: () => void
   onOpenSession: () => void
+  onPreview: ((url: string) => void) | null
   onEdit: () => void
 }) {
-  useUiLocale()
+  const locale = useUiLocale()
+  const previewLabel = { en: 'Open web preview', ko: '웹 미리보기', ja: 'ウェブプレビュー', 'zh-CN': '打开网页预览' }[locale]
   const timerRef = useRef<number | null>(null)
   const longFiredRef = useRef(false)
 
@@ -483,7 +488,7 @@ function CmdRow({
   useEffect(() => cancelPress, [cancelPress])
   const { ref, ...handleProps } = dragProps ?? {}
 
-  return (
+  return <>
     <div ref={ref} data-command-row data-command-name={button.name} data-active={button.running || undefined} className={`mew-action-menu-row mew-sortable-menu-row ${dragging ? 'opacity-60' : ''}`}
       onKeyDown={event => {
         if (!event.nativeEvent.isComposing && event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
@@ -553,7 +558,21 @@ function CmdRow({
       </button>
       {shortcut && <span className="mew-action-menu-hint mew-command-shortcut" aria-hidden="true"><kbd className="whitespace-nowrap font-sans text-[11px]">{shortcut}</kbd></span>}
     </div>
-  )
+    {button.running && [...new Set(button.previewUrls ?? [])].filter(isLocalPreviewUrl).map(url => <div key={url} data-command-row>
+      <button type="button" data-command-preview disabled={!onPreview} aria-label={`${previewLabel} · ${button.name} · ${url}`} onClick={() => onPreview?.(url)} className="mew-action-menu-item min-w-0 pl-8 text-ink-secondary disabled:opacity-40">
+        <Globe width={16} height={16} aria-hidden="true" /><span className="min-w-0 truncate">{previewLabel} · {url}</span>
+      </button>
+    </div>)}
+  </>
+}
+
+function isLocalPreviewUrl(value: string) {
+  try {
+    const url = new URL(value)
+    return (url.protocol === 'http:' || url.protocol === 'https:') &&
+      (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]') &&
+      !url.username && !url.password && !url.search && !url.hash
+  } catch { return false }
 }
 
 /** 이름·명령어만 있는 단순 편집 창 — .mew/cmd-button.json 의 항목 하나에 해당한다 */

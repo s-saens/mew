@@ -12,10 +12,12 @@ test('command menu executes and reorders commands at compact widths', { timeout:
 import React from 'react';import {createRoot} from 'react-dom/client';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 import {CommandButtonMenu} from '${root}/src/components/CommandButtonMenu.tsx';
+import {BrowserContext} from '${root}/src/workspace/workspace-browser-context.ts';
 localStorage.setItem('mew:locale','ko');window.opened=[];window.browserRequests=[];
 window.addEventListener('mew:open-local-browser',event=>window.browserRequests.push(event.detail.url));
 window.open=(url,target,features)=>{window.opened.push({url,target,features});return null};
-createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonMenu project=".workspace" title="명령 목록"/></I18nProvider>);`
+function Fixture(){const [enabled,setEnabled]=React.useState(true);return <BrowserContext.Provider value={enabled ? url=>window.browserRequests.push(url) : null}><I18nProvider><button onClick={()=>setEnabled(!enabled)}>Browser access</button><CommandButtonMenu project=".workspace" title="명령 목록"/></I18nProvider></BrowserContext.Provider>}
+createRoot(document.getElementById('root')).render(<Fixture/>);`
   const bundle = await build({ input: 'virtual:commands.tsx', write: false, platform: 'browser', onwarn(warning, warn) { if (warning.code !== 'MODULE_LEVEL_DIRECTIVE') warn(warning) }, output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
     name: 'fixture', resolveId(id) { if (id === 'virtual:commands.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' },
     load(id) { if (id === 'virtual:commands.tsx') return source; if (id === 'virtual:style') return '' },
@@ -39,7 +41,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
       { name: '이전 서버', command: 'npm test', oneShot: false, session: 'mewcmd-old' },
     ]
     const states = () => entries.map(button => ({ ...button, running: button.session === 'mewcmd-dev' ? running : button.session === 'mewcmd-old',
-      ports: button.session === 'mewcmd-dev' ? ports : button.session === 'mewcmd-stopped' ? [4444] : undefined }))
+      ports: button.session === 'mewcmd-dev' ? ports : button.session === 'mewcmd-stopped' ? [4444] : undefined,
+      previewUrls: button.session === 'mewcmd-dev' && running ? ['http://localhost:3333/path', 'http://localhost:5555/', 'http://localhost:3333/path', 'https://example.com/', 'javascript:alert(1)', 'http://localhost:3333/?token=secret'] : button.session === 'mewcmd-stopped' ? ['http://localhost:4444/'] : undefined }))
     await page.route('http://mew-command.test/**', async route => {
       const url = new URL(route.request().url())
       if (url.pathname === '/api/cmd-buttons/run') {
@@ -87,6 +90,27 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
     await page.waitForTimeout(150)
     assert.equal(runs, 1)
     assert.equal(await menu.locator('.mew-action-menu-port').count(), 0, 'legacy port data does not create preview buttons')
+    const preview = menu.getByRole('button', { name: '웹 미리보기 · 개발 서버 이름이 길어도 동작 · http://localhost:3333/path', exact: true })
+    await preview.waitFor()
+    assert.equal(await menu.locator('[data-command-preview]').count(), 2, 'deduplicate addresses and reject untrusted URLs')
+    await command.focus()
+    await page.keyboard.press('ArrowDown')
+    assert.equal(await preview.evaluate(el => el === el.ownerDocument.activeElement), true, 'keyboard reaches preview after its command')
+    await page.keyboard.press('Control+e')
+    assert.equal(await command.evaluate(el => el === el.ownerDocument.activeElement), true, 'preview links do not change command shortcuts')
+    assert.equal(await menu.getByRole('button', { name: /종료된 서버.*localhost:4444/ }).count(), 0, 'stopped commands do not expose stale addresses')
+    await preview.click()
+    assert.deepEqual(await page.locator('#root').evaluate(el => (el.ownerDocument.defaultView as unknown as { browserRequests: string[] }).browserRequests), ['http://localhost:3333/path'])
+    assert.equal(runs, 1, 'opening a preview does not rerun the command')
+    await menu.waitFor({ state: 'hidden' })
+    await page.getByRole('button', { name: 'Browser access', exact: true }).click()
+    await page.keyboard.press('Alt+r')
+    await preview.waitFor()
+    assert.equal(await preview.isDisabled(), true, 'preview requires Browser access')
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'Browser access', exact: true }).click()
+    await page.keyboard.press('Alt+r')
+    await preview.waitFor()
     assert.equal(await row.getAttribute('data-active'), 'true')
     const bounds = await menu.boundingBox(); assert.ok(bounds)
     assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width)
