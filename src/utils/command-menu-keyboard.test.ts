@@ -73,6 +73,20 @@ test('arrows move between command rows and actions, wrap, and skip disabled butt
   } finally { await win.happyDOM.close() }
 })
 
+test('an empty command list focuses Add while allowing keyboard access to project actions', async () => {
+  const win = new Window()
+  const menu = win.document.createElement('div')
+  menu.innerHTML = '<div data-command-row><button>Results</button></div><div data-command-row><button>Build</button></div><div data-command-row><button>Deploy</button></div><div data-command-row><button data-command-add>Add</button></div>'
+  win.document.body.append(menu)
+  menu.addEventListener('keydown', event => navigateCommandMenu(event as unknown as KeyboardEvent, menu as unknown as HTMLElement))
+  try {
+    focusFirstCommand(menu as unknown as HTMLElement)
+    assert.equal(win.document.activeElement?.textContent, 'Add')
+    win.document.activeElement!.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }))
+    assert.equal(win.document.activeElement?.textContent, 'Deploy')
+  } finally { await win.happyDOM.close() }
+})
+
 test('Alt+R opens from an editor, supports physical keys, and respects exclusive captures', async () => {
   const win = new Window()
   Object.defineProperty(globalThis, 'window', { value: win, configurable: true })

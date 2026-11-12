@@ -13,39 +13,31 @@ import { ProjectActionsResults } from './ProjectActionsResults'
 import { projectActionsStore, recentProjectActionRuns, type ProjectActionsScope } from './ProjectActionsState'
 import { projectActionsCopy } from './project-actions-copy'
 import { ProjectReleaseDialog } from './ProjectReleaseDialog'
-import { projectReleaseCopy } from './project-release-copy'
 
-export function ProjectActions({ project, directory = '', workspacePath, inline = false }: Partial<Pick<ProjectActionsScope, 'directory' | 'workspacePath'>> & { project: string; inline?: boolean }) {
+export type ProjectActionPanel = ProjectAction['kind'] | 'release' | null
+
+export function ProjectActions({ project, directory = '', workspacePath, panel, onPanelChange }: Partial<Pick<ProjectActionsScope, 'directory' | 'workspacePath'>> & { project: string; panel: ProjectActionPanel; onPanelChange: (panel: ProjectActionPanel) => void }) {
   const api = useWorkspaceApi(), browser = useWorkspaceBrowser()
   const setup = useProjectSetup()
-  const locale = useUiLocale(), copy = projectActionsCopy(locale), releaseCopy = projectReleaseCopy(locale), title = useId()
+  const copy = projectActionsCopy(useUiLocale()), title = useId()
   const store = useMemo(() => projectActionsStore(api, { project, directory, workspacePath }), [api, project, directory, workspacePath])
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot)
   const { state, error, loading, busy } = snapshot
-  const [kind, setKind] = useState<ProjectAction['kind'] | null>(null)
-  const [releaseOpen, setReleaseOpen] = useState(false)
+  const kind = panel === 'build' || panel === 'deploy' ? panel : null
   const [editing, setEditing] = useState<{ action: ProjectAction; isNew: boolean } | null>(null)
   const [portal, setPortal] = useState<HTMLDivElement | null>(null)
   useEffect(() => { if (kind) void store.load() }, [kind, store])
   const actions = state?.actions.filter(action => action.kind === kind) ?? []
   const runs = recentProjectActionRuns((state?.runs ?? []).filter(run => run.kind === kind))
   return <>
-    <span data-project-actions className={`inline-flex shrink-0 items-center gap-0.5 ${inline ? 'mb-1 w-full border-b border-edge pb-1' : ''}`}>
-      <button type="button" data-header-menu-trigger data-project-release-trigger aria-haspopup="dialog" aria-expanded={releaseOpen}
-        onClick={event => { event.stopPropagation(); setReleaseOpen(true) }}
-        className="rounded px-1.5 py-1 text-xs font-medium text-ink hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-ink">{releaseCopy.entry}</button>
-      {(['build', 'deploy'] as const).map(value => <button type="button" key={value} data-header-menu-trigger data-project-action-trigger={value}
-        aria-haspopup="dialog" aria-expanded={kind === value} onClick={event => { event.stopPropagation(); setKind(value) }}
-        className="rounded px-1.5 py-1 text-xs text-ink-secondary hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-ink">{copy[value]}</button>)}
-    </span>
-    {releaseOpen && <ProjectReleaseDialog scope={{ project, directory, workspacePath }} onClose={() => setReleaseOpen(false)} onAdvanced={value => { setReleaseOpen(false); setKind(value) }} />}
-    {kind && <DialogFrame labelledBy={title} onClose={() => setKind(null)} className="max-h-[90dvh] max-w-lg overflow-y-auto max-sm:max-w-[calc(100vw-16px)]">
+    {panel === 'release' && <ProjectReleaseDialog scope={{ project, directory, workspacePath }} onClose={() => onPanelChange(null)} onAdvanced={onPanelChange} />}
+    {kind && <DialogFrame labelledBy={title} onClose={() => onPanelChange(null)} className="max-h-[90dvh] max-w-lg overflow-y-auto max-sm:max-w-[calc(100vw-16px)]">
       <HoverTipLayer portalTarget={portal}><div ref={setPortal} className="p-3" data-project-actions-dialog>
         <header className="mb-3 flex items-center gap-2">
           <h2 id={title} className="min-w-0 flex-1 text-base font-semibold">{copy[kind]}</h2>
           <button type="button" disabled={loading || busy} aria-label={copy.discover} data-tip={copy.discover} onClick={() => void store.discover()}
             className="rounded p-1 text-ink-secondary hover:bg-surface-hover disabled:opacity-40"><RefreshDouble width={16} height={16} aria-hidden="true" /></button>
-          <PanelCloseButton aria-label={copy.close} onClick={() => setKind(null)} />
+          <PanelCloseButton aria-label={copy.close} onClick={() => onPanelChange(null)} />
         </header>
         {loading && !state && <div role="status" aria-label={copy.loading} className="flex justify-center py-2"><LoadingIndicator /></div>}
         {error && <div role="alert" className="mb-2 flex min-w-0 items-center gap-2 text-xs text-danger-strong">

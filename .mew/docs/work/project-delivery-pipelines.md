@@ -1,6 +1,6 @@
 ---
 title: "Project delivery pipelines implementation"
-description: "Records the design and implementation of the outcome-oriented delivery screen, sequential persistent pipelines, and external provider adapters. Tracks local verification separately from live provider deployment and later CI/CD capabilities."
+description: "Records implementation and local verification of the delivery screen, pipelines, provider adapters, and unified command-menu entry points, separately from live deployment and later CI/CD capabilities."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
@@ -24,3 +24,9 @@ The three delivery/action browser tests passed with fixture projects and mocked 
 ## Operational boundaries
 
 No deployment, launcher execution, or application server lifecycle operation is authorized for this work. Applying backend changes to a running instance remains user-owned. Provider OAuth onboarding/resource discovery, automatic Git/webhook triggers, isolated runners, parallel execution, static app previews, background push, and remote artifact import remain outside this first implementation. Existing tokens/resources are required for the initial provider settings; Google access tokens can expire. Provider credentials and production deployments are not verified by mocked adapter tests. Local crash recovery blocks recorded surviving process groups, but a crash between OS spawn and PID persistence remains an uncertain window; there is no startup process killing or automatic replay.
+
+## Unified command menu
+
+The separate results, build, and deploy controls crowded project rows. Their entries now share the triangle command menu; choosing one closes the menu and opens the corresponding dialog for that project's root. Command-list loading errors do not block these entries. Command shortcuts, focus behavior, and ordering remain available. [ADR 0171](../decisions/0171-unified-project-command-menu.md) records the entry-point decision.
+
+Local browser tests passed for the delivery and action dialogs, command navigation, recovery, and inactive-project scope. Keyboard unit tests passed, and light/dark screenshots at desktop and narrow widths were inspected. `npm run build` and `npm run lint` passed; lint reported existing warnings, and the final scope-test edit passed targeted oxlint. `git diff --check` passed. The broader overlay check still fails on the previously recorded image-preview backdrop assertion in `server/overlay-layers-ui.test.ts`; it fails before reaching that test's command-menu checks. The full documentation check reports existing missing links elsewhere in the working tree; changed-document links were checked separately. No deployment or application server lifecycle operation was performed.

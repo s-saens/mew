@@ -45,6 +45,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider>
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   const requests: Array<{ method: string; workspacePath: string; name?: string }> = []
+  const deliveryRoots: string[] = []
   let entries = [{ name: 'Build', command: 'echo build' }, { name: 'Test', command: 'echo test' }]
   let releaseBottom!: () => void
   const bottomResponse = new Promise<void>(resolve => { releaseBottom = resolve })
@@ -62,6 +63,13 @@ createRoot(document.getElementById('root')).render(<I18nProvider>
       if (method === 'PUT') entries = body.buttons
       if (url.pathname.endsWith('/run')) return route.fulfill({ json: { ok: true, session: 'fixture' } })
       return route.fulfill({ json: { buttons: entries.map(button => ({ ...button, session: `${workspacePath}:${button.name}`, running: false })) } })
+    }
+    if (['/api/project-pipelines', '/api/release-providers', '/api/project-actions'].includes(url.pathname)) {
+      const workspacePath = url.searchParams.get('workspacePath')!
+      deliveryRoots.push(workspacePath)
+      if (url.pathname === '/api/project-pipelines') return route.fulfill({ json: { projectRoot: workspacePath, pipelines: [], runs: [], readiness: {}, warnings: [], needsAgent: true } })
+      if (url.pathname === '/api/release-providers') return route.fulfill({ json: { connections: [], runs: [] } })
+      return route.fulfill({ json: { projectRoot: workspacePath, actions: [], runs: [], warnings: [], needsAgent: true } })
     }
     return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html lang="ko"><meta charset="utf-8"><style>${css}body{margin:12px}button{color:inherit}</style><div id="root"></div><script>${bundle.output.find(item => item.type === 'chunk')!.code}</script></html>` })
   })
@@ -81,6 +89,15 @@ createRoot(document.getElementById('root')).render(<I18nProvider>
   await inactive.click()
   await menu.getByRole('button', { name: 'Build', exact: true }).waitFor()
   assert.equal(requests.at(-1)?.workspacePath, '/workspace/b')
+  const providersLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/release-providers')
+  const actionsLoaded = page.waitForResponse(response => new URL(response.url()).pathname === '/api/project-actions')
+  await menu.getByRole('button', { name: '결과·출시', exact: true }).click()
+  const release = page.getByRole('dialog', { name: '결과·출시', exact: true })
+  await release.getByRole('heading', { name: '만든 것 확인하기', exact: true }).waitFor()
+  await Promise.all([providersLoaded, actionsLoaded])
+  assert.deepEqual(deliveryRoots, ['/workspace/b', '/workspace/b', '/workspace/b'], 'an inactive row opens delivery in its own workspace')
+  await release.getByRole('button', { name: '닫기', exact: true }).click()
+  await inactive.click()
   await Promise.all([
     page.waitForResponse(response => response.request().method() === 'POST'),
     menu.getByRole('button', { name: 'Build 실행', exact: true }).click(),

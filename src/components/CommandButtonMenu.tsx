@@ -1,6 +1,6 @@
 import { useWorkspaceApi } from '../api/workspace-api-context'
 import { ActionMenuSurface, canAutoFocusInput, getFixedPopupLayout, HoverTipLayer, LoadingIndicator, MenuReorderHandle, useDragReorder, type DragItemProps } from '@mew/ui'
-import { RefreshDouble } from 'iconoir-react'
+import { CloudUpload, Eye, Hammer, RefreshDouble } from 'iconoir-react'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 // 프로젝트 탭의 ▶ 아이콘 버튼 = 명령어 버튼. 누르면 그 프로젝트의 <프로젝트>/.mew/cmd-button.json 에
@@ -21,7 +21,9 @@ import { SessionTerminalPopup } from './SessionTerminalPopup'
 import { WORKSPACE_PROJECT } from '../utils/active-project'
 import { captureCommandMenuShortcut, focusFirstCommand, navigateCommandMenu } from '../utils/command-menu-keyboard'
 import { AUTOMATIC_RETRY_LIMIT } from '../utils/recovery-policy'
-import { ProjectActions } from './ProjectActions'
+import { ProjectActions, type ProjectActionPanel } from './ProjectActions'
+import { projectActionsCopy } from './project-actions-copy'
+import { projectReleaseCopy } from './project-release-copy'
 
 const LONG_PRESS_MS = 500
 const MENU_WIDTH = 308
@@ -50,7 +52,6 @@ export function CommandButtonMenu(props: CommandButtonMenuProps) {
   const key = JSON.stringify([props.project, props.directory ?? '', props.workspacePath])
   const Container = props.inline || props.alwaysOpen ? 'div' : 'span'
   return <Container className={props.inline || props.alwaysOpen ? 'min-w-0' : 'inline-flex shrink-0 items-center'}>
-    <ProjectActions key={`actions:${key}`} project={props.project} directory={props.directory} workspacePath={props.workspacePath} inline={props.inline || props.alwaysOpen} />
     <ScopedCommandButtonMenu key={key} {...props} />
   </Container>
 }
@@ -70,7 +71,7 @@ function ScopedCommandButtonMenu({
   triggerRef,
 }: CommandButtonMenuProps) {
   const { fetchCmdButtons, runCmdButton, killTmuxSession, saveCmdButtons } = useWorkspaceApi()
-  useUiLocale()
+  const locale = useUiLocale(), actionCopy = projectActionsCopy(locale), releaseCopy = projectReleaseCopy(locale)
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const open = alwaysOpen || (controlledOpen ?? uncontrolledOpen)
   const setOpen = useCallback((next: boolean | ((current: boolean) => boolean)) => {
@@ -87,6 +88,7 @@ function ScopedCommandButtonMenu({
   const [busyName, setBusyName] = useState<string | null>(null)
   const [popup, setPopup] = useState<CmdButtonState | null>(null)
   const [editing, setEditing] = useState<Editing | null>(null)
+  const [panel, setPanel] = useState<ProjectActionPanel>(null)
   const [anchor, setAnchor] = useState<CSSProperties | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -335,6 +337,18 @@ function ScopedCommandButtonMenu({
         ? 'border-b border-edge bg-surface-deep py-1'
         : undefined}
     >
+      <div data-project-actions>
+        <div data-command-row><button type="button" data-project-release-trigger aria-haspopup="dialog" onClick={() => { closeMenu(); setPanel('release') }} className="mew-action-menu-item">
+          <Eye width={16} height={16} aria-hidden="true" />{releaseCopy.entry}
+        </button></div>
+        <div data-command-row><button type="button" data-project-action-trigger="build" aria-haspopup="dialog" onClick={() => { closeMenu(); setPanel('build') }} className="mew-action-menu-item">
+          <Hammer width={16} height={16} aria-hidden="true" />{actionCopy.build}
+        </button></div>
+        <div data-command-row><button type="button" data-project-action-trigger="deploy" aria-haspopup="dialog" onClick={() => { closeMenu(); setPanel('deploy') }} className="mew-action-menu-item">
+          <CloudUpload width={16} height={16} aria-hidden="true" />{actionCopy.deploy}
+        </button></div>
+        <div role="separator" className="mew-action-menu-separator" />
+      </div>
       {error && <div className="select-text px-3 py-2 text-xs text-danger-strong">{error}</div>}
       {loadError && <div role="alert" className="flex items-start gap-2 px-3 py-2 text-xs text-ink-secondary">
         <span className="min-w-0 flex-1 select-text whitespace-pre-wrap break-words">{loadError}</span>
@@ -348,7 +362,7 @@ function ScopedCommandButtonMenu({
       )}
       {buttons !== null && list.length === 0 && !error && !metadataUnavailable && <div className="px-3 py-2 text-xs text-ink-muted">{uiText("아직 명령이 없습니다.")}</div>}
       <div role="separator" className="mew-action-menu-separator" />
-      <div data-command-row><button type="button" disabled={metadataUnavailable} onClick={() => startEditing({ index: null, name: '', command: '', oneShot: false })} className="mew-action-menu-item">
+      <div data-command-row><button type="button" data-command-add disabled={metadataUnavailable} onClick={() => startEditing({ index: null, name: '', command: '', oneShot: false })} className="mew-action-menu-item">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>{uiText("명령 추가")}</button>
       </div>
     </MenuSurface>
@@ -383,6 +397,8 @@ function ScopedCommandButtonMenu({
       </button></HoverTipLayer>}
 
       {open && (inline ? menu : createPortal(menu, document.body))}
+
+      <ProjectActions project={project} directory={directory} workspacePath={workspacePath} panel={panel} onPanelChange={setPanel} />
 
       {editing && (
         <CmdButtonEditor

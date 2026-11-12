@@ -1,13 +1,13 @@
 ---
 title: "Project build and deployment actions"
-description: "Editable project Build and Deploy controls, conservative discovery, nonblocking setup, run results, notifications, Browser links, and scoped file/ZIP downloads. Defines individual actions reused by the results and publishing pipelines."
+description: "Editable project Build and Deploy actions opened from the command menu, conservative discovery, nonblocking setup, run results, notifications, Browser links, and scoped file/ZIP downloads. Defines actions reused by publishing pipelines."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
 
 ## Behavior
 
-Provide named **Build** and **Deploy** controls beside the existing project [command button](project-command-buttons.md). Users choose an outcome such as a debug or release build without entering a command. Editing an action exposes its name, kind, variant, command, optional result URL, and downloadable output paths. Legacy command buttons remain independently configurable.
+Provide named **Build** and **Deploy** entries inside the project [command button menu](project-command-buttons.md). Users choose an outcome such as a debug or release build without entering a command. Editing an action exposes its name, kind, variant, command, optional result URL, and downloadable output paths. Legacy command buttons remain independently configurable.
 
 The [results and publishing screen](project-delivery-pipelines.md) composes these actions into ordered workflows and retains completed pipeline results across restarts. This document owns the individual action and artifact behavior.
 

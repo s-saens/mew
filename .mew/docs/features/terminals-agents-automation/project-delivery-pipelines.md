@@ -1,13 +1,13 @@
 ---
 title: "Project results and publishing"
-description: "Defines the project results/publishing screen, editable action/provider pipelines, explicit destination review, durable run recovery, and scoped external connections. Links the detailed delivery design and existing artifact contract."
+description: "Defines the results/publishing screen opened from the project command menu, editable action/provider pipelines, destination review, durable run recovery, and scoped external connections. Links the delivery design and artifact contract."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
 
 ## User contract
 
-Provide a project-level results and publishing entry alongside the existing [Build and Deploy controls](project-build-deploy-actions.md). Lead with the available result and actions to prepare another result or publish the project. Keep pipeline editing, command editing, and provider credentials in settings rather than the ordinary execution path. Use the shared UI components and retain compact mobile/desktop light/dark layouts.
+Provide a project-level results and publishing entry inside the [command menu](project-command-buttons.md), together with the [Build and Deploy controls](project-build-deploy-actions.md). Lead with the available result and actions to prepare another result or publish the project. Keep pipeline editing, command editing, and provider credentials in settings rather than the ordinary execution path. Use the shared UI components and retain compact mobile/desktop light/dark layouts.
 
 Read-only discovery offers workflows from actual local actions and saved external connections. A saved empty pipeline list remains empty. Unsupported or malformed setup exposes recovery and agent assistance without preventing project work. Viewing or saving configuration never executes a workflow.
 

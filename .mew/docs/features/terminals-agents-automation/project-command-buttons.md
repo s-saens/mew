@@ -8,7 +8,7 @@ updated: "2026-11-11"
 status_hash: "11b4825abce468fc30154b3c9ff1e214231099d5c6effbd50778959e7f752969"
 files: ["src/components/CommandButtonMenu.tsx", "src/components/SessionTerminalPopup.tsx", "server/cmdButtons.ts"]
 commits: []
-description: "Contract for legacy project command registration, execution, stopping, output, recovery, shortcuts, reordering, and root-isolated sessions. Links separate Build/Deploy actions while preserving command and global terminal button behavior."
+description: "Contract for the unified project command menu, including results/publishing and Build/Deploy entry, command execution, recovery, shortcuts, reordering, and root-isolated sessions."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -17,12 +17,13 @@ description: "Contract for legacy project command registration, execution, stopp
 ## Requirements
 
 - Run recurring commands for the current project using buttons and view their output.
-- Named [Build and Deploy actions](project-build-deploy-actions.md) appear beside these controls and own finite runs, completion notices, and result access. Their settings do not replace the legacy command file or shortcuts.
+- The command menu also opens [results and publishing](project-delivery-pipelines.md) and named [Build and Deploy actions](project-build-deploy-actions.md). Their settings do not replace the legacy command file or shortcuts.
 
 ### Scope
 
 - When the project sidebar is closed or on mobile, place a ▶ button immediately to the right of the project title in the top bar. When the desktop project sidebar is open, ▶ on each project row opens the same command menu. Existing dropdown items provide per-project command registration, editing, execution, stopping, and a dedicated terminal popup.
 - ▶ on an inactive project row handles only that project's commands and does not switch the current project. Fetch, save, and run requests and polling stay pinned to the target project, and the server rechecks the path and existing permissions. If the current project uses a worktree, its row uses the selected actual working root. Root project command sessions are identified by actual folder path and command name, isolating them from commands with the same name in other roots.
+- Put Results & release, Build, and Deploy at the top of this same menu, above the saved command rows. Opening one closes the dropdown and opens its existing project-scoped dialog. The entries stay available when command metadata is loading or cannot be read; selecting one does not execute any command or deployment. Do not render separate action buttons beside ▶.
 - Pressing the button does not open the file explorer or a separate task panel. Close the list by pressing outside it, pressing Esc, or using Back.
 - When the project or hamburger dropdown is open, a single click or tap on ▶ closes the existing menu and opens the command list immediately. Pressing another top bar menu button from the command list switches menus the same way.
 - Close the dropdown first when opening the edit dialog by pressing Add Command or right-clicking or long-pressing a command name. The menu must not remain above the edit dialog and obscure input, and closing the edit dialog with Cancel, Esc, or Back must not reopen the list.
@@ -30,7 +31,7 @@ description: "Contract for legacy project command registration, execution, stopp
 - Unmodified 1–9 and numeric keypad keys run commands in list order, just like clicking their names. Show numbers at the far right of the first 9 items and provide `aria-keyshortcuts`. Exclude ports, Stop, Terminal, Add, and reorder handles from number selection.
 - Use the same layout as the project list: handle on the left, name in the middle, and number on the right. Reorder by dragging the handle with a mouse or touch, using ↑/↓ on the handle, or Shift+↑/↓ on the row. Save the order in the existing project command file while preserving command contents, the exit-after-completion option, and running state. Process consecutive saves in order, and prevent status polling from overwriting the order during saving. If saving fails, revert to the last saved order and display an error.
 - Highlight running commands using the background of the entire item, including its handle and buttons, instead of a separate checkmark or dot. Show hover and focus across the entire item as well, and place port buttons on a lower line within the same item.
-- Up and Down cycle through command rows and Add Command; Left and Right cycle through the name, Run/Stop, and Terminal buttons in the same row. Skip disabled buttons, and use Home/End to move to the first/last row. Enter/Space activates the focused button, and closing with Esc returns focus to ▶.
+- Up and Down cycle through the result/build/deploy entries, command rows, and Add Command; Left and Right cycle through the name, Run/Stop, and Terminal buttons in the same row. Skip disabled buttons, and use Home/End to move to the first/last row. Enter/Space activates the focused button, and closing with Esc returns focus to ▶.
 - Do not display internal project identifiers such as `.workspace` at the top of the list.
 - The list uses the same shared `ActionMenuSurface` header style as the hamburger and project menus. Width, font, row height, spacing, and focus indicators follow the [shared UI contract](../../development/ui-overlays.md#dropdowns-and-selection-components).
 - Restore previously saved file explorer command tabs as the file explorer.
@@ -48,7 +49,7 @@ description: "Contract for legacy project command registration, execution, stopp
 <!-- mew:implementation:start -->
 ## Implementation details
 
-- The top bar and project sidebar use the same `CommandButtonMenu`. Keep the sidebar menu's `workspacePath` as the target for requests, responses, and polling, independently of switching the account's active root. The dropdown provides per-project command registration, editing, execution, stopping, and a dedicated terminal popup.
+- The top bar, project sidebar, and subproject rows use the same `CommandButtonMenu`. Keep the sidebar menu's `workspacePath` as the target for requests, responses, and polling, independently of switching the account's active root. The dropdown provides project results/publishing and Build/Deploy entry points as well as command registration, editing, execution, stopping, and a dedicated terminal popup. Keep the dialogs mounted outside the dropdown so closing it cannot discard an open dialog or its background completion watcher.
 - Fetch command metadata while the menu is open and poll every 3 seconds. Initial loading and recoverable polling failures show only the shared three-dot loading indicator. Keep the last verified rows visible during recovery, and disable running, stopping, adding, editing, and reordering until metadata is healthy. Serialize metadata reads so a slow request can finish without a later poll superseding it.
 - After an initial recoverable failure, allow up to eleven automatic retries. Stop polling when that budget is exhausted or a permanent API error occurs, and show a scoped error with an accessible Retry icon. An explicit retry starts a fresh budget without reloading the page. Authentication, permission, and other permanent client errors require explicit recovery immediately; HTTP 408, 429, server errors, and transport failures remain retryable.
 - Keep metadata failures separate from explicit execution, stopping, saving, and preview errors. Successful polling must not erase a failed action, and automatic metadata recovery must never replay a command or other mutation. Shared loading and recovery presentation follows the [UI contract](../../development/ui-contracts.md).

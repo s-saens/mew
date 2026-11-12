@@ -60,7 +60,7 @@ test('build and deploy actions support scoped runs, completion notices, previews
       { id: 'release', name: 'Release build', kind: 'build', variant: 'release', command: './gradlew assembleRelease' },
       { id: 'deploy', name: 'Preview deployment', kind: 'deploy', command: 'npm run deploy', previewUrl: 'http://localhost:4173' },
     ]
-    let runs: Record<string, unknown>[] = [{ id: 'run-empty', actionId: 'release', name: 'Release build', kind: 'build', status: 'succeeded', startedAt: '2026-01-01T00:00:00.000Z', finishedAt: '2026-01-01T00:01:00.000Z', output: 'Done', artifacts: [] }], failSave = false, failLoad = false
+    let runs: Record<string, unknown>[] = [{ id: 'run-empty', actionId: 'release', name: 'Release build', kind: 'build', status: 'succeeded', startedAt: '2026-01-01T00:00:00.000Z', finishedAt: '2026-01-01T00:01:00.000Z', output: 'Done', artifacts: [] }], failSave = false, failLoad = false, commandFailure = true
     const state = () => ({ projectRoot: '/fixture/project/apps/mobile', actions, runs, warnings: [], needsAgent: false })
     await page.route('http://mew-actions.test/**', async route => {
       const request = route.request(), url = new URL(request.url())
@@ -79,12 +79,26 @@ test('build and deploy actions support scoped runs, completion notices, previews
         if (failLoad) { failLoad = false; return route.fulfill({ status: 500, json: { error: 'Actions are unavailable' } }) }
         return route.fulfill({ json: state() })
       }
-      if (url.pathname === '/api/cmd-buttons') return route.fulfill({ json: { buttons: [] } })
+      if (url.pathname === '/api/cmd-buttons') return commandFailure ? route.fulfill({ status: 503, json: { error: 'Commands unavailable' } }) : route.fulfill({ json: { buttons: [] } })
       return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="${dark ? 'dark' : ''}"><meta name="viewport" content="width=device-width,initial-scale=1"><meta charset="utf-8"><style>${css}
       :root{--color-surface:${dark ? '#171a24' : '#fff'};--color-surface-solid:var(--color-surface);--color-surface-raised:${dark ? '#252939' : '#f4f5f8'};--color-surface-raised-solid:var(--color-surface-raised);--color-surface-hover:${dark ? '#30394b' : '#e3e8ef'};--color-surface-hover-solid:var(--color-surface-hover);--color-ink:${dark ? '#f4f4f6' : '#202128'};--color-ink-secondary:${dark ? '#bbc0cd' : '#5b6170'};--color-accent:#6585d9;--color-accent-strong:#466ac5;--color-ink-on-accent:#fff;--color-edge:#707789;--color-edge-strong:#707789;--color-edge-bright:#707789;--color-danger-strong:${dark ? '#ffacac' : '#a31616'}}body{margin:0;padding:8px;font:14px sans-serif;background:var(--color-surface);color:var(--color-ink)}*{box-sizing:border-box}</style><div id="root"></div><script>${code}</script></html>` })
     })
     await page.goto('http://mew-actions.test/')
-    await page.getByRole('button', { name: 'Build', exact: true }).click()
+    const trigger = page.getByRole('button', { name: 'apps/mobile command buttons', exact: true })
+    const openAction = async (name: 'Build' | 'Deploy') => {
+      await trigger.click()
+      const menu = page.locator('[data-command-menu]')
+      await menu.getByRole('button', { name, exact: true }).click()
+      await menu.waitFor({ state: 'hidden' })
+    }
+    assert.equal(await page.getByRole('button', { name: 'Build', exact: true }).count(), 0, 'build is available only inside the command menu')
+    assert.equal(await page.getByRole('button', { name: 'Deploy', exact: true }).count(), 0, 'deploy is available only inside the command menu')
+    assert.equal(await page.getByRole('button', { name: 'Results & release', exact: true }).count(), 0, 'results are available only inside the command menu')
+    const failedCommands = page.waitForResponse(response => response.url().includes('/api/cmd-buttons') && response.status() === 503)
+    await trigger.click()
+    await failedCommands
+    await page.locator('[data-command-menu]').getByRole('button', { name: 'Build', exact: true }).click()
+    commandFailure = false
     let dialog = page.getByRole('dialog', { name: 'Build', exact: true })
     await dialog.getByRole('button', { name: 'Debug build', exact: true }).waitFor()
     await dialog.getByText('No files or preview available for this run.', { exact: true }).waitFor()
@@ -101,6 +115,7 @@ test('build and deploy actions support scoped runs, completion notices, previews
     await dialog.getByRole('button', { name: 'Debug build', exact: true }).click()
     await dialog.getByText('Running', { exact: true }).waitFor()
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    await page.waitForFunction(element => element === element.ownerDocument.activeElement, await trigger.elementHandle())
     await page.getByRole('button', { name: 'Toggle actions', exact: true }).click()
     runs = [{ ...runs[0], status: 'succeeded', finishedAt: new Date().toISOString(), exitCode: 0, output: 'BUILD SUCCESSFUL', previewUrl: 'http://localhost:4173', archive: { name: 'dist.zip', fileCount: 6, size: 2097152 }, artifacts: [{ path: 'app/build/outputs/apk/debug/app-debug.apk', name: 'app-debug.apk', size: 2097152 }, { path: 'debug/app.apk', name: 'app.apk' }, { path: 'release/app.apk', name: 'app.apk' }, { path: 'dist/a.js', name: 'a.js' }, { path: 'dist/b.js', name: 'b.js' }, { path: 'dist/c.js', name: 'c.js' }] }]
     await page.waitForFunction(() => (globalThis as unknown as { notices: unknown[] }).notices.length === 1)
@@ -141,7 +156,7 @@ test('build and deploy actions support scoped runs, completion notices, previews
     assert.equal(archive.searchParams.get('workspacePath'), '/fixture/project')
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
     await page.getByRole('button', { name: 'Toggle actions', exact: true }).click()
-    await page.getByRole('button', { name: 'Build', exact: true }).click()
+    await openAction('Build')
     dialog = page.getByRole('dialog', { name: 'Build', exact: true })
     await dialog.getByRole('button', { name: 'Edit Debug build', exact: true }).click()
     const editor = page.getByRole('dialog', { name: 'Edit action', exact: true })
@@ -169,7 +184,7 @@ test('build and deploy actions support scoped runs, completion notices, previews
     await dialog.getByRole('button', { name: 'Package app', exact: true }).waitFor({ state: 'hidden' })
     await Promise.all([page.waitForResponse(response => response.url().includes('/api/project-actions/discover')), dialog.getByRole('button', { name: 'Discover actions', exact: true }).click()])
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
-    await page.getByRole('button', { name: 'Deploy', exact: true }).click()
+    await openAction('Deploy')
     dialog = page.getByRole('dialog', { name: 'Deploy', exact: true })
     await dialog.getByRole('button', { name: 'Preview deployment', exact: true }).waitFor()
     await dialog.getByRole('button', { name: 'Configure with agent', exact: true }).click()
@@ -178,7 +193,7 @@ test('build and deploy actions support scoped runs, completion notices, previews
     await Promise.all([page.waitForResponse(response => response.url().includes('/api/project-actions?')), setup.getByRole('button', { name: 'Close setup', exact: true }).click()])
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
     failLoad = true
-    await page.getByRole('button', { name: 'Build', exact: true }).click()
+    await openAction('Build')
     dialog = page.getByRole('dialog', { name: 'Build', exact: true })
     await dialog.getByText('Actions are unavailable', { exact: true }).waitFor()
     await dialog.getByRole('button', { name: 'Retry', exact: true }).click()

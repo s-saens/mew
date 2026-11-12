@@ -10,7 +10,7 @@ async function fixtureBundle() {
   const root = path.resolve(import.meta.dirname, '..')
   const source = `import React from 'react';import {createRoot} from 'react-dom/client';
 import {I18nProvider} from '${root}/src/i18n.tsx';
-import {ProjectActions} from '${root}/src/components/ProjectActions.tsx';
+import {CommandButtonMenu} from '${root}/src/components/CommandButtonMenu.tsx';
 import {WorkspaceApiProvider} from '${root}/src/api/workspace-api-context.tsx';
 import {createWorkspaceClient} from '${root}/src/api/client.ts';
 import {BrowserContext} from '${root}/src/workspace/workspace-browser-context.ts';
@@ -20,13 +20,13 @@ localStorage.setItem('mew:locale','en');window.previews=[];window.setups=[];wind
 HTMLAnchorElement.prototype.click=function(){window.downloads.push({href:this.href,name:this.download})};
 configureAppRuntime({transport:{fetch:(...args)=>fetch(...args),socket:()=>{throw Error('Unexpected socket')},close(){}},resourceUrl:url=>url,prepareResourceUrl:async url=>url,releaseResourceUrl(){}});
 const client=createWorkspaceClient({workspacePath:'/fixture/project',projectPath:'/fixture/project'});
-createRoot(document.getElementById('root')).render(<I18nProvider><WorkspaceApiProvider client={client}><BrowserContext.Provider value={location.search.includes('browser=off')?null:url=>window.previews.push(url)}><ProjectSetupContext.Provider value={request=>window.setups.push(request)}><ProjectActions project=".workspace" directory="apps/mobile" workspacePath="/fixture/project"/></ProjectSetupContext.Provider></BrowserContext.Provider></WorkspaceApiProvider></I18nProvider>);`
+createRoot(document.getElementById('root')).render(<I18nProvider><WorkspaceApiProvider client={client}><BrowserContext.Provider value={location.search.includes('browser=off')?null:url=>window.previews.push(url)}><ProjectSetupContext.Provider value={request=>window.setups.push(request)}><CommandButtonMenu project=".workspace" directory="apps/mobile" workspacePath="/fixture/project"/></ProjectSetupContext.Provider></BrowserContext.Provider></WorkspaceApiProvider></I18nProvider>);`
   const bundle = await build({ input: 'virtual:release.tsx', write: false, platform: 'browser', onwarn(warning, warn) { if (warning.code !== 'MODULE_LEVEL_DIRECTIVE') warn(warning) }, output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
     name: 'fixture', resolveId(id) { if (id === 'virtual:release.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' },
     load(id) { if (id === 'virtual:release.tsx') return source; if (id === 'virtual:style') return '' },
   }] })
   const files = (await fs.readdir(path.join(root, 'src/components'))).filter(file => /^ProjectRelease.*\.tsx$/.test(file)).map(file => `src/components/${file}`)
-  files.push('src/components/ProjectActions.tsx', 'src/components/ProjectActionsResults.tsx', 'src/components/ProjectActionsEditor.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx')
+  files.push('src/components/CommandButtonMenu.tsx', 'src/components/ProjectActions.tsx', 'src/components/ProjectActionsResults.tsx', 'src/components/ProjectActionsEditor.tsx', 'packages/ui/src/dialog-frame.tsx', 'packages/ui/src/select-field.tsx')
   const content = (await Promise.all(files.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   return { code: bundle.output.find(item => item.type === 'chunk')!.code, css: compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))]) }
@@ -55,6 +55,7 @@ test('release dashboard makes results and publication discoverable and reviews r
     await page.route('http://mew-release.test/**', async route => {
       const request = route.request(), url = new URL(request.url())
       if (url.pathname.startsWith('/api/')) {
+        if (url.pathname === '/api/cmd-buttons') return route.fulfill({ json: { buttons: [] } })
         const body = request.method() === 'GET' ? undefined : request.postData() ? request.postDataJSON() : undefined
         requests.push({ pathname: url.pathname, body, url })
         if (url.pathname === '/api/project-actions') return route.fulfill({ json: { projectRoot: '/fixture/project/apps/mobile', actions: [buildAction], runs: [actionRun], warnings: [], needsAgent: false } })
@@ -77,7 +78,9 @@ test('release dashboard makes results and publication discoverable and reviews r
       :root{--color-surface:${dark ? '#171a24' : '#fff'};--color-surface-solid:var(--color-surface);--color-surface-raised:${dark ? '#252939' : '#f4f5f8'};--color-surface-raised-solid:var(--color-surface-raised);--color-surface-hover:${dark ? '#30394b' : '#e3e8ef'};--color-surface-hover-solid:var(--color-surface-hover);--color-ink:${dark ? '#f4f4f6' : '#202128'};--color-ink-secondary:${dark ? '#bbc0cd' : '#5b6170'};--color-accent:#6585d9;--color-accent-strong:#466ac5;--color-ink-on-accent:#fff;--color-edge:#707789;--color-edge-strong:#707789;--color-edge-bright:#707789;--color-success-ink:${dark ? '#9bd6a8' : '#236732'};--color-danger-strong:${dark ? '#ffacac' : '#a31616'}}body{margin:0;padding:8px;font:14px sans-serif;background:var(--color-surface);color:var(--color-ink)}*{box-sizing:border-box}</style><div id="root"></div><script>${code}</script></html>` })
     })
     await page.goto('http://mew-release.test/')
-    await page.getByRole('button', { name: 'Results & release', exact: true }).click()
+    assert.equal(await page.getByRole('button', { name: 'Results & release', exact: true }).count(), 0)
+    await page.getByRole('button', { name: 'apps/mobile command buttons', exact: true }).click()
+    await page.locator('[data-command-menu]').getByRole('button', { name: 'Results & release', exact: true }).click()
     let dialog = page.getByRole('dialog', { name: 'Results & release', exact: true })
     await dialog.getByRole('button', { name: 'View result', exact: true }).waitFor()
     assert.equal(await dialog.getByText('npm run build', { exact: true }).count(), 0)
@@ -170,6 +173,7 @@ test('release recovery keeps uncertain runs honest and exposes confirmed remote 
     const state = { projectRoot: '/fixture/project/apps/mobile', pipelines: [], runs, warnings: [], needsAgent: true, readiness: {} }
     await page.route('http://mew-release.test/**', route => {
       const url = new URL(route.request().url())
+      if (url.pathname === '/api/cmd-buttons') return route.fulfill({ json: { buttons: [] } })
       if (url.pathname === '/api/project-pipelines') return route.fulfill({ json: state })
       if (url.pathname === '/api/release-providers') return route.fulfill({ json: { connections: [], runs: [] } })
       if (url.pathname === '/api/project-actions') return route.fulfill({ json: { projectRoot: state.projectRoot, actions: [], runs: [], warnings: [], needsAgent: true } })
@@ -177,7 +181,8 @@ test('release recovery keeps uncertain runs honest and exposes confirmed remote 
       return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1"><meta charset="utf-8"><style>${css}:root{--color-surface:#fff;--color-surface-raised:#f4f5f8;--color-surface-hover:#e3e8ef;--color-ink:#202128;--color-ink-secondary:#5b6170;--color-accent:#6585d9;--color-accent-strong:#466ac5;--color-ink-on-accent:#fff;--color-edge:#707789;--color-edge-strong:#707789;--color-edge-bright:#707789}body{margin:0;font:14px sans-serif}*{box-sizing:border-box}</style><div id="root"></div><script>${code}</script></html>` })
     })
     await page.goto(`http://mew-release.test/?browser=${mode === 'unavailable' ? 'off' : 'on'}`)
-    await page.getByRole('button', { name: 'Results & release', exact: true }).click()
+    await page.getByRole('button', { name: 'apps/mobile command buttons', exact: true }).click()
+    await page.locator('[data-command-menu]').getByRole('button', { name: 'Results & release', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Results & release', exact: true })
     await dialog.getByRole('heading', { name: 'See what you’ve made', exact: true }).waitFor()
     if (mode === 'unavailable') {

@@ -70,9 +70,15 @@ createRoot(document.getElementById('root')).render(<I18nProvider><CommandButtonM
     await page.goto('http://mew-command.test/')
     await page.getByRole('button', { name: '명령 목록', exact: true }).waitFor()
     await page.keyboard.press('Alt+r')
-    const menu = page.locator('[data-cmd-overlay]'), row = menu.locator('[data-command-row]').first()
+    const menu = page.locator('[data-cmd-overlay]'), row = menu.locator('[data-command-name]').first()
     const command = row.getByRole('button', { name: '개발 서버 이름이 길어도 동작', exact: true })
     await command.waitFor()
+    assert.equal(await command.evaluate(el => el === el.ownerDocument.activeElement), true)
+    for (const name of ['배포', '빌드', '결과·출시']) {
+      await page.keyboard.press('ArrowUp')
+      assert.equal(await menu.getByRole('button', { name, exact: true }).evaluate(el => el === el.ownerDocument.activeElement), true)
+    }
+    await page.keyboard.press('Control+e')
     assert.equal(await command.evaluate(el => el === el.ownerDocument.activeElement), true)
     assert.deepEqual(await menu.locator('kbd').allTextContents(), ['1', '2', '3'])
     assert.equal(await command.getAttribute('aria-keyshortcuts'), '1')

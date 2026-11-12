@@ -1,6 +1,6 @@
 ---
 title: "Command Buttons and Scheduled Tasks"
-description: "Explains the project results/publishing screen, workflow setup, provider connections, and existing Build/Deploy result downloads. Also covers project and terminal command buttons and recurring agent schedules."
+description: "Explains the unified project command menu, results and publishing, Build/Deploy actions, provider connections, terminal command buttons, and recurring agent schedules."
 updated: "2026-11-11"
 상위파일:
   - "../../.mew/docs/_docs.md"
@@ -10,8 +10,8 @@ Use this guide to view project results, publish a configured project, run freque
 
 | What you want to do | Feature to use |
 | --- | --- |
-| See what you made or publish it using configured steps | Project **Results & release** |
-| Build a project or deploy a configured target and inspect its results | Project **Build** or **Deploy** |
+| See what you made or publish it using configured steps | Project **▶ Command Button → Results & release** |
+| Build a project or deploy a configured target and inspect its results | Project **▶ Command Button → Build** or **Deploy** |
 | Run builds, development servers, and other commands in a specific project | **▶ Command Button** in the top bar or project sidebar |
 | Type a frequently used string into the shell you are currently viewing | Terminal **Command Buttons** |
 | Run a new agent task at a specified time or interval | Menu → **Scheduled Tasks** |
@@ -19,7 +19,7 @@ Use this guide to view project results, publish a configured project, run freque
 
 ## Results and publishing
 
-1. Open **Results & release** for the project. **View result** opens an available address or shows downloadable files. Select **Make a new result** to run its configured preparation steps.
+1. Open the project's **▶ Command Button**, then choose **Results & release**. **View result** opens an available address or shows downloadable files. Select **Make a new result** to run its configured preparation steps.
 2. To publish, select the named publishing flow and choose **Publish**. Review its destination and branch, then choose **Publish now**. Nothing is published just by opening this review. If its settings changed, reopen the review before starting.
 3. Follow the actual steps, then open the resulting site, provider console, or files. You can close the dialog or switch projects; completion notices return to the original project while the Mew page remains connected.
 
@@ -31,7 +31,7 @@ Pipeline history survives a server restart. An unfinished run is marked interrup
 
 ## Build and deploy a project
 
-1. Open **Build** or **Deploy** beside the project's command button. Choose the named action, such as a debug or release build.
+1. Open the project's **▶ Command Button**, then choose **Build** or **Deploy**. Choose the named action, such as a debug or release build.
 2. Follow its status in the results dialog. You can close the dialog or switch projects while it runs; Mew announces completion or failure through your notification preferences while the Mew page remains connected. Select the notification to reopen the results.
 3. Open a completed result to download its available files, such as an APK, or a complete web build ZIP when offered. The result also provides the execution log and any configured Browser address. Failed results retain output for diagnosis and retry.
 

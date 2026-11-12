@@ -14,6 +14,7 @@ export function captureCommandMenuShortcut(open: () => void): () => void {
 
 export function focusFirstCommand(menu: HTMLElement | null) {
   const first = menu?.querySelector<HTMLButtonElement>('[data-command-choice]:not(:disabled)')
+    ?? menu?.querySelector<HTMLButtonElement>('[data-command-add]:not(:disabled)')
     ?? menu?.querySelector<HTMLButtonElement>('button:not(:disabled)')
   first?.focus()
 }

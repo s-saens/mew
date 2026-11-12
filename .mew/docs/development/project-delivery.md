@@ -1,6 +1,6 @@
 ---
 title: "Project delivery design"
-description: "Designs an outcome-oriented project delivery screen, editable sequential pipelines, durable run records, and scoped external CI/CD adapters. Separates the first implementation from later automatic triggers, isolated runners, and static app previews."
+description: "Designs a project delivery screen reached through the command menu, editable sequential pipelines, durable run records, and scoped external CI/CD adapters. Separates implemented behavior from later triggers, isolated runners, and static app previews."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
@@ -11,7 +11,7 @@ People using Mew should be able to answer two questions without learning deploym
 
 ## User experience
 
-Add one project entry for results and publishing. Lead with the latest useful result and two purposes: prepare a result to inspect, and publish it. A successful result offers its real preview address or downloadable files. A website with only static output files offers downloads and setup guidance; it must not pretend that an HTML download is a running preview.
+Open results and publishing from the project command menu, alongside Build and Deploy. Lead with the latest useful result and two purposes: prepare a result to inspect, and publish it. A successful result offers its real preview address or downloadable files. A website with only static output files offers downloads and setup guidance; it must not pretend that an HTML download is a running preview.
 
 When several variants exist, show a named choice using the shared selection control. Show execution steps only when they correspond to configured work. Preserve debug/release labels where they help choose an installable app or release. Keep commands, step editing, and provider fields in settings. The existing Build and Deploy dialogs remain available as advanced controls.
 

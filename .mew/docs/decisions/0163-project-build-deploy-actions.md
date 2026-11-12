@@ -1,13 +1,13 @@
 ---
 title: "Project build and deployment actions"
-description: "Accepts editable outcome-based Build and Deploy actions alongside command buttons, conservative nonblocking discovery, exit-based results, and a default project-setting skill. ADR 0164 extends output discovery while retaining the Mew Port removal."
+description: "Accepts editable outcome-based Build and Deploy actions, conservative nonblocking discovery, exit-based results, and a default project-setting skill. ADR 0164 extends discovery; ADR 0171 replaces the separate entry placement."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
 
 ## Status
 
-Accepted for implementation. No deployment, launcher execution, or server lifecycle operation is authorized by this decision.
+Accepted for implementation. [ADR 0171](0171-unified-project-command-menu.md) supersedes the separate entry placement while retaining the action and configuration contracts. No deployment, launcher execution, or server lifecycle operation is authorized by this decision.
 
 ## Context
 

@@ -1,6 +1,6 @@
 ---
 name: mew-project-setting
-description: "Set up or update a project for Mew from the user's concept: configure build/deploy actions, results and publishing pipelines, useful outputs, and Mew documentation with test-first development by default. Apply when creating, adapting, or repairing project setup."
+description: "Set up or update a project for Mew from the user's concept: configure command-menu build/deploy actions, results and publishing pipelines, useful outputs, and Mew documentation with test-first development by default."
 ---
 
 # Configure a project for Mew
@@ -15,7 +15,7 @@ Resolve routine choices from the user's request and project evidence. Ask only f
 
 ## Configure build and deployment actions
 
-Make common outcomes available through Mew's build/deploy buttons so the user does not need to know shell commands. Keep existing command buttons available for custom workflows.
+Make common outcomes available through Build and Deploy in Mew's project command menu so the user does not need to know shell commands. Keep existing command entries available for custom workflows.
 
 1. Inspect Mew's detected actions and the project's actual scripts and configuration. Reuse supported automation where it can establish the command and result from project evidence. If automation cannot resolve the setup, use agent investigation to configure the missing actions; report unresolved prerequisites without inventing working commands.
 2. Configure the project's `.mew/project-actions.json` using the format below. Add separate debug and release builds when the project supports them. Add deployment actions only for targets established by the project or user. Preserve user edits and allow the user to revise action names, commands, variants, and results.
@@ -41,7 +41,7 @@ Mew discovery recognizes explicit Node build/deploy scripts and Android wrapper 
 
 ## Configure results and publishing
 
-Use the results/publishing screen as the ordinary user entry. A result should offer a real address or useful files, and publishing should name the actual destination. Keep shell commands and service identifiers in the settings used by the actions and flows.
+Use Results & release in the project command menu as the ordinary user entry. A result should offer a real address or useful files, and publishing should name the actual destination. Keep shell commands and service identifiers in the settings used by the actions and flows.
 
 Mew can offer read-only default flows from actions and connected services. When a project needs a custom order, maintain `.mew/project-pipelines.json` as `{ "version": 1, "pipelines": [...] }`. Each pipeline has a stable `id`, a user-facing `name`, a `purpose` of `preview` or `publish`, and ordered `steps`. Each step has an `id`, a `name`, and either `{ "type": "action", "actionId": "existing-action-id" }` or `{ "type": "provider", "connectionId": "existing-private-connection-id" }`. An optional `resultUrl` names an established HTTP(S) result address. Preserve saved empty lists, custom names, and user edits.
 

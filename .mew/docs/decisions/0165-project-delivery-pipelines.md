@@ -1,13 +1,13 @@
 ---
 title: "Outcome-oriented project delivery pipelines"
-description: "Accepts a results-and-publishing UI backed by durable sequential pipelines and scoped external CI/CD adapters. Records credential ownership, explicit dispatch, uncertain-run recovery, and boundaries for future runners and triggers."
+description: "Accepts a results-and-publishing UI backed by durable sequential pipelines and scoped external CI/CD adapters. ADR 0171 places its entry in the command menu; credential ownership and recovery remain in force."
 created: "2026-11-11"
 updated: "2026-11-11"
 ---
 
 ## Status
 
-Accepted for implementation. Extends [ADR 0163](0163-project-build-deploy-actions.md) and [ADR 0164](0164-build-result-files.md). Preserves [ADR 0160](0160-remove-mew-port.md).
+Accepted for implementation. Extends [ADR 0163](0163-project-build-deploy-actions.md) and [ADR 0164](0164-build-result-files.md). [ADR 0171](0171-unified-project-command-menu.md) moves its entry to the command menu. Preserves [ADR 0160](0160-remove-mew-port.md).
 
 ## Context
 
