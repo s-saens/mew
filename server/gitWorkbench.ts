@@ -2,7 +2,7 @@ import { changedFromIp } from './change-ip.ts'
 import { gitOriginLink } from './git-origin-link.ts'
 import { gitProgressParser, type GitRemoteProgress } from '../shared/git-remote-progress.ts'
 import { currentGitEnv, gitRequestContext, gitWriteEnvironment, providerRemote, requireGitConnection, withGitCredential } from './git-execution.ts'
-import { GitConnectionError, gitConnections } from './git-connections.ts'
+import { GitConnectionError, gitConnections, gitIdentityEnv } from './git-connections.ts'
 import fs from 'node:fs'
 import path from 'node:path'
 import { execFile } from 'node:child_process'
@@ -71,6 +71,13 @@ export interface GitBranchRef {
   hash?: string
 }
 
+/** Local ref operations remain available offline, but use the account identity when linked. */
+function applyLinkedIdentity(git: SimpleGit): void {
+  const owner = gitRequestContext.getStore()?.owner
+  const connection = owner ? gitConnections.get(owner) : null
+  if (connection) git.env(gitIdentityEnv(connection.identity))
+}
+
 export async function repositoryBranches(project: string, relPath: string): Promise<GitBranchRef[]> {
   const { git } = repository(project, relPath)
   const raw = await git.raw(['for-each-ref', '--sort=refname', '--format=%(refname)%09%(symref)%09%(objectname)', 'refs/heads/', 'refs/remotes/', 'refs/tags/'])
@@ -89,6 +96,7 @@ export async function repositoryBranches(project: string, relPath: string): Prom
 export async function runBranchAction(project: string, relPath: string, action: unknown, refInput: unknown, nameInput?: unknown): Promise<GitRepositoryInfo & { worktreePath?: string }> {
   if (action !== 'switch' && action !== 'create' && action !== 'delete') throw new GitWorkbenchError('지원하지 않는 Git 작업입니다')
   const { abs, git } = repository(project, relPath)
+  applyLinkedIdentity(git)
   const key = fs.realpathSync(abs)
   if (remoteOperations.has(key)) throw new GitWorkbenchError('Git 원격 작업이 이미 실행 중입니다')
   remoteOperations.add(key)
@@ -484,6 +492,7 @@ export async function runRemoteAction(project: string, relPath: string, action: 
 export async function runCommitAction(project: string, relPath: string, action: unknown, hashInput: unknown, nameInput?: unknown): Promise<GitRepositoryInfo> {
   const { abs, git } = repository(project, relPath)
   if (gitRequestContext.getStore() && (action === 'cherry-pick' || action === 'revert')) { await requireGitConnection(abs); git.env(currentGitEnv()) }
+  else applyLinkedIdentity(git)
   const hash = assertHash(hashInput)
   switch (action as GitCommitAction) {
     case 'branch': await git.raw(['branch', assertRefName(nameInput, 'branch'), hash]); break

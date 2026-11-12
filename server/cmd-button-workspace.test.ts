@@ -11,6 +11,7 @@ import { DATA_DIR } from './dataDir.ts'
 import { setFeature } from './access-policy.ts'
 import { WORKSPACE_PROJECT } from './paths.ts'
 import { readActiveWorkspace, writeActiveWorkspace } from './userUiState.ts'
+import { commandWithGitIdentity } from './command-git-identity.ts'
 
 type Button = { name: string; command: string; session: string; running: boolean; previewUrls: string[] }
 
@@ -68,7 +69,7 @@ test('project command scopes read, save and run their own root without changing 
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(roots[1], '.mew/cmd-button.json'), 'utf8')).commands, updated)
   const started = await request(roots[1], 'POST', { name: 'Run', command: 'untrusted request command' })
   assert.equal(started.status, 200)
-  assert.deepEqual(runs, [{ session: other[0].session, command: 'echo updated-b', cwd: roots[1] }])
+  assert.deepEqual(runs, [{ session: other[0].session, command: commandWithGitIdentity('echo updated-b', email), cwd: roots[1] }])
   assert.equal(readActiveWorkspace(email), roots[0], 'reading, saving and running never switch roots')
   list.mock.mockImplementation(async () => [{ name: other[0].session, windows: 1, attached: false, createdAt: 0 }])
   t.mock.method(tmuxManager, 'listPanePids', async () => [])

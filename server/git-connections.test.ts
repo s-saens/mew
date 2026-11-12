@@ -146,7 +146,7 @@ test('branch API validates workspace and operates locally without a GitHub conne
   try {
     const refs = await fetch(url)
     assert.equal(refs.status, 200)
-    assert.deepEqual((await refs.json() as { branches: unknown[] }).branches, [{ name: current, ref: `refs/heads/${current}`, kind: 'local' }])
+    assert.deepEqual((await refs.json() as { branches: unknown[] }).branches, [{ name: current, ref: `refs/heads/${current}`, kind: 'local', hash: (await git.revparse('HEAD')).trim() }])
     assert.equal((await post({ action: 'create', ref: 'HEAD', name: 'stale', workspace: '/old' })).status, 409)
     assert.equal((await git.status()).current, current)
     const created = await post({ action: 'create', ref: 'HEAD', name: 'new-branch', workspace: process.env.MEW_WORKSPACE })
@@ -155,7 +155,16 @@ test('branch API validates workspace and operates locally without a GitHub conne
     assert.equal(gitConnections.get(owner), null)
     assert.equal((await post({ action: 'switch', ref: `refs/heads/${current}`, workspace: process.env.MEW_WORKSPACE })).status, 200)
     assert.equal((await git.status()).current, current)
-  } finally { server.close(); await once(server, 'close') }
+    gitConnections.set(owner, record('branch-user'))
+    assert.equal((await post({ action: 'create', ref: 'HEAD', name: 'linked-branch', workspace: process.env.MEW_WORKSPACE })).status, 200)
+    assert.equal((await git.raw(['reflog', 'show', '-1', '--format=%gn|%ge', 'linked-branch'])).trim(), 'branch-user|123+branch-user@users.noreply.github.com')
+    assert.equal((await git.raw(['reflog', 'show', '-1', '--format=%gn|%ge', 'HEAD'])).trim(), 'branch-user|123+branch-user@users.noreply.github.com')
+    const hash = (await git.revparse('HEAD')).trim()
+    const action = await fetch(`http://127.0.0.1:${address.port}/git/action?project=branch-api`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'branch', hash, name: 'history-branch' }) })
+    assert.equal(action.status, 200)
+    assert.equal((await git.raw(['reflog', 'show', '-1', '--format=%gn|%ge', 'history-branch'])).trim(), 'branch-user|123+branch-user@users.noreply.github.com')
+    assert.equal((await git.getConfig('user.name')).value, 'OS User')
+  } finally { gitConnections.remove(owner); server.close(); await once(server, 'close') }
 })
 
 test('remote progress streams after authentication, finishes only on Git exit and sanitizes errors', async () => {

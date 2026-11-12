@@ -2,7 +2,7 @@
 title: "Per-account Git connections and execution"
 created: 2026-09-29
 updated: "2026-11-09"
-description: "Per-account GitHub authorization, encrypted storage, and Git command boundaries. Covers author identity, scoped credentials, incidental commits and the temporary attachment exception, managed cloning, and general-agent commit attribution."
+description: "Per-account GitHub authorization, encrypted storage, and Git command boundaries. Covers author identity, scoped credentials, incidental commits and the temporary attachment exception, managed cloning, general-agent commit attribution, and command-button and local-ref attribution."
 상위파일: "MOC.md"
 ---
 
@@ -59,6 +59,8 @@ description: "Per-account GitHub authorization, encrypted storage, and Git comma
 ### Agent execution and OS boundaries
 
 - AI task files receive only the Mew owner and connection ID, provider, and host. The current connection ID is checked at execution start and immediately before each commit, and work does not continue with a disconnected or replaced connection. Tokens are not placed in AI prompts or input.json.
+- Project command-button invocations use the connected GitHub author and committer identity, or the Mew profile and login email when disconnected. Identity is scoped to the invocation; it does not change shared Git configuration or provide remote credentials. Shell commands and terminal buttons can still use OS credentials for remote Git operations.
+- Local branch and history ref actions use the connected GitHub identity for reflogs when available; disconnected local actions remain available.
 - General agents pin author/committer environment to the Mew account starting the request: connected GitHub name/private email, otherwise Mew profile name/login email. Overwrite/remove inherited server/runtime author/date variables without changing or forwarding shared Git settings or tokens.
 - Detached supervisors and ACP children retain that identity through reconnection and process recreation. Already-running supervisors are unchanged; use a new tab. Internal execution without an account retains its environment.
 - Regular terminals, cloning into external folders, and agent remote authentication use the existing OS execution environment. Account selection in the app is not a shell sandbox, and working trees are not cloned per user. Commit signing and hooks follow existing Git settings.

@@ -14,6 +14,7 @@ import { WORKSPACE_PROJECT as project, WORKSPACE_ROOT, setWorkspaceRoot } from '
 import { createSubproject, hasProjectMarker, projectDirectory } from './subprojects.ts'
 import { buildTree, buildTreeAsync, listTreeDirAsync } from './tree.ts'
 import { resetTreeWatchers } from './watcher.ts'
+import { commandWithGitIdentity } from './command-git-identity.ts'
 
 // Exercise real filesystem, catalog and HTTP authorization together in an isolated workspace.
 test('nested subprojects preserve hierarchy, command targets and permissions', async () => {
@@ -84,7 +85,7 @@ test('nested subprojects preserve hierarchy, command targets and permissions', a
       assert.equal((await listing.json() as { buttons: Array<{ command: string }> }).buttons[0].command, 'echo first')
       const run = await fetch(`${url}/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project, path: 'other/def', name: 'Run' }) })
       assert.equal(run.status, 200)
-      assert.deepEqual(runMock.mock.calls[0].arguments.slice(1), ['echo second', path.join(root, 'other/def')])
+      assert.deepEqual(runMock.mock.calls[0].arguments.slice(1), [commandWithGitIdentity('echo second', email), path.join(root, 'other/def')])
     } finally { listMock.mock.restore(); runMock.mock.restore() }
     assert.throws(() => createSubproject(project, 'missing'))
     assert.equal(fs.existsSync(path.join(root, 'missing')), false)

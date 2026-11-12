@@ -71,6 +71,7 @@ import { DATA_DIR } from './dataDir.ts'
 import { createTmuxManager, createTmuxRouter } from '@mew/tmux-term/server'
 import { CmdButtonError, commandSessionName, normalizeCmdButtons, oneShotCommand, readCmdButtons, writeCmdButtons } from './cmdButtons.ts'
 import { addCommandPreviewUrls } from './command-preview-urls.ts'
+import { commandWithGitIdentity } from './command-git-identity.ts'
 import { createProjectActionsRouter } from './project-actions-routes.ts'
 import { createProjectPipelinesRouter } from './project-pipelines-routes.ts'
 import { createReleaseProvidersRouter } from './release-providers-routes.ts'
@@ -2847,7 +2848,7 @@ export function createApiApp() {
       // 일회성 명령은 끝나자마자 자기 세션을 스스로 닫는다 — 세션 이름은 SESSION_NAME_RE로 검증된
       // 값이라 셸에 그대로 이어 붙여도 안전하다
       const command = button.oneShot ? oneShotCommand(button.command, session) : button.command
-      await tmuxManager.runCommand(session, command, root)
+      await tmuxManager.runCommand(session, commandWithGitIdentity(command, authOf(req).email!), root)
       res.json({ ok: true, session })
     } catch (err) {
       handleError(res, err)

@@ -1,6 +1,6 @@
 ---
 title: "Command Buttons and Scheduled Tasks"
-description: "Explains the project command menu, command web links, APK downloads, results and publishing, Build/Deploy actions, provider connections, and recurring agent schedules."
+description: "Explains the project command menu, command web links, APK downloads, results and publishing, Build/Deploy actions, provider connections, recurring agent schedules, and Git identity boundaries for command buttons."
 updated: "2026-11-11"
 상위파일:
   - "../../.mew/docs/_docs.md"
@@ -16,6 +16,8 @@ Use this guide to view project results, publish a configured project, run freque
 | Type a frequently used string into the shell you are currently viewing | Terminal **Command Buttons** |
 | Run a new agent task at a specified time or interval | Menu → **Scheduled Tasks** |
 | Send a message once later in the current conversation | [Scheduled Message](../../.mew/docs/features/terminals-agents-automation/agent-scheduled-messages.md) in the agent input bar |
+
+Project command buttons use the GitHub identity connected to the initiating Mew account for commit authors and committers. Without a connection, they use the Mew profile name and login email. Git remote authentication in these shell commands still follows the server OS environment; use the Git panel for Pull and Push with the connected GitHub account. On Linux and macOS, each project button runs in a subshell, so changes such as `cd` and `export` do not persist for later commands. Terminal command buttons type into an existing shell and retain that shell’s environment.
 
 ## Results and publishing
 
