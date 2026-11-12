@@ -96,7 +96,8 @@ import {
   mergeAgentReplay,
   pruneAgentLocalCaches,
 } from '../utils/agentEventCache'
-import { DEFAULT_RUNTIME_ID, RUNTIMES, runtimeOf } from './agentRuntimes'
+import { DEFAULT_RUNTIME_ID, RUNTIMES, isTerminalRuntime, runtimeOf } from './agentRuntimes'
+import { TerminalPicker } from './TerminalPicker'
 import { type fetchAgentTabs, type WorkspaceClient, type AgentRuntimeStatus, type AgentSessionClaim, type AgentCwdSuggestions, type ProjectInfo, type AgentSet, type AgentScheduledPrompt, type SkillSummary } from '../api/client'
 import type { MentionInputHandle } from './agent-composer-input'
 import { MentionTextarea, type MentionOption, type TriggerOptionSet } from './MentionTextarea'
@@ -1355,14 +1356,14 @@ function RuntimeDropdown({ current, onSelect }: { current: string; onSelect: (ru
           {statuses === null && !error ? (
             <div className="px-3 py-2 text-xs text-ink-muted">{uiText("런타임 확인 중…")}</div>
           ) : (
-            RUNTIMES.filter((runtime) => runtime.id !== 'tmux').map((rt) => {
+            RUNTIMES.filter((runtime) => !isTerminalRuntime(runtime.id)).map((rt) => {
               const status = statuses?.find((item) => item.id === rt.id)
               const busy = installing === rt.id || status?.installing === true
               return (
                 <div key={rt.id} className={`flex items-center gap-2 px-2.5 py-1 ${rt.id === 'tmux' ? 'mb-1' : ''}`}>
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center text-ink-secondary"><rt.Glyph /></span>
                   <div className={`min-w-0 flex-1 truncate text-xs ${rt.id === current ? 'text-ink' : 'text-ink-secondary'}`}>{rt.label}</div>
-                  {rt.id !== 'tmux' && <RuntimeSettingsButton runtimeId={rt.id} label={rt.label} />}
+                  {!isTerminalRuntime(rt.id) && <RuntimeSettingsButton runtimeId={rt.id} label={rt.label} />}
                   {rt.id !== current &&
                     (status?.installed ? (
                       <button
@@ -1416,7 +1417,7 @@ function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) 
     } catch { return [] }
   })
   const runtimes = [...new Set([...runtimeOrder, 'codex', 'claude', 'kimi', ...RUNTIMES.map(runtime => runtime.id)])]
-    .flatMap(id => RUNTIMES.filter(runtime => runtime.id === id && id !== 'tmux'))
+    .flatMap(id => RUNTIMES.filter(runtime => runtime.id === id && !isTerminalRuntime(id)))
   const reorder = (from: number, to: number) => {
     if (from < 0 || to < 0 || from >= runtimes.length || to >= runtimes.length || from === to) return
     const next = runtimes.map(runtime => runtime.id)
@@ -1617,7 +1618,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
   const [closeTarget, setCloseTarget] = useState<string | null>(null)
   const savedPreviews = useAgentTabPreviews(cacheAccount, workspacePath, tabs, activeId, allowAgent && tabsSynced)
   useEffect(() => {
-    const running = tabs.filter(tab => allowAgent && tabsSynced && tab.runtime && tab.runtime !== 'tmux' && opened.has(tab.id) && infos[tab.id]?.busy).length
+    const running = tabs.filter(tab => allowAgent && tabsSynced && tab.runtime && !isTerminalRuntime(tab.runtime) && opened.has(tab.id) && infos[tab.id]?.busy).length
     onRunningAgentsChange?.(running)
   }, [allowAgent, tabsSynced, tabs, opened, infos, onRunningAgentsChange])
   useEffect(() => () => onRunningAgentsChange?.(0), [onRunningAgentsChange])
@@ -1716,7 +1717,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
           setPickerOpen(false)
           const tab = state.tabs.find(candidate => candidate.id === state.activeId)
           const currentDock = latestDock.current
-          if (tab && currentDock) currentDock.select(currentDock.groupFor(tab.runtime === 'tmux' ? 'terminal' : 'agent', tab.id), tab.id)
+          if (tab && currentDock) currentDock.select(currentDock.groupFor(isTerminalRuntime(tab.runtime) ? 'terminal' : 'agent', tab.id), tab.id)
         }
       },
       ready: () => { if (alive) setTabsSynced(true) },
@@ -1803,7 +1804,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
     setPickerOpen(false)
     setActiveId(id)
     const tab = tabs.find((tab) => tab.id === id)
-    if (dock && tab) dock.select(dock.groupFor(tab.runtime === 'tmux' ? 'terminal' : 'agent', id), id)
+    if (dock && tab) dock.select(dock.groupFor(isTerminalRuntime(tab.runtime) ? 'terminal' : 'agent', id), id)
     setOpened((prev) => (prev.has(id) ? prev : new Set(prev).add(id)))
   }
 
@@ -1822,7 +1823,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
 
   const addTab = () => { setPickerGroup(focusedGroup); setPickerOpen(true) }
 
-  const addRuntimeTab = (runtime: string, preset?: AgentTab['preset'], destination = runtime === 'tmux' ? 'terminal' : pickerGroup) => {
+  const addRuntimeTab = (runtime: string, preset?: AgentTab['preset'], destination = isTerminalRuntime(runtime) ? 'terminal' : pickerGroup) => {
     if (openingRuntime) return
     setOpeningRuntime(runtime)
     setOpenRuntimeError(null)
@@ -1845,7 +1846,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
         latestDock.current?.assign(destination, tab.id)
         setOpened((prev) => new Set(prev).add(tab.id))
         setPickerOpen(false)
-        if (runtime !== 'tmux') onPickerRuntimeChosen?.(runtime)
+        if (!isTerminalRuntime(runtime)) onPickerRuntimeChosen?.(runtime)
       })
       .catch((err: unknown) => setOpenRuntimeError(err instanceof Error ? err.message : String(err)))
       .finally(() => setOpeningRuntime(null))
@@ -1871,7 +1872,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
   const finishCloseTab = (id: string) => {
     const closing = tabs.find((tab) => tab.id === id)
     if (!closing) return
-    closingFocusGroup.current = dock?.groupFor(closing.runtime === 'tmux' ? 'terminal' : 'agent', id) ?? ''
+    closingFocusGroup.current = dock?.groupFor(isTerminalRuntime(closing.runtime) ? 'terminal' : 'agent', id) ?? ''
     closedTabs.current = [...closedTabs.current.slice(-49), { tab: closing, group: closingFocusGroup.current, index: tabs.indexOf(closing) }]
     if (closing.runtime && runtimeOf(closing.runtime).surface === 'terminal') {
       void stopAgentTerminal(closing.runtime, closing.id).catch(console.error)
@@ -1913,7 +1914,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
   const closeTab = (id: string) => {
     const tab = tabs.find(candidate => candidate.id === id)
     if (!tab) return
-    if (tab.runtime !== 'tmux' && infos[id]?.busy) {
+    if (!isTerminalRuntime(tab.runtime) && infos[id]?.busy) {
       setCloseTarget(id)
       return
     }
@@ -1928,10 +1929,10 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
     onConfirm={() => { setCloseTarget(null); finishCloseTab(closingTab.id) }}
   />
 
-  const panelGroups = dock ? [...new Set(['agent', 'terminal', ...tabs.map((tab) => dock.groupFor(tab.runtime === 'tmux' ? 'terminal' : 'agent', tab.id))])] : []
-  const groupTabs = (group: string) => tabs.filter((tab) => dock?.groupFor(tab.runtime === 'tmux' ? 'terminal' : 'agent', tab.id) === group)
+  const panelGroups = dock ? [...new Set(['agent', 'terminal', ...tabs.map((tab) => dock.groupFor(isTerminalRuntime(tab.runtime) ? 'terminal' : 'agent', tab.id))])] : []
+  const groupTabs = (group: string) => tabs.filter((tab) => dock?.groupFor(isTerminalRuntime(tab.runtime) ? 'terminal' : 'agent', tab.id) === group)
   const groupActive = useCallback((group: string) => {
-    const list = tabs.filter(tab => dock?.groupFor(tab.runtime === 'tmux' ? 'terminal' : 'agent', tab.id) === group)
+    const list = tabs.filter(tab => dock?.groupFor(isTerminalRuntime(tab.runtime) ? 'terminal' : 'agent', tab.id) === group)
     return list.find(tab => tab.id === dock?.state.active[group])?.id ?? list.find(tab => tab.id === activeId)?.id ?? list[0]?.id ?? null
   }, [tabs, dock, activeId])
   const focusedActiveId = dock ? groupActive(focusedGroup) : activeId
@@ -1939,9 +1940,9 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
   const reopenTab = (group = focusedGroup) => {
     if (!tabsSynced || closeTarget) return false
     const terminal = group.startsWith('terminal')
-    const index = closedTabs.current.findLastIndex(({ tab }) => !dock || (tab.runtime === 'tmux') === terminal)
+    const index = closedTabs.current.findLastIndex(({ tab }) => !dock || (isTerminalRuntime(tab.runtime)) === terminal)
     const closed = closedTabs.current[index]
-    if (!closed || (closed.tab.runtime === 'tmux' ? !allowTerminal : !allowAgent)) return false
+    if (!closed || (isTerminalRuntime(closed.tab.runtime) ? !allowTerminal : !allowAgent)) return false
     if (closed.tab.runtime && runtimeOf(closed.tab.runtime).surface === 'terminal' && !allowTerminal) return false
     closedTabs.current.splice(index, 1)
     // A fresh host ID keeps delayed session shutdown and cache cleanup on the closed tab.
@@ -1982,7 +1983,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
   const switchTab = (dir: 'left' | 'right') => {
     const list = dock ? groupTabs(focusedGroup) : tabs
     if (!list.length) return
-    const includePicker = !dock || !focusedGroup.startsWith('terminal')
+    const includePicker = true
     const picking = includePicker && pickerOpen && (!dock || pickerGroup === focusedGroup)
     const idx = picking ? list.length : list.findIndex((tab) => tab.id === focusedActiveId)
     if (idx < 0) return
@@ -2105,7 +2106,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
   }, [])
 
   const renderSession = (tab: AgentTab, isActive: boolean, visible = isActive) => {
-    if (tab.runtime === 'tmux' ? !allowTerminal : !allowAgent) return null
+    if (isTerminalRuntime(tab.runtime) ? !allowTerminal : !allowAgent) return null
     if (tab.runtime && runtimeOf(tab.runtime).surface === 'terminal' && !allowTerminal) return <p className="p-3 text-sm text-ink-secondary">{t('access.terminalRequired')}</p>
     const resumeSessionId = sessionIdOf(tab, tab.runtime!, tab.cwd!) ?? null
     return (runtimeOf(tab.runtime!).surface === 'terminal' ? (
@@ -2116,7 +2117,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
                 cwd={tab.cwd!}
                 activeFilePath={focusedFilePath}
                 getSelectedText={getSelectedText}
-                renderCommandButtons={tab.runtime === 'tmux' ? renderCommandButtons : undefined}
+                renderCommandButtons={isTerminalRuntime(tab.runtime) ? renderCommandButtons : undefined}
               />
             ) : <AgentSessionView
               key={cacheAccount}
@@ -2162,18 +2163,18 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
     {closeConfirmation}
     {panelGroups.filter(group => group.startsWith('terminal') ? allowTerminal : allowAgent).map((group) => {
       const terminal = group.startsWith('terminal'), list = groupTabs(group), selected = groupActive(group)
-      const picking = !terminal && ((pickerOpen && pickerGroup === group) || (tabsSynced && !tabs.some((tab) => tab.runtime !== 'tmux')))
-      return <DockPanel key={group} id={group} tabs={list.map((tab) => tab.id)} kind={terminal ? 'terminal' : 'agent'} visible={(terminal ? terminalOpen : agentOpen) && (picking || list.length > 0 || !tabs.some((tab) => (tab.runtime === 'tmux') === terminal))} onFocus={() => focusGroup(group)}>
+      const picking = (terminal ? terminalOpen : agentOpen) && ((pickerOpen && pickerGroup === group) || (tabsSynced && !tabs.some(tab => isTerminalRuntime(tab.runtime) === terminal)))
+      return <DockPanel key={group} id={group} tabs={list.map((tab) => tab.id)} kind={terminal ? 'terminal' : 'agent'} visible={(terminal ? terminalOpen : agentOpen) && (picking || list.length > 0 || !tabs.some((tab) => (isTerminalRuntime(tab.runtime)) === terminal))} onFocus={() => focusGroup(group)}>
         <AgentTabBar group={group} tabs={list} activeId={selected} pickerOpen={picking} infos={infos} onActivate={activate}
-          onAdd={() => { focusGroup(group); if (terminal) addRuntimeTab('tmux', undefined, group); else { setPickerGroup(group); setPickerOpen(true) } }}
+          onAdd={() => { focusGroup(group); setPickerGroup(group); setPickerOpen(true) }}
           onRename={renameTab} onReorder={(from, to) => { const a = tabs.findIndex((tab) => tab.id === list[from]?.id), b = tabs.findIndex((tab) => tab.id === list[to]?.id); if (a >= 0 && b >= 0) reorderTabs(a, b) }}
           onCloseTab={closeTab} onReopenTab={() => reopenTab(group)} onClosePanel={() => { if (!dock.desktop || !dock.closeGroup(group)) (terminal ? onCloseTerminal ?? onClose : onClose)() }} />
         {(!tabsSynced || picking || terminal && (!list.length || openRuntimeError)) && <DockInlineBody group={group} className="relative flex min-h-0 flex-1 flex-col bg-surface-deep">
-        <AgentDockContent onReopen={() => reopenTab(group)} onAdd={() => { focusGroup(group); if (terminal) addRuntimeTab('tmux', undefined, group); else { setPickerGroup(group); setPickerOpen(true) } }}>
+        <AgentDockContent onReopen={() => reopenTab(group)} onAdd={() => { focusGroup(group); setPickerGroup(group); setPickerOpen(true) }}>
         {!tabsSynced && (() => {
           return !terminal ? <AgentRestoringView /> : <div className="px-4 py-3 text-xs text-ink-muted" aria-busy="true">{uiText("불러오는 중…")}</div>
         })()}
-        {tabsSynced && terminal && !list.length && <div className="flex min-h-0 flex-1 items-center justify-center"><button type="button" className="rounded-md border border-edge-bright px-4 py-2 text-sm text-ink-secondary hover:bg-surface-raised" onClick={() => { focusGroup(group); addRuntimeTab('tmux', undefined, group) }}>{uiText("새 터미널")}</button></div>}
+        {tabsSynced && picking && terminal && terminalOpen && <TerminalPicker onSelect={(runtime) => addRuntimeTab(runtime, undefined, group)} />}
         {picking && !terminal && <div className="relative flex min-h-0 flex-1 flex-col overflow-auto">
           {openRuntimeError && <PanelNotice>{openRuntimeError}</PanelNotice>}
           {openingRuntime && <div className="px-4 pt-3 text-xs text-ink-muted">{uiText("{name} 여는 중…", { name: runtimeOf(openingRuntime).label })}</div>}
@@ -2184,11 +2185,11 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
         </DockInlineBody>}
       </DockPanel>
     })}
-    {tabsSynced && tabs.filter((tab) => (tab.runtime === 'tmux' ? allowTerminal : allowAgent) && tab.runtime && tab.cwd && opened.has(tab.id)).map((tab) => {
-      const group = dock.groupFor(tab.runtime === 'tmux' ? 'terminal' : 'agent', tab.id)
-      const active = (tab.runtime === 'tmux' ? terminalOpen : agentOpen) && groupActive(group) === tab.id && !(pickerOpen && pickerGroup === group)
+    {tabsSynced && tabs.filter((tab) => (isTerminalRuntime(tab.runtime) ? allowTerminal : allowAgent) && tab.runtime && tab.cwd && opened.has(tab.id)).map((tab) => {
+      const group = dock.groupFor(isTerminalRuntime(tab.runtime) ? 'terminal' : 'agent', tab.id)
+      const active = (isTerminalRuntime(tab.runtime) ? terminalOpen : agentOpen) && groupActive(group) === tab.id && !(pickerOpen && pickerGroup === group)
       return <DockBody key={`${tab.id}:${tab.runtime}:${tab.cwd}`} group={group} active={active} onFocus={() => focusGroup(group)}>
-        <AgentDockContent onReopen={() => reopenTab(group)} onClose={() => closeTab(tab.id)} onAdd={() => { focusGroup(group); if (tab.runtime === 'tmux') addRuntimeTab('tmux', undefined, group); else { setPickerGroup(group); setPickerOpen(true) } }}>{renderSession(tab, active && focusedGroup === group, active)}</AgentDockContent>
+        <AgentDockContent onReopen={() => reopenTab(group)} onClose={() => closeTab(tab.id)} onAdd={() => { focusGroup(group); setPickerGroup(group); setPickerOpen(true) }}>{renderSession(tab, active && focusedGroup === group, active)}</AgentDockContent>
       </DockBody>
     })}
   </>
@@ -2288,7 +2289,7 @@ function AgentTerminalView({
     return () => { alive = false }
   }, [cwd, retry, runtime, tabId, startAgentTerminal])
 
-  if (session) return <TmuxTerminal socketFactory={openSocket} sessionName={session} inputPlaceholder={t('common.textInput')} activeFilePath={activeFilePath} getSelectedText={getSelectedText} renderCommandButtons={renderCommandButtons} insertRefTarget={active ? runtime === 'tmux' ? 'terminal' : 'agent' : null} />
+  if (session) return <TmuxTerminal socketFactory={openSocket} sessionName={session} inputPlaceholder={t('common.textInput')} activeFilePath={activeFilePath} getSelectedText={getSelectedText} renderCommandButtons={renderCommandButtons} insertRefTarget={active ? isTerminalRuntime(runtime) ? 'terminal' : 'agent' : null} />
   return (
     <div className="relative flex h-full items-center justify-center bg-surface-deep text-center">
       {error ? (

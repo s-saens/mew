@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
-import { AGENT_TERMINAL_SESSION_PREFIX, type TmuxManager } from '@mew/tmux-term/server'
-import { RUNTIMES, resolvedTerminalSpec } from './agentRuntimes.ts'
+import { AGENT_TERMINAL_SESSION_PREFIX, createDirectTerminal, directTerminalNames, stopDirectTerminal, type DirectTerminalKind, type TmuxManager } from '@mew/tmux-term/server'
+import { findExecutable, RUNTIMES, resolvedTerminalSpec } from './agentRuntimes.ts'
 import { spawnSpecCommand } from './spawnSpecCommand.ts'
 import type { WorkspaceScope } from '../shared/workspace-scope.ts'
 
@@ -10,6 +10,19 @@ const TAB_ID = /^[A-Za-z0-9_-]{1,64}$/
 export class AgentTerminalError extends Error {}
 export type AgentTerminalIdentity = WorkspaceScope & { account: string }
 type TerminalOptions = { allowLegacy?: boolean }
+export function isDirectTerminal(runtime: string): runtime is DirectTerminalKind {
+  return runtime === 'shell' || runtime === 'zellij' || runtime === 'screen'
+}
+export function isShellTerminal(runtime: string): boolean { return runtime === 'tmux' || isDirectTerminal(runtime) }
+
+export function terminalBackends() {
+  return [
+    { id: 'shell', label: 'Terminal', installed: true },
+    { id: 'tmux', label: 'tmux', installed: !!findExecutable(process.env.MEW_MULTIPLEXER || (process.platform === 'win32' ? 'psmux' : 'tmux')) },
+    { id: 'zellij', label: 'Zellij', installed: !!findExecutable('zellij') },
+    { id: 'screen', label: 'GNU Screen', installed: !!findExecutable('screen') },
+  ]
+}
 
 function selectedSession(names: Set<string>, runtime: string, tab: string, identity: AgentTerminalIdentity | undefined, options: TerminalOptions): string {
   const qualified = agentTerminalSessionName(runtime, tab, identity)
@@ -33,6 +46,15 @@ export async function startAgentTerminal(
   identity?: AgentTerminalIdentity,
   options: TerminalOptions = {},
 ): Promise<{ session: string }> {
+  if (isDirectTerminal(runtime)) {
+    if (!terminalBackends().find(item => item.id === runtime)?.installed) throw new AgentTerminalError(`${runtime} is not installed`)
+    const names = new Set(directTerminalNames())
+    const qualified = directSessionName(runtime, tab, identity)
+    const legacy = directSessionName(runtime, tab)
+    const session = !names.has(qualified) && options.allowLegacy && names.has(legacy) ? legacy : qualified
+    createDirectTerminal(session, runtime, cwd)
+    return { session }
+  }
   const entry = RUNTIMES[runtime]
   const spec = resolvedTerminalSpec(runtime)
   if (entry?.surface !== 'terminal' || !spec) throw new AgentTerminalError('터미널형 에이전트 런타임이 아닙니다')
@@ -47,8 +69,20 @@ export async function startAgentTerminal(
 }
 
 export async function stopAgentTerminal(manager: TmuxManager, runtime: string, tab: string, identity?: AgentTerminalIdentity, options: TerminalOptions = {}): Promise<void> {
+  if (isDirectTerminal(runtime)) {
+    const names = new Set(directTerminalNames())
+    const qualified = directSessionName(runtime, tab, identity)
+    const legacy = directSessionName(runtime, tab)
+    const session = !names.has(qualified) && options.allowLegacy && names.has(legacy) ? legacy : qualified
+    await stopDirectTerminal(session, runtime)
+    return
+  }
   if (RUNTIMES[runtime]?.surface !== 'terminal') throw new AgentTerminalError('터미널형 에이전트 런타임이 아닙니다')
   const names = new Set((await manager.list()).map(item => item.name))
   const session = selectedSession(names, runtime, tab, identity, options)
   if (names.has(session)) await manager.kill(session)
+}
+
+function directSessionName(runtime: DirectTerminalKind, tab: string, identity?: AgentTerminalIdentity): string {
+  return `mewdirect-${agentTerminalSessionName(runtime, tab, identity).slice(AGENT_TERMINAL_SESSION_PREFIX.length)}`
 }

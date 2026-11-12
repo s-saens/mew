@@ -8,6 +8,7 @@ import { isValidSessionName } from './tmux.ts'
 import { preparePtyHelper } from './pty-helper.ts'
 import { terminalBackend } from './backends/index.ts'
 import { sameWebSocketOrigin } from './websocket-origin.ts'
+import { connectDirectTerminal } from './direct-terminal.ts'
 
 const DEFAULT_WS_PATH = '/api/tmux/ws'
 const MIN_COLS = 10
@@ -65,7 +66,9 @@ export function attachTmuxWebSocket(
 
     wss.handleUpgrade(req, socket, head, (ws) => {
       opts.onConnection?.(ws, req)
-      handleConnection(ws, session, cols, rows, opts.cwd, () => opts.authorize?.(req) ?? true)
+      const authorized = () => opts.authorize?.(req) ?? true
+      if (session.startsWith('mewdirect-')) connectDirectTerminal(session, ws, cols, rows, authorized)
+      else handleConnection(ws, session, cols, rows, opts.cwd, authorized)
     })
   })
 }

@@ -177,7 +177,7 @@ export function TmuxTerminal({
   const [keyboardLocked, setKeyboardLocked] = useState(readKeyboardLock)
   const [selectSnapshot, setSelectSnapshot] = useState('')
   const [copied, setCopied] = useState<'ok' | 'fail' | null>(null)
-  const [connState, setConnState] = useState<'connecting' | 'open' | 'reconnecting'>('connecting')
+  const [connState, setConnState] = useState<'connecting' | 'open' | 'reconnecting' | 'exited'>('connecting')
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const selectPreRef = useRef<HTMLPreElement>(null)
   const selectModeRef = useRef(false)
@@ -525,6 +525,7 @@ export function TmuxTerminal({
     let disposed = false
     let reconnectTimer: number | null = null
     let attempts = 0
+    let exited = false
 
     function openSocket() {
       if (disposed) return
@@ -542,8 +543,9 @@ export function TmuxTerminal({
       ws.onmessage = (event) => {
         if (typeof event.data === 'string') term.write(event.data)
       }
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         if (disposed) return
+        if (event?.code === 4001) { exited = true; setConnState('exited'); return }
         setConnState('reconnecting')
         scheduleReconnect()
       }
@@ -563,7 +565,7 @@ export function TmuxTerminal({
 
     // 탭 복귀/온라인 복귀 시 대기 중인 백오프를 건너뛰고 곧바로 재접속한다 (사용자가 수동으로 하던 것)
     function reconnectNow() {
-      if (disposed) return
+      if (disposed || exited) return
       if (wsRef.current && wsRef.current.readyState <= WebSocket.OPEN) return // 이미 연결됨/연결 중
       if (reconnectTimer !== null) {
         window.clearTimeout(reconnectTimer)
@@ -728,7 +730,8 @@ export function TmuxTerminal({
             {selectSnapshot}
           </pre>
         )}
-        {connState !== 'open' && <div role="status" aria-label={uiText('불러오는 중…')} className="pointer-events-none absolute right-2 top-2 z-30 flex text-ink-secondary">
+        {connState === 'exited' && <div role="status" className="absolute right-2 top-2 z-30 text-xs text-ink-secondary">{uiText('터미널이 종료되었습니다')}</div>}
+        {connState !== 'open' && connState !== 'exited' && <div role="status" aria-label={uiText('불러오는 중…')} className="pointer-events-none absolute right-2 top-2 z-30 flex text-ink-secondary">
           <LoadingIndicator size={16} />
         </div>}
       </div>

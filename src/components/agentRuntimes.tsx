@@ -19,6 +19,9 @@ import {
 import { Terminal } from 'iconoir-react'
 
 export const RUNTIMES = [
+  { id: 'shell', get label() { return uiText('기본 터미널') }, surface: 'terminal' as const, Glyph: Terminal },
+  { id: 'zellij', label: 'Zellij', surface: 'terminal' as const, Glyph: Terminal },
+  { id: 'screen', label: 'GNU Screen', surface: 'terminal' as const, Glyph: Terminal },
   { id: 'tmux', get label() { return uiText("tmux 터미널") }, surface: 'terminal' as const, Glyph: Terminal },
   { id: 'claude', label: 'Claude Agent', surface: 'acp' as const, Glyph: ClaudeCodeGlyph },
   { id: 'antigravity', label: 'Antigravity', surface: 'acp' as const, Glyph: AntigravityGlyph },
@@ -35,3 +38,6 @@ export const RUNTIMES = [
 export const DEFAULT_RUNTIME_ID = 'claude'
 export const runtimeOf = (id: string) => RUNTIMES.find((runtime) => runtime.id === id)
   ?? RUNTIMES.find((runtime) => runtime.id === DEFAULT_RUNTIME_ID)!
+
+export const isTerminalRuntime = (id: string | null | undefined): boolean =>
+  id === 'shell' || id === 'tmux' || id === 'zellij' || id === 'screen'

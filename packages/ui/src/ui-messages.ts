@@ -1095,6 +1095,8 @@ export const uiMessages = {
   " 설정": [" settings","设置","の設定"],
   "새 세션부터 적용": ["Applies to new sessions","从新会话开始生效","新しいセッションから適用"],
   "설치됨": ["Installed","已安装","インストール済み"],
+  "터미널이 종료되었습니다": ["Terminal exited", "终端已退出", "ターミナルが終了しました"],
+  "기본 터미널": ["Default terminal", "默认终端", "標準ターミナル"],
   "설치되지 않음": ["Not installed","未安装","未インストール"],
   "설치": ["Install","安装","インストール"],
   "런타임 삭제": ["Uninstall runtime","卸载运行时","ランタイムを削除"],

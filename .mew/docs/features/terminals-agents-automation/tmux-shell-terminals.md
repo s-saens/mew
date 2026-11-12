@@ -1,14 +1,14 @@
 ---
 id: "mew-agents-terminal"
 parent: "mew-agents"
-title: "tmux shell terminal"
+title: "Shell terminals and multiplexers"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-03"
+updated: "2026-11-12"
 status_hash: "b19a2771f0bfb2f727bc14539350c69b524d222b67a2322b322f359fefd6a804"
-files: ["src/components/AgentPanel.tsx", "src/components/TermButtonBar.tsx", "src/components/CommandButtonMenu.tsx", "server/termButtons.ts", "packages/tmux-term/src/TmuxTerminal.tsx", "packages/tmux-term/src/server/tmuxWs.ts"]
+files: ["src/components/AgentPanel.tsx", "src/components/TerminalPicker.tsx", "src/components/TermButtonBar.tsx", "src/components/CommandButtonMenu.tsx", "server/termButtons.ts", "packages/tmux-term/src/TmuxTerminal.tsx", "packages/tmux-term/src/server/tmuxWs.ts", "packages/tmux-term/src/server/direct-terminal.ts", "server/agentTerminal.ts"]
 commits: []
-description: "Per-project shell tabs, input and commands, restoration, and connection recovery. Defines deferred rendering, tmux versus Windows psmux/PowerShell, mobile controls and focus, tab operations, and verification limits."
+description: "Per-project shell, tmux, Zellij, and GNU Screen tabs: backend selection, session lifetimes, restoration, input, mobile controls, and connection recovery."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -23,7 +23,7 @@ description: "Per-project shell tabs, input and commands, restoration, and conne
 - The terminal's default background is transparent, allowing the panel background to show through. Text, cursors, the ANSI palette, and the selection-mode screen follow mew's light and dark themes.
 
 - Shell tabs show their current one-based position in muted gray immediately before the close button, following the shared [tab position contract](agent-sets-and-tab-creation.md#scope).
-- Provides regular shell tab creation, reconnection, input, session termination, and terminal command buttons.
+- Choose the default shell, tmux, Zellij, or GNU Screen from the terminal panel’s `+` picker. Missing executables are shown as unavailable. Tabs retain their selected type, working directory, and terminal command buttons.
 - Detects localhost TCP listening ports opened by project commands and opens the app from the same command row.
 - Unifies the input area's background, input field, and send button design with the agent panel.
 
@@ -41,14 +41,16 @@ description: "Per-project shell tabs, input and commands, restoration, and conne
 
 - The agent panel prepares `TmuxTerminal` through `DeferredAgentTerminal` only when a terminal session surface renders. Restoring background agent metadata does not download xterm. While code loads, display the shared busy indicator and retain current session props. Canceling the surface cannot attach its old session after loading completes; reopening reuses the downloaded module. Backend session creation, restoration, authorization, and termination retain their existing owners. The [startup contract](../../development/browser-startup.md#workspace-initialization) defines the module boundary.
 
-- Linux/macOS uses the existing tmux, while native Windows uses psmux and PowerShell. The backend owns the executables and argv for creation, commands, attach, input, capture, and clipboard control, while retaining the existing tmux API and session IDs. Namespaces per Windows state path separate them from user sessions. Implementation, Windows CI, and public support gates follow the [OS execution contract](../../development/windows-native.md).
+- The `+` picker and an empty terminal panel show the available terminal types; keyboard new-tab shortcuts open the same picker. Number keys select available entries. `GET /api/terminal-backends` reports executable availability, and unavailable options cannot be selected. Existing tmux tabs keep their runtime and session path. The selected runtime is shared with account tab metadata under the [account tab contract](../../development/account-tabs.md).
+
+- The default shell is a server-owned PTY using `$SHELL` or `/bin/sh` on POSIX and the default command interpreter on Windows. It survives browser disconnection while the server remains running but ends with the server. Zellij and GNU Screen attach to named sessions and can reconnect after a server restart; their executables must be installed. Their server-owned PTY and the default shell replay up to 256 Ki UTF-16 code units of recent raw terminal output on reconnection; a truncated control sequence or alternate-screen state may not restore exactly. Closing the tab terminates its session; closing the panel or browser does not. Existing tmux uses its existing backend, including psmux on native Windows. See [ADR 0170](../../decisions/0170-terminal-backends.md) and the [OS execution contract](../../development/windows-native.md).
 
 - The command menu is wider to show more of each name, with smaller text, spacing, and control widths. Specific dimensions follow the [shared UI contract](../../development/ui-overlays.md#dropdowns-and-selection-components).
 
 
-- `Ctrl/Cmd+N/T` and `Alt+N` use the same new-terminal flow as the group's `+` through focus registration for the regular shell tab bar and body. The shared `TmuxTerminalPanel` opens the same name input. The keys are not sent to the PTY or used to create a new file, and key repeats, IME input, and modals do not trigger creation. Browser-reserved key conditions, tab closing, and cycling follow the [Shared Keyboard Shortcut Contract](../../development/ui-editor-input.md#focus-based-tab-shortcuts).
+- `Ctrl/Cmd+N/T` and `Alt+N` use the same new-terminal flow as the group's `+` through focus registration for the regular shell tab bar and body. The shared terminal panel opens the same backend picker. The keys are not sent to the PTY or used to create a new file, and key repeats, IME input, and modals do not trigger creation. Browser-reserved key conditions, tab closing, and cycling follow the [Shared Keyboard Shortcut Contract](../../development/ui-editor-input.md#focus-based-tab-shortcuts).
 
-- `Ctrl/Cmd+Shift+T` reopens tabs in the current root's terminal panel, starting with the most recently closed. It preserves tab names, working directories, and order, and starts terminated shells as new sessions. It does nothing if there is no closed-tab history. Actions that only hide the panel are not recorded, and the history is cleared on refresh or root/account changes. Up to 50 closed agent and terminal tabs combined are kept in memory, with the most recent entry selected by panel type.
+- `Ctrl/Cmd+Shift+T` reopens tabs in the current root's terminal panel, starting with the most recently closed. It preserves tab names, terminal types, working directories, and order, and starts terminated shells as new sessions. It does nothing if there is no closed-tab history. Actions that only hide the panel are not recorded, and the history is cleared on refresh or root/account changes. Up to 50 closed agent and terminal tabs combined are kept in memory, with the most recent entry selected by panel type.
 
 - Double-clicking the title, icon, or tab padding in the shared `AgentTabBar` (double-tapping on mobile) edits that tab's name. F2 opens the same input, while double-clicking the close button or name input does not reopen editing. On desktop, double-clicking the panel drag handle maximizes or restores the panel.
 

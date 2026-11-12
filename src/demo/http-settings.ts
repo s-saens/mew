@@ -95,10 +95,14 @@ export const handleDemoSettings: DemoHttpHandler = ({ store, request, url, body,
     else store.setState(`runtime-logged-out:${status.id}`, true)
     return demoJson({ status, output: 'Demo: 실제 설치·삭제·계정 연결은 변경하지 않았습니다.' })
   }
+  if (route === '/api/terminal-backends') {
+    requireMethod(request, 'GET')
+    return demoJson({ backends: ['shell', 'tmux', 'zellij', 'screen'].map(id => ({ id, label: id, installed: true })) })
+  }
   const runtimeRoute = route.match(/^\/api\/agent-runtimes\/([^/]+)\/(models|account|settings|terminal\/([^/]+))$/)
   if (runtimeRoute) {
     const id = decodeURIComponent(runtimeRoute[1])
-    if (runtimeRoute[3] && runtimes.some(item => item.id === id)) {
+    if (runtimeRoute[3] && (runtimes.some(item => item.id === id) || ['shell', 'zellij', 'screen'].includes(id))) {
       requireMethod(request, 'POST', 'DELETE')
       const tab = decodeURIComponent(runtimeRoute[3])
       if (!/^[\w-]{1,64}$/.test(tab)) throw new DemoError('터미널 탭을 확인해 주세요.')

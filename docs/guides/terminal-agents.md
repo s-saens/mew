@@ -1,7 +1,7 @@
 ---
 title: "Terminal and Agent Tabs"
-description: "Covers shell and AI tabs, runtime preparation, tab selection and arrangement, saved prompt drafts, reviewed speech input, queues and history, and entry points for the CLI, Paint, agent sets, skills, and MCP."
-updated: "2026-11-11"
+description: "Covers shell and multiplexer selection, terminal session lifetimes, AI tabs, runtime preparation, tab arrangement, prompt drafts, speech input, queues, history, and agent tools."
+updated: "2026-11-12"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -19,13 +19,19 @@ The terminal and tools run by AI operate with the OS account permissions of the 
 
 [Conversations and History](#conversations-and-history) · [Run CLI Commands](#run-cli-commands-in-conversations) · [Conversations Continued in External CLIs](#conversations-continued-in-external-clis) · [Tabs and Layout](#creating-and-arranging-tabs)
 
+## Choose a terminal
+
+Open **Terminal** and select `+`. Choose **Terminal** for the server account's default shell, or choose **tmux**, **Zellij**, or **GNU Screen**. Uninstalled multiplexers appear unavailable; install them on the server to use them. The picker also appears when the terminal panel has no tabs. Use the number keys to select available entries. Each new terminal starts in the current project folder.
+
+Closing the panel or browser leaves a terminal running while the server remains running. Closing its tab ends the session. A default-shell session ends when the server stops; multiplexer tabs can reconnect to their named sessions after a server restart if those sessions remain available. Reopening a closed tab starts a new session of the same type. See the [terminal contract](../../.mew/docs/features/terminals-agents-automation/tmux-shell-terminals.md) for details.
+
 ## Conversations and History
 
 Opening **Agents** (`Alt+L`) in the dock immediately shows the `+` selection screen if there are no tabs. Select a runtime and complete installation and login. Existing tabs are restored; press `+` to add one. Claude Agent, Antigravity, Codex, and others are controlled through ACP chat. Open a regular shell from **Terminal** (`Ctrl+백틱`) in the dock.
 
 In the `+` runtime list, press `1`–`9` to open a new tab with the installed runtime at that number. The default order is Codex → Claude Agent → Kimi Code. Drag the handle on the left to reorder the list; the numbers change accordingly, and the order persists in the same browser. You can also focus the handle and use the up and down arrow keys to reorder it.
 
-When the tab bar or input field has focus, use `Ctrl/Cmd+N/T` or `Alt+N` to create a new agent or terminal tab in the same group. `Ctrl/Cmd+Shift+T` reopens tabs in that panel, starting with the most recently closed. Agents resume saved conversations, while terminals open a new shell with the same name and working directory. Closed-tab history is cleared on refresh or project switching. `Ctrl/Cmd+W` closes the current tab, and `Ctrl/Cmd+1…9` and `Ctrl/Cmd+Tab` select and switch tabs. Chrome-reserved shortcuts can only be received after entering fullscreen with the **mew fullscreen button**. See [Shortcut Settings](../configuration/appearance.md#keyboard-shortcut-settings) for detailed conditions.
+When the tab bar or input field has focus, use `Ctrl/Cmd+N/T` or `Alt+N` to create a new agent or terminal tab in the same group. `Ctrl/Cmd+Shift+T` reopens tabs in that panel, starting with the most recently closed. Agents resume saved conversations, while terminals open a new session of the same type with the same name and working directory. Closed-tab history is cleared on refresh or project switching. `Ctrl/Cmd+W` closes the current tab, and `Ctrl/Cmd+1…9` and `Ctrl/Cmd+Tab` select and switch tabs. Chrome-reserved shortcuts can only be received after entering fullscreen with the **mew fullscreen button**. See [Shortcut Settings](../configuration/appearance.md#keyboard-shortcut-settings) for detailed conditions.
 
 - Enter a prompt in the ACP input field and send it with the send button or `Ctrl+Enter`. For `@` references, `/` skills, attachments, and input history, see [Input Usage](../../.mew/docs/features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md).
 - To dictate a draft, choose the composer's microphone, record and stop, then review the text and choose **Insert**. Send the message separately when ready. Keep the same draft open and unchanged while transcribing. This action is unavailable in CLI mode and history-only views and requires [speech setup and permissions](../configuration/speech-input.md).

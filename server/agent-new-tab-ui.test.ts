@@ -80,8 +80,9 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
         const pathname = new URL(route.request().url()).pathname
         if (pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: chunk.code })
         if (pathname === '/api/user-ui/agent-tabs') return route.fulfill({ json: { state: { tabs: ['first', 'second'].map(id => ({ id, label: id, renamed: true, runtime: terminalMode ? 'tmux' : 'codex', cwd: '/workspace' })), activeId: 'first' }, claims: [] } })
+        if (pathname === '/api/terminal-backends') return route.fulfill({ json: { backends: [{ id: 'shell', label: 'Shell', installed: true }, { id: 'tmux', label: 'tmux', installed: true }, { id: 'zellij', label: 'Zellij', installed: false }, { id: 'screen', label: 'Screen', installed: true }] } })
         if (pathname === '/api/agent-runtimes') return route.fulfill({ json: { runtimes: [{ id: 'codex', installed: true }, { id: 'tmux', installed: true }] } })
-        if (pathname.startsWith('/api/agent-runtimes/tmux/terminal/')) return route.fulfill({ json: { ok: true, session: 'fixture-shell' } })
+        if (/^\/api\/agent-runtimes\/(tmux|shell|screen)\/terminal\//.test(pathname)) return route.fulfill({ json: { ok: true, session: 'fixture-shell' } })
         if (pathname === '/api/agent-cwd') return route.fulfill({ json: { cwd: '/workspace' } })
         if (pathname === '/api/projects') return route.fulfill({ json: [] })
         if (pathname === '/api/agent/commands') return route.fulfill({ json: { commands: [] } })
@@ -302,12 +303,17 @@ window.showTerminal=()=>{rootView.unmount();rootView=createRoot(document.getElem
         await expectPositions(2)
         await page.getByRole('tab', { name: /first/ }).click()
         await moveTab(1, 'second')
+        await moveTab(1, null)
+        await page.getByRole('button', { name: /^기본 터미널/ }).waitFor()
+        assert.equal(await page.getByRole('button', { name: /Zellij/ }).isDisabled(), true)
         await moveTab(1, 'first')
+        await moveTab(-1, null)
         await moveTab(-1, 'second')
         assert.equal(await page.getByRole('tab').count(), 2, 'terminal navigation does not create a shell')
         let count = 2
         for (const surface of [page.getByRole('tab', { name: /first/ }), page.locator('[data-test-terminal]:visible')]) for (const combo of ['Control+t', 'Meta+t']) {
           await surface.focus(); await page.keyboard.press(combo)
+          await page.getByRole('button', { name: /^기본 터미널/ }).click()
           await page.waitForFunction('document.querySelectorAll("[role=tab]").length===' + ++count)
           assert.equal(await page.evaluate('window.fileCreates'), 2, 'terminal bar and PTY create terminal tabs instead of files')
         }

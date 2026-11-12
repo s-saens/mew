@@ -7,6 +7,7 @@ export {
   type TmuxSession,
 } from './tmux.ts'
 export { attachTmuxWebSocket } from './tmuxWs.ts'
+export { createDirectTerminal, stopDirectTerminal, directTerminalNames, type DirectTerminalKind } from './direct-terminal.ts'
 export { terminalBackend } from './backends/index.ts'
 export { createTmuxRouter } from './router.ts'
 export { AGENT_TERMINAL_SESSION_PREFIX, COMMAND_SESSION_PREFIX, isAgentTerminalSession, isCommandSession, isHiddenTmuxSession } from '../commandSession.ts'

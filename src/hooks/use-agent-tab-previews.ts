@@ -1,3 +1,4 @@
+import { isTerminalRuntime } from '../components/agentRuntimes'
 import { useWorkspaceApi } from '../api/workspace-api-context.tsx'
 import { useEffect, useMemo, useState } from 'react'
 import { json } from '../api/response.ts'
@@ -15,7 +16,7 @@ export function useAgentTabPreviews(account: string, workspacePath: string | nul
     return result.preview
   }, () => refresh(value => value + 1)), [scope, mewFetch])
   const targets = tabs.flatMap((tab): AgentTabPreviewTarget[] => {
-    if (!tab.runtime || tab.runtime === 'tmux' || !tab.cwd) return []
+    if (!tab.runtime || isTerminalRuntime(tab.runtime) || !tab.cwd) return []
     const sessionId = sessionIdOf(tab, tab.runtime, tab.cwd)
     return sessionId ? [{ id: tab.id, runtime: tab.runtime, cwd: tab.cwd, sessionId }] : []
   })

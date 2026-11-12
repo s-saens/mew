@@ -125,7 +125,7 @@ import { readRuntimeAccount } from './agentAccount.ts'
 import { AgentDefaultError, readAgentDefault, writeAgentDefault } from './agentDefaults.ts'
 import { AgentCwdError, resolveAgentCwd, suggestAgentCwds } from './agentCwd.ts'
 import { AgentScheduledPromptError, cancelAgentScheduledPrompt, listAgentScheduledPrompts, scheduleAgentPrompt, updateAgentScheduledPrompt } from './agentScheduledPrompts.ts'
-import { AgentTerminalError, startAgentTerminal, stopAgentTerminal } from './agentTerminal.ts'
+import { AgentTerminalError, isShellTerminal, startAgentTerminal, stopAgentTerminal, terminalBackends } from './agentTerminal.ts'
 import { currentWorkspaceScope } from './workspace-scope.ts'
 import { AgentCommandStore } from './agent-commands.ts'
 import { createAgentCommandRouter } from './agent-command-routes.ts'
@@ -2399,6 +2399,10 @@ export function createApiApp() {
     res.json({ runtimes: runtimeStatuses() })
   })
 
+  app.get('/terminal-backends', requireFeature('terminal'), (_req, res) => {
+    res.json({ backends: terminalBackends() })
+  })
+
   app.get('/agent-runtimes/:id/models', requireFeature('agent'), async (req, res) => {
     res.setHeader('Cache-Control', 'no-store')
     const runtime = String(req.params.id)
@@ -2418,7 +2422,7 @@ export function createApiApp() {
 
   // terminal형 런타임은 통합 패널의 탭별 전용 tmux에서 공식 TUI 또는 기본 셸을 실행한다. 브라우저는
   // runtime·tab·cwd만 보내며 실행 방식과 실제 tmux 이름은 서버 등록표가 정한다(ADR 0117·0119).
-  app.post('/agent-runtimes/:id/terminal/:tab', requireFeature('terminal'), (req, res, next) => req.params.id === 'tmux' ? next() : requireFeature('agent')(req, res, next), async (req, res) => {
+  app.post('/agent-runtimes/:id/terminal/:tab', requireFeature('terminal'), (req, res, next) => isShellTerminal(String(req.params.id)) ? next() : requireFeature('agent')(req, res, next), async (req, res) => {
     try {
       const cwd = resolveAgentCwd(typeof req.body?.cwd === 'string' ? req.body.cwd : '', workspacePaths.root)
       const scope = currentWorkspaceScope()
@@ -2428,7 +2432,7 @@ export function createApiApp() {
     }
   })
 
-  app.delete('/agent-runtimes/:id/terminal/:tab', requireFeature('terminal'), (req, res, next) => req.params.id === 'tmux' ? next() : requireFeature('agent')(req, res, next), async (req, res) => {
+  app.delete('/agent-runtimes/:id/terminal/:tab', requireFeature('terminal'), (req, res, next) => isShellTerminal(String(req.params.id)) ? next() : requireFeature('agent')(req, res, next), async (req, res) => {
     try {
       const scope = currentWorkspaceScope()
       await stopAgentTerminal(tmuxManager, String(req.params.id), String(req.params.tab), scope ? { ...scope, account: authOf(req).email! } : undefined, { allowLegacy: !workspaceContext.getStore()?.explicit })

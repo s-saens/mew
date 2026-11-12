@@ -2,7 +2,7 @@
 title: "Real-time account tabs"
 description: "Defines authoritative account-and-project editor, agent, and terminal tabs across devices, single-use fresh editor-tab preparation during project switching, live presence signals, migration, concurrent saves, draft protection, and recovery. Separates shared tab metadata from single-project desktop slots and optional scoped multi-project views, preserving logical project identity across worktrees."
 created: "2026-11-04"
-updated: "2026-11-07"
+updated: "2026-11-12"
 ---
 
 Open editor, agent, and terminal tabs and active selection belong to the authenticated account and logical project on one Mew instance. Changes propagate through the existing presence connection. Different accounts and projects keep independent lists. Dock positions, panel sizes, visibility, mobile foreground, and popup geometry retain their [device-local ownership](ui-workspace-layout.md#workspace-panel-layout). See [ADR 0133](../decisions/0133-realtime-account-tabs.md).
@@ -31,7 +31,7 @@ The client serializes saves and coalesces queued changes. Pending local edits ta
 
 ## Agent and terminal tabs
 
-The existing `/api/user-ui/agent-tabs` ledger shares both types, names, order, runtime, session pointers, and active selection. A save may include `base`, its last accepted account snapshot. The server applies only changes since that base by tab ID, including individual session-pointer slots. Concurrent additions and unrelated field changes survive. A stale edit cannot resurrect a tab already closed on another device. Legacy clients without `base` retain full-snapshot behavior.
+The existing `/api/user-ui/agent-tabs` ledger shares both types, names, order, runtime, session pointers, and active selection. Terminal runtime identifies the default shell, tmux, Zellij, or GNU Screen; existing tmux tabs retain their runtime. Session lifetimes and reconnect behavior follow the [terminal contract](../features/terminals-agents-automation/tmux-shell-terminals.md). A save may include `base`, its last accepted account snapshot. The server applies only changes since that base by tab ID, including individual session-pointer slots. Concurrent additions and unrelated field changes survive. A stale edit cannot resurrect a tab already closed on another device. Legacy clients without `base` retain full-snapshot behavior.
 
 Clients serialize saves, rebase pending local changes over returned state, and suppress remote echo writes. Remote updates retain mounted sessions for surviving IDs and update selection in the device's existing dock group. Closing a shared tab retains the existing session termination contract; merely receiving state or hiding a panel does not terminate its retained sessions. Runtime and transcript ownership remains in [agent sessions](agent-sessions.md) and [conversation storage](conversation-storage.md).
 

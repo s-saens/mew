@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { TmuxManager, TmuxSession } from '@mew/tmux-term/server'
-import { agentTerminalSessionName, startAgentTerminal, stopAgentTerminal } from './agentTerminal.ts'
+import { agentTerminalSessionName, isShellTerminal, startAgentTerminal, stopAgentTerminal, terminalBackends } from './agentTerminal.ts'
 
 function fakeTmux() {
   const sessions: TmuxSession[] = []
@@ -97,4 +97,25 @@ test('new single-project terminals retain their execution across modes and old a
   await stopAgentTerminal(fake.manager, 'tmux', 'old-tab', identity)
   assert.deepEqual(fake.kills, [qualified.session])
   assert.ok(fake.sessions.some(session => session.name === legacy))
+})
+
+test('direct shell uses scoped identities without touching tmux', { skip: process.platform === 'win32' }, async () => {
+  const fake = fakeTmux()
+  const scope = { account: 'owner', projectPath: '/project', workspacePath: '/project' }
+  const other = { ...scope, account: 'other' }
+  const first = await startAgentTerminal(fake.manager, 'shell', 'direct-tab', process.cwd(), scope)
+  const repeat = await startAgentTerminal(fake.manager, 'shell', 'direct-tab', process.cwd(), scope)
+  const second = await startAgentTerminal(fake.manager, 'shell', 'direct-tab', process.cwd(), other)
+  try {
+    assert.equal(first.session, repeat.session)
+    assert.notEqual(first.session, second.session)
+    assert.equal(fake.creates.length, 0)
+    assert.deepEqual(terminalBackends().map(item => item.id), ['shell', 'tmux', 'zellij', 'screen'])
+    assert.equal(terminalBackends()[0].installed, true)
+    assert.equal(isShellTerminal('screen'), true)
+    assert.equal(isShellTerminal('codex'), false)
+  } finally {
+    await stopAgentTerminal(fake.manager, 'shell', 'direct-tab', scope)
+    await stopAgentTerminal(fake.manager, 'shell', 'direct-tab', other)
+  }
 })

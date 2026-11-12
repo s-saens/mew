@@ -14,7 +14,7 @@ import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {TmuxTerminal} from '${root}/packages/tmux-term/src/TmuxTerminal.tsx';
 window.inputs=[];
 window.sockets=[];
-class Socket {static OPEN=1;readyState=0;constructor(){window.sockets.push(this)}connect(){this.readyState=1;this.onopen?.();this.onmessage?.({data:'$ terminal ready\\r\\n'})}disconnect(){this.readyState=3;this.onclose?.()}send(data){const value=JSON.parse(data);if(value.type==='input')window.inputs.push(value.data)}close(){this.readyState=3}}
+class Socket {static OPEN=1;readyState=0;constructor(){window.sockets.push(this)}connect(){this.readyState=1;this.onopen?.();this.onmessage?.({data:'$ terminal ready\\r\\n'})}disconnect(code){this.readyState=3;this.onclose?.(code ? {code} : undefined)}send(data){const value=JSON.parse(data);if(value.type==='input')window.inputs.push(value.data)}close(){this.readyState=3}}
 window.WebSocket=Socket;
 createRoot(document.getElementById('root')).render(<TmuxTerminal sessionName="keybar-fixture" inputPlaceholder="Message"/>);`
   const bundle = await build({ input: 'virtual:keys.tsx', write: false, platform: 'browser', output: { format: 'iife', codeSplitting: false }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{ name: 'fixture', resolveId(id) { if (id === 'virtual:keys.tsx') return id; if (id.endsWith('.css')) return 'virtual:style' }, load(id) { if (id === 'virtual:keys.tsx') return source; if (id === 'virtual:style') return '' } }] })
@@ -98,6 +98,10 @@ createRoot(document.getElementById('root')).render(<TmuxTerminal sessionName="ke
     assert.ok((await bar.boundingBox())!.y + (await bar.boundingBox())!.height <= (await draft.boundingBox())!.y)
     await page.setViewportSize({ width: 1024, height: 700 })
     await bar.waitFor({ state: 'detached' })
+    await page.evaluate('window.sockets[1].disconnect(4001)')
+    await page.getByRole('status').getByText('터미널이 종료되었습니다').waitFor()
+    await page.evaluate('window.dispatchEvent(new Event("online"))')
+    assert.equal(await page.evaluate('window.sockets.length'), 2, 'an exited terminal is not reconnected')
     assert.deepEqual(errors, [])
   } finally { await browser.close() }
 })
