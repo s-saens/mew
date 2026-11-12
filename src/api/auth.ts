@@ -19,6 +19,8 @@ export interface AuthStatus {
   setupRequired?: boolean
 }
 
+export const GUEST_AUTH: AuthStatus = { authenticated: false, email: null, role: 'guest', mustChangePassword: false, displayName: null, avatarDataUrl: null }
+
 export function fetchAuthStatus(): Promise<AuthStatus> {
   return mewFetch('/api/auth/me').then(json<AuthStatus>)
 }

@@ -1,6 +1,6 @@
 ---
 title: "Browser startup and deferred loading"
-description: "Browser routes and current startup contracts for runtime authentication, storage scope, initial workspace snapshots, editor/optional module preparation, immediate dialog shells with deferred bodies, failure handling, and chunk boundaries. Separates verification contracts from verbatim historical isolated measurements."
+description: "Browser routes and startup contracts for parallel local authentication, storage scope, initial workspace snapshots, deferred modules, failure handling, and chunk boundaries. Separates verification contracts from historical isolated measurements."
 created: "2026-11-03"
 updated: "2026-11-06"
 ---
@@ -19,7 +19,7 @@ The missing-page screen inherits the saved theme and local fonts. Its 404 graphi
 
 Separately from regular and remote access, `demo.html` prepares an in-memory runtime environment, then loads the same `main`·`AppBootstrap`·`App`. `src/runtime/app-runtime.ts` injects transport, collaboration, initial authentication, and the base path, distinguishing them from actual P2P state. [Browser Demo](demo.md) owns the state, deployment, and verification contract for the demo, which does not duplicate the UI.
 
-`src/main.tsx` applies the saved font/theme and shows the lightweight `StartupScreen`. Start the P2P parent MessagePort, authentication query, and current-path entry download in parallel.
+`src/main.tsx` applies the saved font/theme and shows the lightweight `StartupScreen`. Start the P2P parent MessagePort, authentication query, and current-path entry download in parallel. For an ordinary workspace entry without runtime-provided authentication, start `/api/auth/me` alongside the bootstrap import and reuse its result; a failed request retains the guest fallback. Share and missing-page routes do not start this lookup.
 
 - Load `AppBootstrap`, but render it only after confirming storage scope.
 - Use `initialAuth` only when the P2P launcher verified it on the current connection. It sets the local-user/instance storage scope; missing or malformed state requires `/api/auth/me` verification. Do not reuse passed state during reconnection.

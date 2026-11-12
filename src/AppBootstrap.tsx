@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { useUiLocale } from '@mew/ui/i18n'
-import { fetchAuthStatus, type AuthStatus } from './api/auth'
+import { fetchAuthStatus, GUEST_AUTH, type AuthStatus } from './api/auth'
 import { LoginPage } from './components/LoginPage'
 import { useRefreshTasks } from './hooks/use-refresh-tasks'
 import { clearFileContentCache, setContentIdentity } from './utils/contentCache'
@@ -13,7 +13,6 @@ import { WorkspaceErrorScreen } from './components/app-error-boundary'
 import { FirstOwnerSetup } from './components/FirstOwnerSetup'
 
 type WorkspaceComponent = typeof import('./App.tsx')['default']
-const GUEST_AUTH: AuthStatus = { authenticated: false, email: null, role: 'guest', mustChangePassword: false, displayName: null, avatarDataUrl: null }
 const startupScreen = <StartupScreen />
 /** Consume launcher credentials before any workspace or account UI can use the URL. */
 function consumeFirstOwnerSetupToken(): string | null {

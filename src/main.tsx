@@ -18,6 +18,7 @@ import { startAppInstallTracking } from './utils/app-install.ts'
 import { parsePublicSharePath } from './utils/public-share-route.ts'
 import { appRoute } from '../shared/app-route.ts'
 import { AppErrorBoundary, WorkspaceErrorScreen } from './components/app-error-boundary.tsx'
+import { fetchAuthStatus, GUEST_AUTH } from './api/auth.ts'
 
 applyWorkspaceZoom(loadWorkspaceZoom())
 startAppInstallTracking()
@@ -62,9 +63,12 @@ async function startApp() {
     const remoteApp = document.querySelector('meta[name="mew-p2p-app"]')
     const initialRoute = remoteApp ? 'workspace' : appRoute(location.pathname, getAppRuntime().basePath)
     const bootstrapModule = initialRoute === 'workspace' ? import('./AppBootstrap.tsx') : null
+    const localAuth = !remoteApp && initialRoute === 'workspace' && !nativeAuth && !getAppRuntime().initialAuth
+      ? fetchAuthStatus().catch(error => { console.error(error); return GUEST_AUTH })
+      : undefined
     const [bootstrap, initialAuth] = await Promise.all([
       bootstrapModule,
-      remoteApp ? initializeRemoteApp() : nativeAuth ?? getAppRuntime().initialAuth,
+      remoteApp ? initializeRemoteApp() : nativeAuth ?? getAppRuntime().initialAuth ?? localAuth,
     ])
     const sharePath = remoteApp ? new URLSearchParams(location.search).get('sharePath') : location.pathname
     const share = sharePath ? parsePublicSharePath(sharePath) : null

@@ -214,11 +214,20 @@ test('cold startup preserves deferred workspace loading, remote authentication a
   const requested = (chunk: typeof workspaceChunk) => requests.includes(`/${chunk.fileName}`)
   const reset = () => { requests.length = 0; authRequests = 0 }
 
+  let releaseBootstrap!: () => void
+  const bootstrapHeld = new Promise<void>(resolve => { releaseBootstrap = resolve })
+  let bootstrapContinued!: () => void
+  const bootstrapReleased = new Promise<void>(resolve => { bootstrapContinued = resolve })
+  await page.route(`**/${bootstrapChunk.fileName}`, async route => { await bootstrapHeld; await route.continue(); bootstrapContinued() })
   holdAuth = true
   await page.goto(origin, { waitUntil: 'commit' })
   await page.locator('[data-startup-screen]').waitFor()
   assert.equal(requested(workspaceChunk), false, 'local authentication delay still paints the startup screen')
   await authPending
+  assert.equal(authRequests, 1, 'local authentication starts while the bootstrap download is held')
+  releaseBootstrap()
+  await bootstrapReleased
+  await page.unroute(`**/${bootstrapChunk.fileName}`)
   assert.ok(releaseAuth)
   releaseAuth!()
   await page.locator('[data-workspace-role="guest"]').waitFor()
