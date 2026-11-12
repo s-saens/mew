@@ -351,6 +351,14 @@ function ScopedCommandButtonMenu({
           <CloudUpload width={16} height={16} aria-hidden="true" />{actionCopy.deploy}
         </button></div>
         <ProjectAvailableArtifacts project={project} directory={directory} workspacePath={workspacePath} />
+        {list.some(b => b.running && b.previewUrls?.some(isLocalPreviewUrl)) && <div className="border-t border-edge py-1" data-found-servers>
+          <div className="px-3 py-1 text-xs text-ink-secondary">{{ en: 'Found servers', ko: '찾은 서버', ja: '見つかったサーバー', 'zh-CN': '找到的服务器' }[locale]}</div>
+          {list.filter(b => b.running).flatMap(b => [...new Set(b.previewUrls ?? [])].filter(isLocalPreviewUrl).map(url => <div key={`${b.name}:${url}`} data-command-row>
+            <button type="button" data-command-preview disabled={!browser} aria-label={`${{ en: 'Open web preview', ko: '웹 미리보기', ja: 'ウェブプレビュー', 'zh-CN': '打开网页预览' }[locale]} · ${b.name} · ${url}`} onClick={() => { closeMenu(); browser?.(url) }} className="mew-action-menu-item min-w-0 text-ink-secondary disabled:opacity-40">
+              <Globe width={16} height={16} aria-hidden="true" /><span className="min-w-0 flex-1 truncate">{b.name}</span><span className="truncate text-xs">{url}</span>
+            </button>
+          </div>))}
+        </div>}
         <div role="separator" className="mew-action-menu-separator" />
       </div>
       {error && <div className="select-text px-3 py-2 text-xs text-danger-strong">{error}</div>}
@@ -361,7 +369,7 @@ function ScopedCommandButtonMenu({
       {((buttons === null && !loadError) || recovering) && <div role="status" aria-label={uiText("불러오는 중…")} className="flex items-center px-3 py-2 text-ink-muted"><LoadingIndicator size={16} /></div>}
       {buttons !== null && (
         list.map((b, i) => (
-          <CmdRow key={b.name} button={b} shortcut={i < 9 ? String(i + 1) : undefined} dragProps={list.length > 1 ? drag.getItemProps(i) : undefined} dragging={drag.dragIndex === i} onMove={direction => reorder(i, i + direction)} onConsumeClick={drag.consumeClick} busy={busyName === b.name || metadataUnavailable} onRun={() => run(b)} onStop={() => stop(b)} onOpenSession={() => { setPopup(b); setOpen(false) }} onPreview={browser ? url => { closeMenu(); browser(url) } : null} onEdit={() => startEditing({ index: i, name: b.name, command: b.command, oneShot: b.oneShot })} />
+          <CmdRow key={b.name} button={b} shortcut={i < 9 ? String(i + 1) : undefined} dragProps={list.length > 1 ? drag.getItemProps(i) : undefined} dragging={drag.dragIndex === i} onMove={direction => reorder(i, i + direction)} onConsumeClick={drag.consumeClick} busy={busyName === b.name || metadataUnavailable} onRun={() => run(b)} onStop={() => stop(b)} onOpenSession={() => { setPopup(b); setOpen(false) }} onEdit={() => startEditing({ index: i, name: b.name, command: b.command, oneShot: b.oneShot })} />
         ))
       )}
       {buttons !== null && list.length === 0 && !error && !metadataUnavailable && <div className="px-3 py-2 text-xs text-ink-muted">{uiText("아직 명령이 없습니다.")}</div>}
@@ -456,7 +464,6 @@ function CmdRow({
   onRun,
   onStop,
   onOpenSession,
-  onPreview,
   onEdit,
 }: {
   button: CmdButtonState
@@ -470,11 +477,9 @@ function CmdRow({
   /** 실행 중일 때 재생 버튼이 하는 일 — 이 명령의 세션 종료 */
   onStop: () => void
   onOpenSession: () => void
-  onPreview: ((url: string) => void) | null
   onEdit: () => void
 }) {
-  const locale = useUiLocale()
-  const previewLabel = { en: 'Open web preview', ko: '웹 미리보기', ja: 'ウェブプレビュー', 'zh-CN': '打开网页预览' }[locale]
+  useUiLocale()
   const timerRef = useRef<number | null>(null)
   const longFiredRef = useRef(false)
 
@@ -558,11 +563,6 @@ function CmdRow({
       </button>
       {shortcut && <span className="mew-action-menu-hint mew-command-shortcut" aria-hidden="true"><kbd className="whitespace-nowrap font-sans text-[11px]">{shortcut}</kbd></span>}
     </div>
-    {button.running && [...new Set(button.previewUrls ?? [])].filter(isLocalPreviewUrl).map(url => <div key={url} data-command-row>
-      <button type="button" data-command-preview disabled={!onPreview} aria-label={`${previewLabel} · ${button.name} · ${url}`} onClick={() => onPreview?.(url)} className="mew-action-menu-item min-w-0 pl-8 text-ink-secondary disabled:opacity-40">
-        <Globe width={16} height={16} aria-hidden="true" /><span className="min-w-0 truncate">{previewLabel} · {url}</span>
-      </button>
-    </div>)}
   </>
 }
 

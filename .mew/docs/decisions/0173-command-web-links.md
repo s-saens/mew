@@ -1,6 +1,6 @@
 ---
 title: "Open web addresses reported by project commands"
-description: "Adds project-scoped links to local web addresses reported by running command sessions, using the existing host Browser without restoring Mew Port or host-wide listener discovery."
+description: "Adds project-scoped links to local web addresses reported by command sessions, grouped as found servers and opened through the host Browser."
 created: "2026-11-12"
 updated: "2026-11-12"
 ---
@@ -15,7 +15,7 @@ A web development command commonly prints a local address when it starts. Users 
 
 ## Decision
 
-Inspect bounded recent output from each running project command session for supported local HTTP(S) addresses. Offer the extracted addresses alongside that command and open a selection in the existing host Browser, subject to its permission and navigation guards. Do not infer an address from a package script or claim that a reported address is reachable. Capture failure must not prevent command use.
+Inspect bounded recent output from each running project command session for supported local HTTP(S) addresses. Group extracted addresses with their command names in the command menu and open a selection in the existing host Browser, subject to its permission and navigation guards. Do not infer an address from a package script or claim that a reported address is reachable. Capture failure must not prevent command use.
 
 The [command contract](../features/terminals-agents-automation/project-command-buttons.md) owns details, including scope and limitations; the [work record](../work/project-delivery-pipelines.md) records local verification.
 
