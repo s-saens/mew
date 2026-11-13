@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { appendEventFold, createEventFold, foldEvents, formatDuration, isTurnComplete, type AgentEvent } from './agentFold.ts'
+import { composeRuntimePrompt } from '../../server/agentRuntimes.ts'
 
 const user = (text: string): Extract<AgentEvent, { type: 'update' }> => ({
   type: 'update',
@@ -9,6 +10,18 @@ const user = (text: string): Extract<AgentEvent, { type: 'update' }> => ({
 const agent = (text: string): AgentEvent => ({
   type: 'update',
   update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } },
+})
+
+test('restored selected skill prompts display the user request without changing saved events', () => {
+  const request = '/commit and push\n  Keep whitespace.  '
+  const wrapped = composeRuntimePrompt('codex', request, [{ name: 'commit', description: 'commit', path: '/skills/commit/SKILL.md' }])
+  const event = user(wrapped)
+  const items = foldEvents([event], 'en')
+  assert.equal(items[0]?.kind === 'user' && items[0].text, request)
+  assert.equal(event.update.content.text, wrapped)
+  const malformed = wrapped.replace('length="', 'length="9')
+  const unchanged = foldEvents([user(malformed)], 'en')
+  assert.equal(unchanged[0]?.kind === 'user' && unchanged[0].text, malformed)
 })
 
 test('한 턴은 질문 하나와 답변 묶음 하나로 접힌다', () => {

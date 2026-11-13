@@ -2,7 +2,7 @@
 title: "Conversation Storage and Range Synchronization"
 created: 2026-09-30
 updated: "2026-11-11"
-description: "Conversation persistence and recovery contracts: SQLite originals, attachments, range/work-detail synchronization, and temporary transcript display before ACP readiness. Defines account-tab previews, on-demand history-result prefetch, late IndexedDB display, cache and queue scope, limits, authority, and incremental rendering."
+description: "Conversation persistence and recovery contracts: SQLite originals, attachments, range/work-detail synchronization, selected-skill prompt display, and temporary transcript display before ACP readiness. Defines previews, device cache, authority, and incremental rendering."
 상위파일: "MOC.md"
 ---
 
@@ -69,6 +69,8 @@ For browser copies, `shared/agent-display.ts` reduces `update` in `tool_call` an
 Reduce data first at the `server/agentHost.ts` IPC send boundary, avoiding serialization of large originals between supervisor and server. Keep the same transformation in the shared send function of `server/agentWs.ts`, after authentication/permission checks, for `history`, full `replay`, and individual events from older supervisors. Preserve order, generation, sequence numbers, range boundaries, and restoration failure information.
 
 SQLite transcripts, supervisor memory, and provider ACP history retain originals. Display conversion neither mutates original objects nor participates in provider restoration, context, or tool execution. It reduces transfer volume for large tool results, without guaranteeing total transfer volume or initial display time for large questions/answers.
+
+**Selected skills in restored questions.** When ACP replays a complete Mew selected-skill wrapper, extract its original user request before emitting the restored user message. The browser also applies the same exact version, length, and names validation when folding saved or device-cached events, so previously stored wrappers show the request. Invalid or incomplete wrappers remain unchanged. This display handling does not alter provider history or the prompt supplied to the runtime.
 
 **MCP startup diagnostics.** Codex ACP reports asynchronous server startup failures/cancellations as `tool_call` or `tool_call_update` with reserved `mcp_startup.*` IDs. These are connection diagnostics, not assistant work for a user request. The display fold ignores them before allocating a conversation turn, both live and during replay. Do not defer them into anonymous `work_pending` markers: retain their identity and one sequence position so the browser can apply the same rule. Preserve original supervisor/SQLite/provider records and ordinary MCP tool calls; genuine assistant text such as “Done” remains visible. Common connection state and recovery stay in the [MCP management contract](shared-mcp.md#shared-authentication).
 

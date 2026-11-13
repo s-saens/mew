@@ -14,12 +14,13 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-history-test-'))
 process.env.MEW_DATA_DIR = path.join(root, 'data')
 process.env.MEW_WORKSPACE = root
 const stub = path.join(root, 'agent.mjs')
+const wrappedQuestion = '<mew-selected-skills version="1" names="%5B%22commit%22%5D" length="4">\nhint\n</mew-selected-skills>\n\nUser request:\nq44'
 fs.writeFileSync(stub, `import { AgentSideConnection, ndJsonStream, PROTOCOL_VERSION } from ${JSON.stringify(import.meta.resolve('@agentclientprotocol/sdk'))};
 import { Readable, Writable } from 'node:stream';
 new AgentSideConnection(conn=>({
  initialize:async()=>({protocolVersion:PROTOCOL_VERSION,agentCapabilities:{loadSession:true}}),
  newSession:async()=>({sessionId:'history-session'}),
- loadSession:async({sessionId})=>{if(sessionId==='history-byte-budget'){await conn.sessionUpdate({sessionId,update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:'Budget question'}}});for(const size of [1200000,600000,600000,8*1024*1024+1])await conn.sessionUpdate({sessionId,update:{sessionUpdate:'agent_thought_chunk',content:{type:'text',text:'x'.repeat(size)}}});await conn.sessionUpdate({sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Budget answer'}}});return{}}for(let i=0;i<45;i++){await conn.sessionUpdate({sessionId,update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:'q'+i}}});await conn.sessionUpdate({sessionId,update:{sessionUpdate:'tool_call',toolCallId:'saved-'+i,title:'Read fixture',status:'completed',rawInput:{body:'x'.repeat(1000)},rawOutput:{body:'y'.repeat(1000)}}});await conn.sessionUpdate({sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'a'+i}}})}return{}},
+ loadSession:async({sessionId})=>{if(sessionId==='history-byte-budget'){await conn.sessionUpdate({sessionId,update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:'Budget question'}}});for(const size of [1200000,600000,600000,8*1024*1024+1])await conn.sessionUpdate({sessionId,update:{sessionUpdate:'agent_thought_chunk',content:{type:'text',text:'x'.repeat(size)}}});await conn.sessionUpdate({sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Budget answer'}}});return{}}for(let i=0;i<45;i++){await conn.sessionUpdate({sessionId,update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:i===44?${JSON.stringify(wrappedQuestion)}:'q'+i}}});await conn.sessionUpdate({sessionId,update:{sessionUpdate:'tool_call',toolCallId:'saved-'+i,title:'Read fixture',status:'completed',rawInput:{body:'x'.repeat(1000)},rawOutput:{body:'y'.repeat(1000)}}});await conn.sessionUpdate({sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'a'+i}}})}return{}},
  prompt:async({sessionId})=>{await conn.sessionUpdate({sessionId,update:{sessionUpdate:'tool_call',toolCallId:'live-tool',title:'Run fixture',status:'pending',rawInput:{body:'x'.repeat(1000)}}});await conn.sessionUpdate({sessionId,update:{sessionUpdate:'tool_call_update',toolCallId:'live-tool',status:'completed',rawOutput:{body:'y'.repeat(1000)}}});await conn.sessionUpdate({sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'live'}}});return{stopReason:'end_turn'}},
  cancel:async()=>({})
 }),ndJsonStream(Writable.toWeb(process.stdout),Readable.toWeb(process.stdin)));`)
@@ -67,6 +68,7 @@ test('WS negotiates paged history, live sequence and reconnect delta without ful
   const page = first.messages.find(item => item.type === 'history').page as HistoryPage<AgentEvent>
   assert.equal(page.usersBefore, 25)
   assert.equal(page.events.filter(event => event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk').length, 20)
+  assert.ok(page.events.some(event => event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk' && event.update.content.type === 'text' && event.update.content.text === 'q44'), 'ACP restoration emits only the user request')
   assert.ok(!first.messages.some(item => item.type === 'replay'))
   displayTools(page.events)
   const stored = readAgentTranscript('codex', root, 'history-session')!

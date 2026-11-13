@@ -28,6 +28,7 @@ import fs from 'node:fs'
 import { killMemoryScope, memoryPressure, memoryScopeCommand, readAgentMemory, type MemoryReader } from './agent-memory.ts'
 import { agentContextText, captureAgentContext, refreshAgentContext, restoreAgentContext, saveAgentContext } from './agent-context.ts'
 import { contextBlock, stripMewContext } from './project-context-text.ts'
+import { selectedRuntimePrompt } from '../shared/selected-runtime-prompt.ts'
 import { currentSkillPolicy, skillLibraryPrompt, skillRuntimeEnvironment, skillRuntimeSessionOptions } from './skill-runtime-policy.ts'
 import type { AgentContextBinding } from '../shared/project-agent-context.ts'
 import { antigravityAuthUrl } from './antigravityAcp.ts'
@@ -768,7 +769,8 @@ export class AgentSession {
         if (params.update.sessionUpdate === 'user_message_chunk') {
           const content = params.update.content
           if (!Array.isArray(content) && content?.type === 'text') {
-            const text = stripLocalCommandMeta(stripMewContext(content.text))
+            const unwrapped = stripLocalCommandMeta(stripMewContext(content.text))
+            const text = selectedRuntimePrompt(unwrapped)?.text ?? unwrapped
             if (!text) return
             if (text !== content.text) {
               this.#emit({ type: 'update', update: { ...params.update, content: { ...content, text } } })

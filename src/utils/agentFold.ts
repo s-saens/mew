@@ -3,6 +3,7 @@ import type { HistoryPage, HistoryPosition, HistoryPreview } from '../../shared/
 import type { AgentAttachmentRef } from '../../shared/agent-attachment.ts'
 import type { AgentConnectionReady, AgentConnectionPong } from '../../shared/agent-connection.ts'
 import { isMcpStartupEvent } from '../../shared/agent-display.ts'
+import { selectedRuntimePrompt } from '../../shared/selected-runtime-prompt.ts'
 import { uiText, getUiLocale } from '@mew/ui/i18n-core'
 // 에이전트 창이 받은 이벤트 흐름을 화면 항목으로 접는다. 그리는 쪽은 components/AgentPanel.tsx.
 // 서버는 상태를 보내지 않고 이벤트만 보낸다 — 재접속하면 지나간 이벤트를 그대로 되받으므로
@@ -331,7 +332,8 @@ export function appendEventFold(previous: EventFold, events: AgentEvent[]): Even
     if (event.type !== 'update') continue
     const update = event.update
     if (update.sessionUpdate === 'user_message_chunk') {
-      const text = update.content?.type === 'text' ? (update.content.text ?? '') : `[${update.content?.type}]`
+      const rawText = update.content?.type === 'text' ? (update.content.text ?? '') : `[${update.content?.type}]`
+      const text = selectedRuntimePrompt(rawText)?.text ?? rawText
       const last = items.at(-1)
       // 실시간 스트림에는 메시지 경계가 없다. 반면 저장 전사를 복원하는 런타임은 messageId를 준다.
       // ID가 바뀌면 연속 프레임이어도 반드시 새 질문 버블로 나눈다.
