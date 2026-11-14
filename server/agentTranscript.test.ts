@@ -46,7 +46,7 @@ test('앞선 답변이 바뀌어도 설정이 없는 다음 중단 턴의 종료
   const cancelled: AgentEvent = { type: 'turn_end', stopReason: 'cancelled', durationMs: 500 }
   const saved = [...savedTurn, message('user', '다음 질문'), message('agent', '중간 응답'), cancelled]
   const loaded = [message('user', '원래 질문'), message('agent', '바뀐 답변'), message('user', '다음 질문')]
-  assert.deepEqual(reconcileAgentTranscript(saved, loaded), [...loaded, cancelled])
+  assert.deepEqual(reconcileAgentTranscript(saved, loaded), [...loaded.slice(0, 2), savedTurn.at(-1), ...loaded.slice(2), cancelled])
 })
 
 test('질문이 달라진 뒤의 반복 질문과 외부 추가 질문에는 중단 상태를 붙이지 않는다', () => {
@@ -62,7 +62,7 @@ test('복원된 답변이 달라도 같은 질문의 설정은 유지해 같은 
   const saved = [configuredUser('원래 질문'), ...savedTurn.slice(1)]
   const loaded = [message('user', '원래 질문'), message('agent', '복원 시 달라진 답변')]
   const restored = reconcileAgentTranscript(saved, loaded)
-  assert.deepEqual(restored, [configuredUser('원래 질문'), loaded[1]], '최신 답변에 설정만 복원한다')
+  assert.deepEqual(restored, [configuredUser('원래 질문'), loaded[1], savedTurn.at(-1)], '최신 답변에 설정과 완료 시간을 복원한다')
   assert.deepEqual(userSettings([...restored, configuredUser('한 시간 뒤 같은 설정')]), [settingsA, settingsA])
   assert.deepEqual(userSettings([...restored, configuredUser('바꾼 설정', settingsB)]), [settingsA, settingsB])
   assert.deepEqual(reconcileAgentTranscript(restored, loaded), restored, 'turn_end 없는 전사를 다시 복원해도 설정을 잃지 않는다')
@@ -92,10 +92,26 @@ test('외부에서 resume한 새 대화는 보존하고 같은 기존 턴은 시
 
 test('히스토리가 바뀌거나 줄었으면 캐시의 다른 내용과 꼬리를 되살리지 않는다', () => {
   const changed = [message('user', '원래 질문'), message('agent', '새로 생성한 답변')]
-  assert.deepEqual(reconcileAgentTranscript(savedTurn, changed), changed)
+  assert.deepEqual(reconcileAgentTranscript(savedTurn, changed), [...changed, savedTurn.at(-1)])
   assert.deepEqual(reconcileAgentTranscript([...savedTurn, message('user', '삭제된 질문'), message('agent', '삭제된 답변')], [message('user', '원래 질문'), message('agent', '원래 답변')]), savedTurn)
   const unrelated = [message('user', '다른 질문'), message('agent', '다른 답변')]
   assert.deepEqual(reconcileAgentTranscript(savedTurn, unrelated), unrelated)
+})
+
+test('changed and omitted ACP answers retain each saved duration through repeated disk restoration', () => {
+  const end = (durationMs: number): AgentEvent => ({ type: 'turn_end', stopReason: 'end_turn', durationMs })
+  const saved = [...savedTurn, message('user', 'second'), message('agent', 'intermediate and final'), end(9876)]
+  const loaded = [message('user', '원래 질문'), message('agent', 'final answer'), message('user', 'second')]
+  const expected = [...loaded.slice(0, 2), savedTurn.at(-1), loaded[2], end(9876)]
+  const restored = reconcileAgentTranscript(saved, loaded)
+  assert.deepEqual(restored, expected)
+  assert.deepEqual(foldEvents(restored as Parameters<typeof foldEvents>[0]).filter(item => item.kind === 'turn').map(item => item.durationMs), [1200, 9876])
+  assert.equal(writeAgentTranscript('codex', '/work', 'duration-restore', restored), true)
+  closeTranscriptDatabase()
+  assert.deepEqual(reconcileAgentTranscript(readAgentTranscript('codex', '/work', 'duration-restore'), loaded), expected)
+  const replacementEnd = end(55)
+  assert.deepEqual(reconcileAgentTranscript(savedTurn, [...loaded.slice(0, 2), replacementEnd]), [...loaded.slice(0, 2), replacementEnd])
+  assert.deepEqual(reconcileAgentTranscript([message('agent', 'old'), end(5)], [message('agent', 'new')]), [message('agent', 'new')])
 })
 
 test('텍스트 없이 컨텍스트만 복원하는 ACP는 저장된 전사를 계속 사용한다', () => {

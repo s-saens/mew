@@ -235,7 +235,7 @@ function conversationTurns(events: AgentEvent[]): { events: AgentEvent[]; identi
   return turns
 }
 
-/** Fresh history wins; matching questions also keep Mew's settings and cancellation. */
+/** Fresh history wins; matching questions also keep Mew's settings and completion. */
 export function reconcileAgentTranscript(saved: AgentEvent[] | null, loaded: AgentEvent[]): AgentEvent[] {
   if (!saved?.length) return loaded
   // Some ACP adapters restore context without replaying conversation messages.
@@ -252,11 +252,11 @@ export function reconcileAgentTranscript(saved: AgentEvent[] | null, loaded: Age
     // the submitted question, so retain them independently of answer/turn_end equality.
     // Stop at the first changed question: repeated text in a different turn is not a match.
     if (!matchingUsers) return turn.events
-    // ACP history can omit partial answers and turn_end. Cancellation belongs to the
-    // submitted question even when the replayed answer differs from the live stream.
-    const cancelled = previous.events.findLast(event => event.type === 'turn_end' && event.stopReason === 'cancelled')
-    const events = cancelled && !turn.events.some(event => event.type === 'turn_end')
-      ? [...turn.events, cancelled] : turn.events
+    // ACP can omit intermediate answers and turn_end. Retain the recorded ending
+    // for the same question, unless ACP supplies an ending of its own.
+    const ending = turn.userIdentity !== '[]' ? previous.events.findLast(event => event.type === 'turn_end') : undefined
+    const events = ending && !turn.events.some(event => event.type === 'turn_end')
+      ? [...turn.events, ending] : turn.events
     const settings = previous.events.flatMap(event =>
       event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk' && event.settings ? [event.settings] : [])
     const first = settings[0]
