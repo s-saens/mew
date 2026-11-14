@@ -1,5 +1,5 @@
 // 역할별 트리 가시성 — owner·manager(showAll)는 확장자·숨김 목록에 걸리지 않고 그대로 보고,
-// member 이하는 문서용으로 걸러 본다. 어느 역할이든 차단 경로(.git·node_modules·.data)와
+// member 이하는 문서용으로 걸러 본다. 어느 역할이든 차단 경로(node_modules·.data)와
 // build/ 산출물은 그대로 막힌다. 정책 기준본은 docs/ops/mew/access-model.md.
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -48,10 +48,11 @@ test('숨김 목록은 showAll에서만 풀린다', () => {
 })
 
 test('차단 경로는 showAll이어도 뚫리지 않는다 — API가 경로 자체를 거부하므로', () => {
-  for (const p of ['.git/config', 'node_modules/react/index.js', '.data/users.json']) {
+  for (const p of ['node_modules/react/index.js', '.data/users.json']) {
     assert.equal(isPathVisible(CODE, p), false, `${p}는 기본 눈에서 막혀야 한다`)
     assert.equal(isPathVisible(CODE, p, { showAll: true }), false, `${p}는 showAll에서도 막혀야 한다`)
   }
+  assert.equal(isPathVisible(CODE, '.git/config', { showAll: true }), true)
 })
 
 test('.worktrees는 부모 트리에서 제외하고 워크트리 자체를 루트로 열면 탐색한다', async () => {

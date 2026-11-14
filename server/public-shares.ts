@@ -17,7 +17,7 @@ import { recordChangeIp } from './change-ip.ts'
 const STORE = path.join(DATA_DIR, 'public-shares.json')
 const TOKEN = /^[A-Za-z0-9_-]{43}$/
 const MAX_TEXT_BYTES = 10 * 1024 * 1024
-const EXTRA_PRIVATE = new Set(['.ssh', '.gnupg', '.aws', '.kube', '.npmrc', '.netrc', '.pypirc', '.worktrees'])
+const EXTRA_PRIVATE = new Set(['.git', '.ssh', '.gnupg', '.aws', '.kube', '.npmrc', '.netrc', '.pypirc', '.worktrees'])
 
 interface StoredShare extends Omit<PublicShare, 'url'> {
   project: string

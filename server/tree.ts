@@ -38,7 +38,7 @@ export interface TreeNode {
  * 정책 기준본은 `docs/ops/mew/access-model.md`.
  *
  * showAll이어도 걷어내지 않는 둘 — 숨김 규칙이 아니라 구조적 제약이다:
- *  - `.git`·`node_modules`·`.data` — API가 경로 자체를 거부하며, node_modules는 항목이 수만 개가 된다.
+ *  - `node_modules`·`.data` — API가 경로 자체를 거부하며, node_modules는 항목이 수만 개가 된다.
  *    `.worktrees`도 부모 프로젝트에서 제외해 같은 저장소를 반복 탐색하지 않는다.
  *  - `build/` 안의 산출물(`DOWNLOAD_ONLY_DIRS`) — flutter build 하나가 9천 항목이다. APK/AAB는 보인다.
  */

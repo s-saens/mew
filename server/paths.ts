@@ -134,8 +134,8 @@ export function containsServerDataPath(directory: string): boolean {
 
 const PROJECT_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 
-// 어떤 역할로도 API에 노출하지 않는 경로 — 저장소 내부와 이 앱 자신의 인증 데이터(.data/users.json 등).
-const DENY_SEGMENTS = new Set(['.git', 'node_modules', '.data'])
+// 어떤 역할로도 API에 노출하지 않는 경로 — 의존성 및 이 앱 자신의 인증 데이터.
+const DENY_SEGMENTS = new Set(['node_modules', '.data'])
 
 // 시크릿 파일(.env·.env.local 등, .env.example 제외). 로그인 사용자에게는 열려 있고 **게스트에게만** 차단된다
 // — 로그인 가능한 역할은 어차피 셸이나 파일 조작 권한을 갖기 때문. 게스트 차단은 guestAccess.ts가 이 함수로 한다.
@@ -193,7 +193,7 @@ export function projectRoot(project: string): string {
   return root
 }
 
-/** 프로젝트 상대 경로를 절대 경로로 — 루트 탈출과 차단 경로(.git·node_modules·.data)를 거부한다 */
+/** 프로젝트 상대 경로를 절대 경로로 — 루트 탈출과 차단 경로(node_modules·.data)를 거부한다 */
 export function resolveProjectPath(project: string, relativePath: string): string {
   return resolvePathFromRoot(projectRoot(project), relativePath, assertNotServerDataPath)
 }

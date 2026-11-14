@@ -29,7 +29,7 @@ export const DEFAULT_IGNORE = [
 
 // 목록에서 빼도 계속 차단되는 이름 — paths.ts의 DENY_SEGMENTS가 API 계층에서 막는다(저장소 내부·인증 데이터).
 // 지울 수 있는 것처럼 보이면 "지웠는데 왜 안 보이지"가 되므로 UI가 고정 항목으로 표시한다.
-export const LOCKED_IGNORE = ['.git', 'node_modules', '.data']
+export const LOCKED_IGNORE = ['node_modules', '.data']
 
 const MAX_ENTRIES = 200
 const MAX_NAME_LEN = 64

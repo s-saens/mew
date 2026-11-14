@@ -115,7 +115,7 @@ function matches(parent: string, target: string): boolean { return parent === ''
 export function fileAccess(auth: RequestAuth, project: string, relPath: string): { view: boolean; edit: boolean } {
   try {
     const target = policyPath(project, relPath), caps = capabilitiesFor(auth)
-    if (auth.role === 'guest' && target.split('/').some(isSecretFile)) return { view: false, edit: false }
+    if (auth.role === 'guest' && target.split('/').some(segment => segment.toLowerCase() === '.git' || isSecretFile(segment))) return { view: false, edit: false }
     const rule = fileRules(subjectOf(auth)).filter(rule => matches(rule.path, target)).sort((a, b) => b.path.length - a.path.length)[0]
     const view = caps.filesRead && (rule?.view ?? auth.role !== 'guest')
     return { view, edit: view && caps.filesWrite && (rule?.edit ?? auth.role !== 'guest') }

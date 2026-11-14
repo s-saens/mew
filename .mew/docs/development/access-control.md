@@ -2,7 +2,7 @@
 title: "Per-account feature and file permissions"
 created: "2026-09-16"
 updated: "2026-11-11"
-description: "Defines per-account feature and file permissions, first-owner enrollment, live Mewlink revocation, server-data boundaries, public capabilities, and browser/WebSocket checks. Covers Browser, privileged speech engines, Mew Port removal, shared MCP ownership, account preservation, and rejection of obsolete Android grants."
+description: "Defines per-account feature and file permissions, first-owner enrollment, live Mewlink revocation, server-data boundaries, public capabilities, and browser/WebSocket checks. Covers Browser, privileged speech engines, Mew Port removal, shared MCP ownership, account preservation, rejection of obsolete Android grants, and Git metadata file access."
 상위파일: "MOC.md"
 ---
 
@@ -63,6 +63,8 @@ The owner-only `DELETE /api/admin/users/:accountId` returns 404 for a nonexisten
 - `server/access-routes.ts`: Owner-only `/api/admin/access`, `/feature`, and `/path`. File change requests send the workspace identifier from when it was opened and are rejected with 409 if the root has changed.
 - The existing `guest-access.json` is imported once into the current workspace when no new policy file exists. It is written along with the next permission save. The old `/api/guest-access` change API is 410.
 - Documents, subprojects, root aliases, and symbolic links are evaluated by their actual paths, so restrictions cannot be bypassed through another alias. Paths outside the workspace and blocked paths are rejected. Recursive moves, copies, and deletions are rejected upon encountering a directory symbolic link to prevent scope escapes and cycles.
+
+Authenticated file access to `.git` follows ordinary file permissions, including recursive deletion of a containing folder. Guest access and public capability links still block Git metadata. The default hidden list may hide `.git`, but it is not a fixed API restriction. Git metadata can contain credentials and hooks; grant file access accordingly. See [ADR 0174](../decisions/0174-git-metadata-file-access.md).
 
 The general file boundary always rejects not only folders named `.data` but also the actual `DATA_DIR` and all descendants. This applies even when renamed through `MEW_DATA_DIR` or when the default XDG data folder is inside the workspace. File and folder symbolic links and descendant paths that do not yet exist are also checked using their actual parent paths. Neither owner nor explicit file allow rules can lift this block. These paths are also hidden from project lists, trees, and catalogs.
 

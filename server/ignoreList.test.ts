@@ -1,5 +1,5 @@
 // 숨김 목록은 설정 창에서 아무나(owner/manager) 고치는 값이라, 저장 전 정규화가 유일한 방어선이다.
-// 특히 경로 형태(`a/b`·`..`)가 통과하면 "이름 비교"라는 전제가 깨지고, 차단 경로(.git 등)가 목록에서
+// 특히 경로 형태(`a/b`·`..`)가 통과하면 "이름 비교"라는 전제가 깨지고, 차단 경로가 목록에서
 // 빠지면 UI가 "지웠다"고 보여주지만 서버는 계속 막아 화면과 실제가 어긋난다.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -29,6 +29,7 @@ test('normalizeIgnoreList: 차단 경로는 빼도 되돌아오고 중복은 하
   const names = normalizeIgnoreList(['dist', 'dist', 'coverage'])
   assert.deepEqual(names.filter((n) => n === 'dist'), ['dist'])
   for (const locked of LOCKED_IGNORE) assert.ok(names.includes(locked), `${locked}는 되돌아와야 한다`)
+  assert.ok(!names.includes('.git'), '.git can be removed from the ignore list')
 })
 
 test('normalizeIgnoreList: 경로·빈 값·배열 아님은 거부', () => {
