@@ -76,3 +76,18 @@ test('missing saved entrypoints remain reportable without preventing project ope
   assert.equal(projectDocsDir(root), 'docs')
   assert.throws(() => planProjectSetup({ projectRoot: root, settings }), /파일을 찾을 수 없습니다/)
 })
+
+test('wiki discovery preserves explicitly configured and legacy document roots', t => {
+  const root = fixture(t)
+  fs.mkdirSync(path.join(root, '.mew/wiki'), { recursive: true })
+  assert.equal(projectDocsDir(root), '.mew/wiki')
+  fs.mkdirSync(path.join(root, 'docs'))
+  assert.equal(projectDocsDir(root), 'docs', 'existing root docs keeps precedence')
+  assert.equal(projectDocsDir(root, 'docs'), 'docs')
+  writeProjectAgentSettings(root, defaultAgentSettings('docs'))
+  assert.equal(projectDocsDir(root), 'docs')
+  const legacy = fixture(t)
+  fs.mkdirSync(path.join(legacy, '.mew/docs'), { recursive: true })
+  fs.mkdirSync(path.join(legacy, '.mew/wiki'))
+  assert.equal(projectDocsDir(legacy), '.mew/docs')
+})

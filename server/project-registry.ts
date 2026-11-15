@@ -208,7 +208,7 @@ export class ProjectRegistry {
     assertManagedName(name)
     if (typeof git !== 'boolean') throw new ProjectRegistryError('Git 설정이 올바르지 않습니다')
     return this.createManaged(account, name, async directory => {
-      fs.mkdirSync(path.join(directory, '.mew', 'docs'), { recursive: true })
+      fs.mkdirSync(path.join(directory, '.mew', 'wiki'), { recursive: true })
       if (git) {
         await simpleGit(directory).init()
         fs.writeFileSync(path.join(directory, '.gitignore'), '.mew/temp/\n')

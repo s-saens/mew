@@ -74,5 +74,7 @@ export function projectDocsDir(root: string, fallback?: string): string {
   if (fallback && !path.isAbsolute(fallback)) {
     try { if (fs.statSync(safeProjectPath(root, fallback)).isDirectory()) return fallback } catch { /* legacy setting belongs to another project */ }
   }
-  return !fs.existsSync(path.join(root, 'docs')) && fs.existsSync(path.join(root, '.mew/docs')) ? '.mew/docs' : 'docs'
+  if (fs.existsSync(path.join(root, 'docs'))) return 'docs'
+  if (fs.existsSync(path.join(root, '.mew/docs'))) return '.mew/docs'
+  return fs.existsSync(path.join(root, '.mew/wiki')) ? '.mew/wiki' : 'docs'
 }
