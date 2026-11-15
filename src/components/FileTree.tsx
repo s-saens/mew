@@ -1417,7 +1417,7 @@ export function FileTree({
   function canDropInto(dir: string): boolean {
     const items = draggingRef.current
     if (!items || readOnly || visibleNodes.get(dir)?.editable === false) return false
-    return items.every(item => !isSelfOrDescendant(item.path, item.type, dir))
+    return items.every(item => !(documentPages && item.path === dir) && !isSelfOrDescendant(item.path, item.type, dir))
   }
 
   function onDragOverDir(dir: string | null) {

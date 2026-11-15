@@ -66,6 +66,10 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
           writes.push({ endpoint: url.pathname, payload: request.postDataJSON() })
           await route.fulfill({ json: { path: 'folder-copy/_folder-copy.md', moves: [], changed: [] } }); return
         }
+        if (url.pathname === '/api/docs/pages/move') {
+          writes.push({ endpoint: url.pathname, payload: request.postDataJSON() })
+          await route.fulfill({ status: 400, json: { error: 'Cannot move a document into itself' } }); return
+        }
         if (url.pathname.startsWith('/api/')) { await route.fulfill({ json: {} }); return }
         await route.fulfill(url.pathname === '/app.js' ? { contentType: 'text/javascript', body: chunk.code } : { contentType: 'text/html', body: `<!doctype html><html class="dark"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script src="/app.js"></script></html>` })
       })
@@ -330,6 +334,24 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
     } finally { await dragData.dispose() }
 
     await reset('documents')
+    for (const grouped of [false, true]) {
+      if (grouped) {
+        await row('first.md').click()
+        await row('last.md').click({ modifiers: ['Control'] })
+      }
+      const beforeSelfDrop = writes.length
+      const data = await page.evaluateHandle('new DataTransfer()')
+      try {
+        await row('first.md').dispatchEvent('dragstart', { dataTransfer: data })
+        await row('first.md').dispatchEvent('dragover', { dataTransfer: data })
+        await row('first.md').dispatchEvent('drop', { dataTransfer: data })
+        await row('first.md').dispatchEvent('dragend', { dataTransfer: data })
+        await page.waitForTimeout(80)
+        assert.equal(writes.length, beforeSelfDrop, 'dropping a document onto itself sends no move request')
+        assert.equal(await page.getByRole('dialog').count(), 0, 'self-drop does not show an error')
+      } finally { await data.dispose() }
+      await reset('documents')
+    }
     await row('folder').click()
     await assertSelected(['folder'])
     assert.deepEqual(await page.evaluate('window.opened'), [])

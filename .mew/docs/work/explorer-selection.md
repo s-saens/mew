@@ -1,6 +1,6 @@
 ---
 title: "Explorer selection and double-click opening"
-description: "Records the 2026-11-01 change to explorer selection, double-click opening, modifier multiselection, selection-bound menus, and bulk operations. Covers passing feature regressions, build, lint and isolated visual checks, a reproduced failure in an unchanged tree-persistence test fixture, and the boundary excluding deployment and physical-device verification. Includes the 2026-11-02 change to explicit Files folder expansion by double-click or icon click."
+description: "Records explorer selection, bulk operations, explicit folder expansion, and the 2026-11-16 document self-drop fix. Covers local verification and deployment and physical-device limits."
 created: "2026-11-01"
 updated: "2026-11-02"
 ---
@@ -37,3 +37,7 @@ Folder names and row space now select without changing expansion. Double-clickin
 ## Application boundary
 
 No deployment, launcher execution, or server start, stop, or restart was performed. Physical-device verification remains outside this task.
+
+## Document self-drop (2026-11-16)
+
+Dropping a leaf document onto itself previously sent a move request and showed an error. The explorer now rejects that destination before moving any selected item, as specified in the [Documents contract](../features/projects-files-search/documents-and-document-map-management.md). The isolated explorer browser regression passed for single and grouped selections. `npm run build` passed, including TypeScript, with a chunk-size warning; `npm run lint` passed with warnings. `npm run check:docs` validated descriptions but reported 39 existing repository link errors. No deployment or server lifecycle operation was performed; physical-device behavior was not checked.
