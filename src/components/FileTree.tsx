@@ -58,6 +58,7 @@ type Focused = { path: string; type: 'file' | 'dir' } | null
 type PopoverState = { path: string; type: 'file' | 'dir'; x: number; y: number } | null
 
 interface NodeCtx {
+  wikiLabel: string
   search?: ExplorerSearch
   searchPaths?: ReadonlyMap<string, string>
   project: string
@@ -527,7 +528,7 @@ function Node({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: NodeCt
           {projectLink && <SubprojectLink name={node.name} unavailable={!ctx.canOpenProjects}
             className="relative z-10" data-subproject-link={node.path} onClick={() => ctx.openProject?.(node.path)} />}
           {node.path === ctx.documentsFolder?.path && <button type="button"
-            aria-label={uiText('문서')} data-tip={uiText('문서')} data-documents-link
+            aria-label={ctx.wikiLabel} data-tip={ctx.wikiLabel} data-documents-link
             onClick={ctx.documentsFolder.onOpen}
             className="relative z-10 mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded text-ink-muted hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-accent">
             <ArrowUpRight width={14} height={14} aria-hidden="true" />
@@ -1667,6 +1668,7 @@ export function FileTree({
     onDropFiles: (dir, files) => void uploadFilesInto(dir, files),
     openGit: onOpenGit,
     documentsFolder,
+    wikiLabel: t('explorer.documents'),
   }
 
   return (

@@ -98,7 +98,7 @@ test('Mewcat tools use real App project switching, Documents tabs and reviewed w
     assert.equal(await page.locator('[data-editor-active="mew:file:docs/MOC.md"]').count(), 1)
     assert.ok(reads.some(read => read.path === 'MOC.md' && read.project === 'docs'), 'Documents files retain their existing API and tab scope')
     await run({ kind: 'open_panel', panel: 'documents' })
-    assert.equal(await page.locator('[data-explorer-toggle]').getByRole('button', { name: '문서', exact: true }).getAttribute('aria-pressed'), 'true')
+    assert.equal(await page.locator('[data-explorer-toggle]').getByRole('button', { name: '위키', exact: true }).getAttribute('aria-pressed'), 'true')
     await run({ kind: 'start_project_session', projectRoot: '/beta', runtime: 'codex', request: '메모 작성과 검색 기능을 만들어요.' })
     const draft = await page.evaluate(() => { const fixture = globalThis as unknown as Fixture; return { tab: fixture.workTab, draft: JSON.parse(localStorage.getItem('mew:agent-input-drafts') ?? '{}')['v2:' + JSON.stringify(['helper@test', '/beta', '/beta', fixture.workTab.id])] } })
     assert.equal(draft.tab.cwd, '/beta')

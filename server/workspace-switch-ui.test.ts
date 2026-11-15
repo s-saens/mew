@@ -541,7 +541,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
       await input.fill('beta')
       for (const enabled of [false, true]) {
         if (enabled) await contentToggle.tap()
-        for (const [dx, scope] of [[-90, '파일'], [90, '문서'], [90, '문서'], [-90, '파일'], [-90, '파일'], [90, '문서']] as const) {
+        for (const [dx, scope] of [[-90, '파일'], [90, '위키'], [90, '위키'], [-90, '파일'], [-90, '파일'], [90, '위키']] as const) {
           await swipe('[data-sidebar]', dx)
           const scopeButton = sidebar.getByRole('button', { name: scope, exact: true })
           await page.waitForFunction(el => el?.getAttribute('aria-pressed') === 'true', await scopeButton.elementHandle())
@@ -554,7 +554,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
       }
       await page.setViewportSize({ width: 1100, height: 700 })
       await swipe('[data-sidebar]', -90)
-      assert.equal(await sidebar.getByRole('button', { name: '문서', exact: true }).getAttribute('aria-pressed'), 'true', 'desktop body swipes preserve the scope')
+      assert.equal(await sidebar.getByRole('button', { name: '위키', exact: true }).getAttribute('aria-pressed'), 'true', 'desktop body swipes preserve the scope')
       await page.setViewportSize({ width: 390, height: 700 })
       await swipe('.mobile-dock', -65)
       await foreground('editor')
@@ -872,9 +872,9 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
     const explorerToggle = page.locator('[data-explorer-toggle]')
     const explorerScope = explorerToggle.locator('button[aria-pressed="true"]')
     assert.equal(await explorerToggle.getByRole('combobox').count(), 0, 'file/document scope keeps its two-button toggle')
-    assert.equal(await explorerToggle.getByRole('button', { name: '문서', exact: true }).count(), 1)
+    assert.equal(await explorerToggle.getByRole('button', { name: '위키', exact: true }).count(), 1)
     assert.equal(await explorerToggle.getByRole('button', { name: '파일', exact: true }).count(), 1)
-    const selectExplorerScope = async (label: '문서' | '파일', touch = false) => {
+    const selectExplorerScope = async (label: '위키' | '파일', touch = false) => {
       const button = explorerToggle.getByRole('button', { name: label, exact: true })
       if (touch) await button.tap()
       else await button.click()
@@ -903,8 +903,9 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
     await page.getByRole('button', { name: 'Close docs/example.ts', exact: true }).click()
     await docsFolder.dblclick()
     assert.equal(await page.locator('[data-path="docs/MOC.md"]').count(), 0, 'folder can collapse')
+    assert.equal(await page.locator('[data-documents-link]').getAttribute('aria-label'), '위키')
     await page.locator('[data-documents-link]').click()
-    assert.equal((await explorerScope.innerText()).trim(), '문서')
+    assert.equal((await explorerScope.innerText()).trim(), '위키')
     const graphEntry = page.locator('[data-docs-graph-entry]')
     assert.equal(await graphEntry.count(), 1)
     assert.ok((await graphEntry.boundingBox())!.y < (await page.locator('[data-tree-key="sidebar-tree:docs:/alpha"] [data-path="MOC.md"]').boundingBox())!.y)
@@ -926,11 +927,11 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
     await page.keyboard.press('Enter')
     await page.keyboard.press('Home')
     await page.keyboard.press('Enter')
-    assert.equal((await explorerScope.innerText()).trim(), '문서')
+    assert.equal((await explorerScope.innerText()).trim(), '위키')
     await page.keyboard.press('ArrowRight')
     assert.equal((await explorerScope.innerText()).trim(), '파일')
     await page.keyboard.press('ArrowLeft')
-    assert.equal((await explorerScope.innerText()).trim(), '문서')
+    assert.equal((await explorerScope.innerText()).trim(), '위키')
     if (mode === 'documents') {
       for (const width of [1100, 390]) {
         await page.setViewportSize({ width, height: 700 })
@@ -940,7 +941,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
         await page.locator('[data-path="docs/example.ts"]').waitFor()
         await page.screenshot({ path: `/tmp/mew-docs-folder-${width}.png` })
         await page.locator('[data-documents-link]').click()
-        assert.equal((await explorerScope.innerText()).trim(), '문서')
+        assert.equal((await explorerScope.innerText()).trim(), '위키')
         await selectExplorerScope('파일')
         await page.locator('[data-path="docs/example.ts"]').waitFor()
         await docsFolder.dblclick()
@@ -1001,7 +1002,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
       }
       await page.setViewportSize({ width: 1100, height: 700 })
       assert.equal(await page.locator('[data-current-project="/alpha"]').count(), 1)
-      await selectExplorerScope('문서')
+      await selectExplorerScope('위키')
       for (const combo of ['Control+n', 'Control+t']) {
         await explorerScope.focus(); await page.keyboard.press(combo)
         await page.locator('[data-tree-key="sidebar-tree:docs:/alpha"]').getByPlaceholder('새 문서 이름').waitFor()
@@ -1010,7 +1011,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
       await selectExplorerScope('파일')
       await explorerScope.focus(); await page.keyboard.press('Control+Shift+n')
       await page.locator('[data-tree-key="sidebar-tree:root:/alpha"]').getByPlaceholder('새 폴더 이름').waitFor()
-      await page.keyboard.press('Escape'); await selectExplorerScope('문서')
+      await page.keyboard.press('Escape'); await selectExplorerScope('위키')
       await page.getByRole('button', { name: 'Select extra.md', exact: true }).click()
       await page.getByRole('button', { name: 'Select extra.md', exact: true }).focus()
       await page.keyboard.press('Control+w')
@@ -1063,7 +1064,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
       await page.locator('[data-sidebar]').screenshot({ path: path.join(process.env.MEW_EXPLORER_SCREENSHOTS, 'desktop-documents.png') })
       await selectExplorerScope('파일')
       await page.locator('[data-sidebar]').screenshot({ path: path.join(process.env.MEW_EXPLORER_SCREENSHOTS, 'desktop-files.png') })
-      await selectExplorerScope('문서')
+      await selectExplorerScope('위키')
     }
     const documentRow = page.locator('[data-tree-key="sidebar-tree:docs:/alpha"] [data-path="alpha.md"]')
     await documentRow.click()
@@ -1356,7 +1357,7 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
     assert.equal(await sidebar.isVisible(), true, 'selecting current dock panel does not close it')
     await dock.getByRole('button', { name: '에디터 화면', exact: true }).tap()
     await dock.getByRole('button', { name: '파일 탐색기', exact: true }).tap()
-    await selectExplorerScope('문서', true)
+    await selectExplorerScope('위키', true)
     const toggleBounds = (await explorerToggle.boundingBox())!, sidebarBounds = (await sidebar.boundingBox())!
     assert.ok(toggleBounds.y < sidebarBounds.y + sidebarBounds.height / 2)
     assert.ok(toggleBounds.width >= sidebarBounds.width - 20)
