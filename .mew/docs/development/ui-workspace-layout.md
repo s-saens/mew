@@ -184,6 +184,8 @@ Editor toggling preserves all panes, tabs, bodies, splits, and mounts. Its deskt
 
 Mobile dock selection only changes the foreground through the shared `openWorkspacePanel` or `showMobileEditor`; pressing the same button again does not close it. On desktop, only an open, focused panel closes through `closeWorkspacePanel`; other open panels receive focus, and closed panels open.
 
+In compact workspaces, horizontal Dock buttons share the available width without gaps, so the selected background fills its entire slot. Each button retains a 32px minimum width and the Dock scrolls horizontally when the items do not fit.
+
 Unmodified F1–F12 select visible Dock items by their current display order in the active workspace. Selection uses the non-toggle path, skips hidden and unavailable items, consumes unmatched keys and repeats, and leaves dialog and remote input alone. The fullscreen app keyboard lock requests these keys; browser and OS reservations may still prevent delivery. See [keyboard shortcuts](../../../docs/configuration/appearance.md#keyboard-shortcut-settings).
 
 Dock swipes select the adjacent panel in the displayed dock order, relative to the mobile foreground panel or desktop focused panel. Left-to-right selects the previous panel (-1), and right-to-left selects the next (+1), triggering once when movement reaches at least 20px and horizontal movement exceeds 1.5 times vertical movement. Hidden and unauthorized items are skipped, and navigation stops at either end. Selected tabs are preserved; this does not switch tabs instead. For chat and Android, which are absent from the dock, use a dock button to select the target panel.
