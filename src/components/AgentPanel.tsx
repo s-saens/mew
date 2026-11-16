@@ -3250,6 +3250,9 @@ function AgentSessionView({
 
   const displayItems = useMemo(() => historyPreview ? foldEvents(historyPreview.events, uiLocale, historyPreview.start) : promptItems,
     [historyPreview, promptItems, uiLocale])
+  const latestTurn = displayItems.findLast(item => item.kind === 'turn')
+  const latestTurnBusy = latestTurn?.key === pendingReplyKey ? null : !historyPreview && latestTurn && !latestTurn.done ? meta?.activeTask === 'cli' ? false : meta?.busy ?? null : false
+  const latestTurnState = latestTurn?.kind === 'turn' ? turnState(latestTurn, latestTurnBusy) : null
   const timeline = useMemo(() => historyPreview ? displayItems : commandTimeline(displayItems, cli.records, usersBefore),
     [historyPreview, displayItems, cli.records, usersBefore])
   const settingsChanges = useMemo(() => {
@@ -4035,6 +4038,7 @@ function AgentSessionView({
       <div className="flex min-h-0 flex-1 flex-col">
       {/* 탭바 바로 아래의 세션 도구 바. 히스토리·정보 팝업만 이 바에서 펼친다. */}
       <div ref={infoOverlayRef} inert={!connected} className="relative z-20 flex h-8 shrink-0 items-center justify-between border-b border-edge bg-surface px-3">
+        <div className="flex items-center gap-1">
         <SessionPicker
           sessions={sessions}
           searching={searchingSessions}
@@ -4085,6 +4089,8 @@ function AgentSessionView({
             send({ type: 'load_session', sessionId: meta.sessionId })
           } : undefined}
         />
+        {latestTurnState && <span data-agent-status className={`h-1.5 w-1.5 shrink-0 rounded-full ${BUBBLE_DOT[latestTurnState]}`} title={BUBBLE_LABEL[latestTurnState]} aria-label={BUBBLE_LABEL[latestTurnState]} />}
+        </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -5221,11 +5227,6 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
             }}
             className={`flex min-w-0 text-left text-xs text-ink-secondary hover:text-ink ${open ? 'flex-1 self-stretch items-center gap-1.5 px-2.5' : 'w-full items-start gap-2 px-3 py-2'}`}
           >
-            <span
-              className={`shrink-0 rounded-full ${open ? 'size-1.25' : 'mt-1 h-1.5 w-1.5'} ${BUBBLE_DOT[state]}`}
-              title={BUBBLE_LABEL[state]}
-              aria-label={BUBBLE_LABEL[state]}
-            />
             {open ? <>
               <span className="sr-only">{summary}</span>
             </> : (
