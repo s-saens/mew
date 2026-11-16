@@ -1,7 +1,7 @@
 ---
 title: "Getting started with mew"
 updated: "2026-11-11"
-description: "Installation, first sign-in, remote access, host browser setup, updates, and data retention for Mew. Covers source setup, first-administrator creation, the link.mew.run entry, and Windows wizard/prebuilt release limits."
+description: "Installation, first sign-in, remote access, host browser setup, updates, and data retention for Mew. Covers source setup, experimental Termux prerequisites and limits, first-administrator creation, the link.mew.run entry, and Windows wizard/prebuilt release limits."
 ---
 
 # Getting started with mew
@@ -98,6 +98,12 @@ cd mew
 ```
 
 On other distributions, install the equivalent packages first. Follow [Finish setup](#finish-setup) above. For a server that should start on boot or accept remote connections, use the [deployment guide](../deployment/native.md).
+
+#### Termux on Android
+
+Termux is experimental and full setup has not been verified. When running the source setup directly in Termux, it offers to install a missing Node LTS and npm, compiler, make, Python, and tmux using `pkg` without sudo. If Node fails to start because of mismatched Termux libraries, update the installed Termux packages with `pkg update` and `pkg upgrade`, then check `node --version` before retrying.
+
+These prerequisite steps do not establish Android support. Native npm dependencies and the mandatory Chrome and Playwright browser preparation may still fail on Android; the latter currently supports Linux, macOS, and Windows hosts. Use a supported host if setup cannot finish.
 
 ### Finish setup
 
