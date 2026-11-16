@@ -25,6 +25,22 @@ const configuredUser = (text: string, settings = settingsA): AgentEvent => ({ ..
 const userSettings = (events: AgentEvent[]) => events.flatMap(event =>
   event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk' ? [event.settings] : [])
 
+test('앞 질문이 바뀌어도 유일하고 순서가 같은 질문과 답변의 시간은 반복 복원한다', () => {
+  const saved = [...savedTurn, message('user', '유일한 질문'), message('agent', '보존할 답변'),
+    { type: 'turn_end', stopReason: 'end_turn', durationMs: 9876 } as AgentEvent]
+  const loaded = [message('user', '외부 질문'), message('agent', '외부 답변'), message('user', '유일한 질문'), message('agent', '보존할 답변')]
+  const restored = reconcileAgentTranscript(saved, loaded)
+  assert.equal(writeAgentTranscript('codex', '/work', 'duration-after-insertion', restored), true)
+  const again = reconcileAgentTranscript(readAgentTranscript('codex', '/work', 'duration-after-insertion'), loaded)
+  assert.equal(foldEvents(again as Parameters<typeof foldEvents>[0]).filter(item => item.kind === 'turn')[1].durationMs, 9876)
+  const repeated = [...saved, message('user', '유일한 질문'), message('agent', '보존할 답변')]
+  assert.deepEqual(reconcileAgentTranscript(repeated, loaded), loaded, '중복 질문은 추측하지 않는다')
+  const changedAnswer = [...loaded.slice(0, -1), message('agent', '새 답변')]
+  assert.deepEqual(reconcileAgentTranscript(saved, changedAnswer), changedAnswer, '다른 답변에는 시간을 붙이지 않는다')
+  const savedWithExternal = [...saved, ...loaded.slice(0, 2), { type: 'turn_end', stopReason: 'end_turn', durationMs: 100 } as AgentEvent]
+  assert.deepEqual(reconcileAgentTranscript(savedWithExternal, loaded), loaded, '순서가 뒤바뀐 질문에는 시간을 붙이지 않는다')
+})
+
 test('답변이 달라지거나 생략되어도 같은 질문의 중단 상태는 저장·반복 복원 뒤 유지한다', () => {
   const cancelled: AgentEvent = { type: 'turn_end', stopReason: 'cancelled', durationMs: 500 }
   const saved = [configuredUser('중단할 질문'), ...savedTurn.slice(1, -1), cancelled]

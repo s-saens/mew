@@ -241,22 +241,51 @@ export function reconcileAgentTranscript(saved: AgentEvent[] | null, loaded: Age
   // Some ACP adapters restore context without replaying conversation messages.
   if (!loaded.some(event => event.type === 'update' && ['user_message_chunk', 'agent_message_chunk', 'agent_thought_chunk', 'tool_call', 'tool_call_update'].includes(event.update.sessionUpdate))) return saved
   const cached = conversationTurns(saved), fresh = conversationTurns(loaded)
+  const uniqueIndex = (turns: typeof cached) => {
+    const indices = new Map<string, number>()
+    for (const [index, turn] of turns.entries()) {
+      if (turn.userIdentity === '[]') continue
+      indices.set(turn.userIdentity, indices.has(turn.userIdentity) ? -1 : index)
+    }
+    return indices
+  }
+  const cachedUsers = uniqueIndex(cached), freshUsers = uniqueIndex(fresh)
+  const anchors = fresh.flatMap((turn, index) => {
+    const savedIndex = cachedUsers.get(turn.userIdentity)
+    return freshUsers.get(turn.userIdentity) === index && savedIndex !== undefined && savedIndex >= 0
+      && cached[savedIndex].identity === turn.identity
+      && turn.events.some(event => event.type === 'update' && event.update.sessionUpdate === 'agent_message_chunk')
+      && cached[savedIndex].events.some(event => event.type === 'turn_end' && typeof event.durationMs === 'number')
+      ? [{ index, savedIndex }] : []
+  })
+  const orderedAnchors = new Map<number, number>()
+  let greatest = -1
+  const preceding = anchors.map(anchor => { const value = greatest; greatest = Math.max(greatest, anchor.savedIndex); return value })
+  let least = Infinity
+  for (let i = anchors.length - 1; i >= 0; i--) {
+    const anchor = anchors[i]
+    if (preceding[i] < anchor.savedIndex && anchor.savedIndex < least) orderedAnchors.set(anchor.index, anchor.savedIndex)
+    least = Math.min(least, anchor.savedIndex)
+  }
   let matching = true
   let matchingUsers = true
   return fresh.flatMap((turn, index) => {
-    const previous = cached[index]
-    matching = matching && !!previous && previous.identity === turn.identity && previous.events.some(event => event.type === 'turn_end')
-    matchingUsers = matchingUsers && !!previous && previous.userIdentity === turn.userIdentity
-    if (matching) return previous.events
+    const prefix = cached[index]
+    matching = matching && !!prefix && prefix.identity === turn.identity && prefix.events.some(event => event.type === 'turn_end')
+    matchingUsers = matchingUsers && !!prefix && prefix.userIdentity === turn.userIdentity
+    const anchor = orderedAnchors.get(index)
+    const previous = matchingUsers ? prefix : anchor !== undefined ? cached[anchor] : undefined
+    if (matching) return prefix.events
     // ACP can omit intermediate replies or replay different answer text. Settings belong to
     // the submitted question, so retain them independently of answer/turn_end equality.
-    // Stop at the first changed question: repeated text in a different turn is not a match.
-    if (!matchingUsers) return turn.events
+    // After a changed prefix, require a unique question, matching answer, and preserved order.
+    if (!previous) return turn.events
     // ACP can omit intermediate answers and turn_end. Retain the recorded ending
     // for the same question, unless ACP supplies an ending of its own.
     const ending = turn.userIdentity !== '[]' ? previous.events.findLast(event => event.type === 'turn_end') : undefined
     const events = ending && !turn.events.some(event => event.type === 'turn_end')
       ? [...turn.events, ending] : turn.events
+    if (!matchingUsers) return events
     const settings = previous.events.flatMap(event =>
       event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk' && event.settings ? [event.settings] : [])
     const first = settings[0]
