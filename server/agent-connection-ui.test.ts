@@ -85,6 +85,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       const errors: string[] = []
       page.on('pageerror', error => errors.push(error.message))
       let fresh = false
+      let failCommands = false
       let releaseTabs!: () => void
       const tabsReady = new Promise<void>(resolve => { releaseTabs = resolve })
       await page.route('http://mew-connection.test/**', async route => {
@@ -93,6 +94,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         if (pathname === '/api/upload-into') return route.fulfill({ json: { relPath: '.mew/assets/startup.png' } })
         if (pathname === '/api/user-ui/agent-tabs') await tabsReady
         if (pathname === '/api/user-ui/agent-tabs') return route.fulfill({ json: { state: { tabs: (fresh ? ['fresh'] : ['first', 'second']).map(id => ({ id, label: id, renamed: true, runtime: 'codex', cwd: '/workspace', ...(!fresh ? { sessionIds: { [JSON.stringify(['codex', '/workspace'])]: id } } : {}) })), activeId: fresh ? 'fresh' : 'first' }, claims: [] } })
+        if (pathname === '/api/agent/commands' && failCommands) return route.abort()
         if (pathname === '/api/agent-cwd') return route.fulfill({ json: { cwd: '/workspace' } })
         if (pathname === '/api/projects') return route.fulfill({ json: [] })
         if (pathname.startsWith('/api/')) return route.fulfill({ json: { settings: null, skills: [], jobs: [], commands: [], runtimes: [] } })
@@ -152,6 +154,15 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.equal(await composerValue(draft), 'Draft before first connection')
       await draft.fill('Keep this unsent draft')
       await session.getByText('Saved conversation', { exact: true }).waitFor()
+      failCommands = true
+      const recovery = session.locator('[data-agent-recovering]')
+      await recovery.waitFor()
+      assert.equal(await recovery.locator('.mew-loading-dot').count(), 3)
+      assert.ok(await recovery.evaluate(el => !!el.parentElement?.querySelector('button[aria-label="히스토리"]')), 'recovery dots sit beside History')
+      assert.equal(await session.locator('[data-agent-conversation] [data-agent-recovering]').count(), 0)
+      assert.equal(await recovery.getByRole('status').getAttribute('aria-label'), '불러오는 중…')
+      failCommands = false
+      await recovery.waitFor({ state: 'hidden' })
       const clearCount = () => page.evaluate<number>('window.messages.filter(message=>message.type==="clear_session").length')
       const beforeClear = await clearCount()
       await draft.press('Control+r')
@@ -229,7 +240,6 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         window.sockets.first.emit({type:'permission',id:'approval-two',toolCall:{title:'Run another command'},options:[]})`)
       const approvalTab = page.locator('[role="tab"]', { hasText: 'first' })
       const approvalHeader = session.locator('[data-agent-turn-header]').last()
-      const status = session.locator('[data-agent-status]')
       const assertApprovalDot = async (scope: Locator) => {
         const dot = scope.locator('span[aria-label="승인 대기"]')
         await dot.waitFor()
@@ -238,12 +248,12 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       }
       await assertApprovalDot(approvalTab)
       assert.equal(await approvalTab.getAttribute('aria-selected'), 'true', 'new approval automatically selects its tab')
-      await assertApprovalDot(session)
+      await assertApprovalDot(approvalHeader)
       await page.locator('[role="tab"]', { hasText: 'second' }).click()
       await assertApprovalDot(approvalTab)
       await approvalTab.click()
       assert.equal(await approvalHeader.locator('button[aria-expanded]').getAttribute('aria-expanded'), 'true', 'new approval requests reveal their action buttons')
-      await assertApprovalDot(session)
+      await assertApprovalDot(approvalHeader)
       await page.screenshot({ path: `/tmp/mew-approval-${width}-${dark ? 'dark' : 'light'}.png` })
       await session.getByRole('button', { name: '이번 작업 허용', exact: true }).click()
       assert.deepEqual(await page.evaluate('window.messages.at(-1)'), { type: 'permission', id: 'approval-one', optionId: 'allow-once' })
@@ -258,9 +268,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       await assertApprovalDot(approvalTab)
       await page.evaluate("window.sockets.first.emit({type:'permission_done',id:'approval-three'});window.sockets.first.emit({type:'permission_done',id:'approval-two'})")
       await approvalTab.locator('span[aria-label="작업 중"]').waitFor()
-      await session.locator('[data-agent-status][aria-label="작업 중"]').waitFor()
-      assert.equal(await status.getAttribute('aria-label'), '작업 중')
-      assert.equal(await approvalHeader.locator('span[aria-label="작업 중"]').count(), 0)
+      await approvalHeader.locator('span[aria-label="작업 중"]').waitFor()
       assert.ok((await approvalTab.locator('span[aria-label="작업 중"]').getAttribute('class'))?.includes('animate-pulse'))
       await page.evaluate("window.setNoticePreferences({autoOpenApproval:false})")
       const otherTab = page.locator('[role="tab"]', { hasText: 'second' })

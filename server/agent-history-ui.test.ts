@@ -76,11 +76,6 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       await page.getByText('Question 44', { exact: true }).waitFor()
       assert.equal(await page.getByText('Question 24', { exact: true }).count(), 0)
       const savedHeader = page.locator('[data-agent-turn-header]').filter({ has: page.getByText('Saved final answer', { exact: true }) })
-      const status = page.locator('[data-agent-status]')
-      await status.waitFor()
-      assert.equal(await status.getAttribute('aria-label'), '완료')
-      assert.equal(await savedHeader.locator('span[aria-label="완료"]').count(), 0, 'status is beside History, not inside the answer')
-      assert.ok(await status.evaluate(el => !!el.parentElement?.querySelector('button[aria-label="히스토리"]')))
       await savedHeader.locator('button[aria-expanded]').click()
       const savedTurn = savedHeader.locator('..')
       const savedDetails = savedTurn.locator('[data-agent-work-details]')
@@ -170,8 +165,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       const assertHeaderAlignment = async (header: typeof timedHeader) => {
         const centers = await header.evaluate(el => {
           const center = (element: Pick<typeof el, 'getBoundingClientRect'>) => { const rect = element.getBoundingClientRect(); return rect.top + rect.height / 2 }
-          const button = el.querySelector('button[aria-expanded]')!
-          const elements = [button, ...el.querySelectorAll('[data-agent-duration], button:not([aria-expanded]), button:not([aria-expanded]) svg, button:not([aria-expanded]) > span')]
+          const dot = el.querySelector('button[aria-expanded] > span[aria-label]')!
+          const elements = [dot, ...el.querySelectorAll('[data-agent-duration], button:not([aria-expanded]), button:not([aria-expanded]) svg, button:not([aria-expanded]) > span')]
           return elements.map(element => ({ name: element.getAttribute('aria-label') ?? element.textContent, y: center(element) }))
         })
         assert.ok(Math.max(...centers.map(item => item.y)) - Math.min(...centers.map(item => item.y)) <= 0.5, `expanded header shares one vertical center: ${JSON.stringify(centers)}`)
