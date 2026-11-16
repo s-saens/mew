@@ -1,6 +1,6 @@
 ---
 title: "Mewlink device registration and locally authenticated P2P access contract"
-description: "Defines the link.mew.run entry, apex homepage separation, legacy origin compatibility, Mewlink registration, launcher behavior, authentication, browser trust, UI resources, notification and microphone delegation, signaling proofs, and transport limits, including the bounded speech-transcription response wait. Links native iOS storage, recovery, and separate host/central verification boundaries."
+description: "Defines the link.mew.run entry, apex homepage separation, legacy origin compatibility, Mewlink registration, launcher behavior, authentication, browser trust, UI resources, notification and microphone delegation, signaling proofs, and transport limits, including the bounded speech-transcription response wait. Links native iOS storage, recovery, central billing, and separate host/central verification boundaries."
 created: 2026-10-07
 updated: "2026-11-11"
 ---
@@ -8,6 +8,8 @@ updated: "2026-11-11"
 [Work and release criteria](<../work/remote-access.md>) · [Central service installation](../operations/remote-central.md) · [ADR 0195](../history/decisions/0195-mew-account-based-p2p-remote-access.md) · [Follow-up ADR 0203](../history/decisions/0203-mewlink-workers-p2p-ui.md) · [Local authentication ADR 0207](../history/decisions/0207-mewlink-device-access-local-auth.md) · [Permissions](access-control.md)
 
 Central accounts manage device registration, lists, deletion, and optional external identity proofs. Public device URLs start WebRTC without central login; the installed UI accepts **local email/password or a Mewlink account with completed owner approval and self-linking**. Central identity, email, public address, and device registration do not grant local work permissions ([ADR 0208](../history/decisions/0208-mewlink-approved-login-identities.md)). Implementation/isolated checks do not establish production application: users must update local mew and redeploy central. Provider-specific production login, external Android/LTE, sleep, and network-switch measurements remain outstanding.
+
+Central account subscription integration is described in the [billing contract](mewlink-billing.md). Existing remote access remains available without a subscription.
 
 On 2026-10-10, the user confirmed public-address UI/agent chat, then reported desktop/mobile disconnections. Native-RTC isolated loads found and fixed small-message IPC count limits and misclassified native send-wait returns. Checks also reproduced/fixed socket closure, callback exceptions, ordering, and central-tab-close races. They establish neither one cause for the reported symptoms nor deployment/mobile network-switch validation. Browser-view resource 503 is a separate issue.
 
