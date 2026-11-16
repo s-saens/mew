@@ -1,15 +1,15 @@
 ---
-title: "Mewlink Paddle 결제 설정"
-description: "Mewlink Paddle 결제의 승인 준비, 테스트, 설정과 운영 전 확인 사항을 설명하는 간단한 안내."
+title: "Mewlink 결제 설정"
+description: "Mewlink의 Paddle, Polar, Lemon Squeezy 승인 준비와 테스트, 설정 및 운영 전 확인 사항을 설명하는 간단한 안내."
 created: "2026-11-16"
 updated: "2026-11-16"
 ---
 
-# Mewlink Paddle 결제 설정
+# Mewlink 결제 설정
 
 결제는 기본적으로 꺼져 있습니다. 기존 Mewlink는 무료이며, 유료 혜택과 가격은 아직 정하지 않았습니다. 결제 연동은 코드만 준비됐고 실제 결제와 배포는 확인하지 않았습니다.
 
-1. **승인 준비:** 유료 혜택과 가격을 정하고, 서비스 소개·가격표·이용약관·환불정책·개인정보 처리방침·문의처를 공개합니다. Paddle에서 운영 계정과 결제 도메인 `link.mew.run`의 승인을 받습니다. [Paddle 심사 기준](https://www.paddle.com/help/start/account-verification/what-is-domain-verification)
+1. **승인 준비:** 유료 혜택과 가격을 정하고, 서비스 소개·가격표·이용약관·환불정책·개인정보 처리방침·문의처를 공개합니다. 각 결제사의 계정과 상품을 승인받습니다. Paddle은 결제 도메인 `link.mew.run`의 승인도 필요합니다. [Paddle 심사 기준](https://www.paddle.com/help/start/account-verification/what-is-domain-verification)
 
 2. **테스트 준비:** Paddle 샌드박스에서 정기 결제 상품과 가격, API 키, 클라이언트 토큰을 만듭니다. 테스트용 Worker와 D1 데이터베이스는 운영 환경과 분리합니다.
 
@@ -26,4 +26,11 @@ updated: "2026-11-16"
 
 5. **검증 후 운영:** [중앙 서비스 배포 절차](remote-central.md)에 따라 테스트 환경에 적용하고 결제·갱신·취소·고객 포털을 확인합니다. 빌드만으로는 배포되지 않습니다. 실제 결제 전에는 운영용 상품과 별도 키를 만들고 운영 환경에서도 확인합니다. 정산과 세무 처리는 사업자 상황에 맞게 확인합니다.
 
-결제 생성 결과가 불확실하거나 알림이 계속 실패하면 Paddle에서 거래와 구독 상태를 확인한 후 수동으로 복구해야 합니다. 자동 복구는 아직 없습니다. 자세한 동작은 [결제 계약](../development/mewlink-billing.md)을 참고하세요.
+Polar와 Lemon Squeezy도 사용하려면 각 업체에서 별도 상품과 웹훅을 만들고 같은 설정 파일에 해당 값을 추가합니다. 실제 값은 채팅에 붙이지 마세요.
+
+- **Polar:** `POLAR_ENVIRONMENT` (`sandbox` 또는 `production`), `POLAR_ACCESS_TOKEN`, `POLAR_ORGANIZATION_ID`, `POLAR_PRODUCT_ID`, `POLAR_WEBHOOK_SECRET`, `POLAR_ENABLED` (`true`). 웹훅 주소는 `/central/billing/webhook/polar`입니다. API와 웹훅은 `2026-10` 버전을 사용하며, 만료 전에 업그레이드해야 합니다.
+- **Lemon Squeezy:** `LEMON_TEST_MODE` (테스트 `true`, 운영 `false`), `LEMON_API_KEY`, `LEMON_STORE_ID`, `LEMON_VARIANT_ID`, `LEMON_WEBHOOK_SECRET`, `LEMON_ENABLED` (`true`). 웹훅 주소는 `/central/billing/webhook/lemon`입니다. 자체 상점 도메인을 쓴다면 `LEMON_STORE_HOST`도 지정합니다.
+
+테스트와 운영은 모든 결제사에서 각각 별도 D1 데이터베이스를 사용합니다. 신규 고객은 설정된 업체를 고르며, 기존 구독은 원래 결제사에서 관리합니다. 미완료 결제 링크가 만료됐거나 생성 결과가 불확실한 경우, 중복·알림 오류가 발생한 경우에는 해당 결제사와 기록을 대조해 수동으로 복구합니다. D1을 별도로 백업하세요. 자세한 내용과 제한은 [결제 계약](../development/mewlink-billing.md)을 참고하세요.
+
+D1의 `billing_customers_v2`, `billing_transactions_v2`, `billing_subscriptions_v2`, `billing_entitlements_v2`, `billing_conflicts_v2`에서 저장된 기록을 확인할 수 있습니다. 누락된 알림은 자동으로 복구되지 않으므로 결제사와 대조해야 합니다. 이전 Paddle 고객 ID가 여러 계정에 중복 연결돼 있으면 데이터 이전이 중단되므로 원본을 보존하고 연결을 먼저 확인하세요.

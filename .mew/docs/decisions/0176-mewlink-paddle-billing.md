@@ -7,7 +7,7 @@ updated: "2026-11-16"
 
 # Use Paddle for Mewlink subscriptions
 
-Status: Accepted for local implementation; production application and product pricing remain pending.
+Status: Accepted for local implementation; production application and product pricing remain pending. [ADR 0177](0177-mewlink-multiple-billing-providers.md) extends this decision with additional providers.
 
 ## Context
 

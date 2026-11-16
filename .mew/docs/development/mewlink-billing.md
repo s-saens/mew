@@ -1,16 +1,16 @@
 ---
 title: "Mewlink billing contract"
-description: "Central Mewlink Paddle subscription integration, account ownership, checkout and webhook boundaries, disabled default, and current limitations."
+description: "Private Mewlink billing contract for Paddle, Polar, and Lemon Squeezy, including provider isolation, locally stored billing records, webhook handling, and rollout limits."
 created: "2026-11-16"
 updated: "2026-11-16"
 ---
 
 # Mewlink billing contract
 
-The private central service owns subscription records; the account settings page offers checkout and customer-portal links when configured. The host workspace and existing remote access remain unchanged. No price or paid feature is defined by this integration.
+The private central service owns billing records. Its account settings page offers checkout through configured Paddle, Polar, and Lemon Squeezy providers and opens an existing subscription's original provider portal. Host workspace code and existing remote access remain unchanged. No price or paid feature is defined or enforced by this integration.
 
-The server creates a Paddle transaction for an authenticated central account and retains the transaction association. Signed webhooks update subscription status; a browser redirect never grants access. Provider events can arrive more than once or out of order. The service keeps the existing transaction when creation fails ambiguously to avoid creating a duplicate chargeable checkout.
+Provider adapters create checkouts for authenticated central accounts and verify webhook signatures. D1 retains provider-linked customers, transactions, subscriptions, entitlement state, event markers, and detected conflicts. A browser redirect never grants access. D1 is an operational copy, not a complete reconciled accounting ledger: delivery failures, refunds, and provider-specific records require monitoring and reconciliation. Back up D1 independently of the payment providers.
 
-Paddle's public checkout page and notification endpoint are separate from authenticated account actions. Sandbox and production require separate credentials and databases. Do not enable real checkout until a paid benefit, account approval, configuration, and sandbox verification are complete. See [operator setup](../operations/mewlink-billing.md) and [ADR 0176](../decisions/0176-mewlink-paddle-billing.md).
+Providers stay disabled until configured. Sandbox and production require separate credentials and databases; do not enable real checkout until a paid benefit, account approval, configuration, and sandbox verification are complete. The integration does not automatically transfer an existing subscription or payment mandate to another provider. See [operator setup](../operations/mewlink-billing.md) and [ADR 0177](../decisions/0177-mewlink-multiple-billing-providers.md).
 
-After a completed cancellation, a new checkout preserves the previous subscription association so delayed events cannot overwrite the new one. Uncertain transaction creation and exhausted webhook retries require operator reconciliation. Paddle's real checkout, payment methods, and production deployment remain unverified.
+After a completed cancellation, a new checkout preserves the previous subscription association so delayed events cannot overwrite the new one. Lemon Squeezy checkout URLs can be reused until expiry; short expiry and local conflict detection cannot guarantee prevention of duplicate provider charges. An expired incomplete checkout, uncertain transaction creation, detected conflicts, and exhausted webhook retries require operator reconciliation. Real provider checkouts and production deployment remain unverified.
