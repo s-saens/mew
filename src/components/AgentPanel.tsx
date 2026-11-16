@@ -9,6 +9,7 @@ import { useAgentExecutionOptions } from '../hooks/use-agent-execution-options'
 import { useAgentInputDraft } from '../hooks/use-agent-input-draft'
 import { RuntimeInstallProgress } from './RuntimeInstallProgress'
 import { AgentAttachmentIcon } from './agent-attachment-icon'
+import { historyDisplayText } from '../utils/agent-history-display'
 import { AgentDocumentReferences, AgentDocumentTag } from './agent-document-tag'
 import { attachmentKind, conversationAttachments, documentReferenceTokens, uploadedAttachmentTokens, withoutAttachmentTokens } from '../utils/agent-attachments'
 import { AgentMediaPreviewDialog } from './agent-media-preview-dialog'
@@ -845,6 +846,7 @@ function SessionPicker({
             {sessions?.map((session) => {
               const taken = takenIds.includes(session.sessionId)
               const current = session.sessionId === currentSessionId
+              const attachmentLabels = { image: uiText("(사진)"), video: uiText("(비디오)"), audio: uiText("(음성)"), file: uiText("(파일)") }
               return (
                 <button
                   key={session.sessionId}
@@ -858,8 +860,8 @@ function SessionPicker({
                   onFocus={() => onPrepare(session.sessionId)}
                   className="flex w-full flex-col items-start gap-0.5 px-2.5 py-1.5 text-left hover:bg-surface-hover disabled:opacity-40"
                 >
-                  <span className="w-full truncate text-ink">{session.title || session.sessionId.slice(0, 8)}</span>
-                  {session.snippet && <span className="line-clamp-2 w-full break-words text-ink-secondary">{session.snippet}</span>}
+                  <span className="w-full truncate text-ink">{historyDisplayText(session.title || session.sessionId.slice(0, 8), attachmentLabels)}</span>
+                  {session.snippet && <span className="line-clamp-2 w-full break-words text-ink-secondary">{historyDisplayText(session.snippet, attachmentLabels)}</span>}
                   <span className="text-ink-muted">
                     {session.sessionId === loadingSession
                       ? uiText("불러오는 중…")

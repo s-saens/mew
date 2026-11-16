@@ -8,7 +8,7 @@ updated: "2026-11-11"
 status_hash: "b325d279cf16e291b2bcddda7cc0d70268647e336403acba780cb1081da44668"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-startup-queue.tsx", "src/utils/agent-startup-queue.ts", "src/hooks/use-agent-event-state.ts", "src/hooks/use-agent-work-history.ts", "src/utils/agent-work-loader.ts", "src/hooks/use-agent-tab-previews.ts", "src/hooks/use-agent-session-previews.ts", "src/utils/agent-tab-previews.ts", "src/utils/agentFold.ts", "src/hooks/useGridDrag.ts", "server/agentHost.ts", "server/agentWs.ts", "server/agentTranscript.ts", "server/agent-history-preview.ts", "server/agent-tab-preview.ts", "server/user-ui-routes.ts", "server/agent-session-search-service.ts", "server/agent-transcript-search.ts", "server/agent-runtime-history-search.ts"]
 commits: []
-description: "Agent conversation feedback, recovery indicator placement, history, queues, drafts, session conflicts, and restoration, including early recent-history lists and on-demand saved transcript previews for history selection and first visits to tabs after reopening Mew. Defines navigation, quiet recovery, relay liveness, permanent failures, Mewpet recovery, and model-capacity retries."
+description: "Agent conversation feedback, recovery indicator placement, history search and attachment labels, queues, drafts, session conflicts, and restoration, including early recent-history lists and on-demand saved transcript previews for history selection and first visits to tabs after reopening Mew. Defines navigation, quiet recovery, relay liveness, permanent failures, Mewpet recovery, and model-capacity retries."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -134,7 +134,7 @@ The device cache for the most recent 20 questions does not re-save overlapping r
 
 ### History Search
 
-Use a single search field at the top of history to find all or part of a topic, conversation content, or session ID. Search supports both Korean written without spaces, such as `에이전트패널`, and English terms for major features, such as `agent panel`. An empty query shows recent conversations. Results are distinguished by title, body excerpt, and most recent date, with up to 50 shown within the current tab's runtime and working directory. Exact and partial session ID matches appear first.
+Use a single search field at the top of history to find all or part of a topic, conversation content, or session ID. Search supports both Korean written without spaces, such as `에이전트패널`, and English terms for major features, such as `agent panel`. An empty query shows recent conversations. Results are distinguished by title, body excerpt, and most recent date, with up to 50 shown within the current tab's runtime and working directory. Exact and partial session ID matches appear first. In result titles and excerpts, display uploaded attachment references as localized parenthesized photo, video, audio, or file labels while preserving surrounding text and the stored search data.
 
 On supported connections, prepare the recent local list as soon as the authenticated relay is available, independently of ACP readiness. Opening history can then show saved titles and dates immediately while refreshing sources and checking occupancy. Recent local listing uses saved metadata without reading full conversation bodies. Show results from completed sources while the remaining sources continue loading; keep existing rows visible and selectable after occupancy checks and ordinary switching restrictions pass. A list refresh alone does not disable known rows.
 

@@ -24,7 +24,7 @@ class Socket {
  static OPEN=1;readyState=0;
  constructor(url){window.socket=this;setTimeout(()=>{this.readyState=1;this.onopen?.();window.finishInitial=()=>{this.emit({type:'history',page:page('current',current)});this.emit(meta('current'))};if(location.search.includes('startup'))this.emit({type:'history_preview',preview:{sessionId:'current',start:100,events:saved}});else window.finishInitial()},10)}
  emit(event){this.onmessage?.({data:JSON.stringify(event)})}
- send(raw){const request=JSON.parse(raw);window.messages.push(request);if(request.type==='list_sessions'){window.finishSessionList=()=>this.emit({type:'sessions',requestId:request.requestId,query:request.query,sessions:request.query?[{sessionId:request.query,title:'Found '+request.query,snippet:'Matched conversation content'}]:[{sessionId:'available',title:'Available conversation'},{sessionId:'taken',title:'Occupied conversation'}]});if(!window.holdSessionList)window.finishSessionList()}if(request.type==='load_session'){window.selectedAt=performance.now();setTimeout(()=>this.emit({type:'history_preview',preview:{sessionId:request.sessionId,start:100,events:saved}}),10);window.finish=error=>{clearTimeout(this.timer);if(error)this.emit({type:'error',message:error});else{this.emit({type:'history',page:page(request.sessionId,fresh)});this.emit(meta(request.sessionId))}};this.timer=setTimeout(()=>window.finish(),3000)}}
+ send(raw){const request=JSON.parse(raw);window.messages.push(request);if(request.type==='list_sessions'){window.finishSessionList=()=>this.emit({type:'sessions',requestId:request.requestId,query:request.query,sessions:request.query?[{sessionId:request.query,title:'Found '+request.query+' [[.workspace:.mew/temp/assets/photo.jpg]]',snippet:'Matched conversation content [[docs:.mew/assets/clip.mp4]] [[docs:.mew/files/voice.mp3]]'}]:[{sessionId:'available',title:'Available conversation'},{sessionId:'taken',title:'Occupied conversation'}]});if(!window.holdSessionList)window.finishSessionList()}if(request.type==='load_session'){window.selectedAt=performance.now();setTimeout(()=>this.emit({type:'history_preview',preview:{sessionId:request.sessionId,start:100,events:saved}}),10);window.finish=error=>{clearTimeout(this.timer);if(error)this.emit({type:'error',message:error});else{this.emit({type:'history',page:page(request.sessionId,fresh)});this.emit(meta(request.sessionId))}};this.timer=setTimeout(()=>window.finish(),3000)}}
  close(){clearTimeout(this.timer);this.readyState=3;this.onclose?.()}
 }
 window.WebSocket=Socket;
@@ -131,7 +131,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       await sessionInput.dispatchEvent('compositionend')
       await sessionInput.fill('에이전트패널')
       await historyRegion.getByRole('button', { name: 'Found 에이전트패널' }).waitFor()
-      assert.equal(await historyRegion.getByText('Matched conversation content', { exact: true }).isVisible(), true)
+      assert.equal(await historyRegion.getByText('Matched conversation content (비디오) (음성)', { exact: true }).isVisible(), true)
+      assert.equal(await historyRegion.getByText('Found 에이전트패널 (사진)', { exact: true }).isVisible(), true)
       assert.equal(await page.getByText('Current question', { exact: true }).isVisible(), true, 'searching does not switch the conversation')
       assert.equal(await page.evaluate('window.messages.some(request=>request.type==="load_session")'), false)
       await sessionInput.fill('taken')
