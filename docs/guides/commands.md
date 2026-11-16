@@ -1,6 +1,6 @@
 ---
 title: "Command Buttons and Scheduled Tasks"
-description: "Explains the project command menu, command web links, APK downloads, results and publishing, Build/Deploy actions, provider connections, recurring agent schedules, and Git identity boundaries for command buttons."
+description: "Explains the project command menu, results and publishing, Build/Deploy actions, recurring agent schedules, Git identity, and the system resources popup."
 updated: "2026-11-11"
 상위파일:
   - "../../.mew/docs/_docs.md"
@@ -153,7 +153,7 @@ Close it with the **X** button at the upper right of the title bar. It can be cl
 
 - Server: `server/sysStats.ts` + `GET /api/system-stats` (owner/manager — the same boundary as the shell). Client: `src/components/SystemStatsModal.tsx`.
 - CPU usage is calculated from the **increase since the previous call** in `os.cpus()` cumulative times. A single module holds the samples, so multiple windows only shorten each window's sampling interval; the values remain valid.
-- Available memory uses `MemAvailable` from `/proc/meminfo` — `os.freemem()` counts cache as used memory, consistently overstating usage on Linux.
+- Memory reports the server host rather than the Mew process. Linux uses `MemAvailable` when available; macOS estimates usage from `vm_stat` and excludes reclaimable file cache. This estimate can differ from Activity Monitor and is not memory pressure. If the platform-specific reading fails, the fallback can count cache as used. See the [collection contract](../../.mew/docs/features/appearance-accounts-operations/system-resources-and-processes.md#collection-and-api).
 - GPU data comes from one `nvidia-smi --query-gpu=...` call. If unavailable, the result is an empty array and the popup displays "No GPU information."
 - CPU temperature comes from `/sys/class/thermal/thermal_zone*/temp`. \*\*It is not exposed in WSL or containers, so it is `null`\*\*; the popup then explains this in one line (GPU temperature comes separately from `nvidia-smi`, so it also appears in WSL).
 - `processes[]` reads `/proc/<pid>/stat` directly — `ps %cpu` is an **average over the process's entire lifetime**, so it cannot show "who is using resources right now." CPU usage is the increase in `utime+stime` ticks since the previous sample, measured relative to one core, so it can exceed 100%. Entries with RSS, CPU, and GPU all at 0 (kernel threads) are omitted from the response. Per-process GPU data is **memory (MB) only**, as provided by `nvidia-smi --query-compute-apps` — that query does not include per-process GPU utilization. Returns an empty array in environments without `/proc` (non-Linux).

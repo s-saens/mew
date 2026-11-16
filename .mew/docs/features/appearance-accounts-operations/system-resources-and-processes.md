@@ -8,7 +8,7 @@ updated: "2026-11-04"
 status_hash: "20544b07271a698d27b55dfdbbdbc97abb3472a36115cbbbcdffed7759ae2d9f"
 files: ["src/App.tsx", "src/components/header-resources.tsx", "src/components/SystemStatsModal.tsx", "server/sysStats.ts", "server/gpu-stats.ts", "server/resource-sample-cache.ts", "src/components/network-usage-panel.tsx"]
 commits: []
-description: "Defines server resource snapshots, lightweight summary requests, shared collection intervals, and Windows-only NVIDIA queries under WSL without crossing process PID namespaces. Covers singleton header gauges with distinct account-scoped identities, the resource popup, unsupported measurements, recent trends, and the current tab's network totals and speeds."
+description: "Defines server resource snapshots, platform memory estimates, shared collection intervals, and Windows-only NVIDIA queries under WSL. Covers header gauges, the resource popup, overload notifications, unsupported measurements, and the current tab's network totals and speeds."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -52,6 +52,8 @@ The [header resource identity work record](../../work/header-resource-identity.m
 ### Collection and API
 
 `GET /api/system-stats` includes the process list by default. `GET /api/system-stats?processes=0` retains the response shape with an empty `processes` array and skips both process enumeration and per-process GPU queries. The header and overload monitor use this summary request; the resource popup uses the full request.
+
+Memory describes the server host, not the Mew process. On Linux, available memory uses `MemAvailable` when present. On macOS, used memory is estimated from `vm_stat` anonymous, wired, compressed, and purgeable pages; available memory is the remainder of physical memory. This accounts for reclaimable file cache, but is not a memory pressure measurement and may differ from Activity Monitor. If the platform-specific reading fails, the collector falls back to `os.freemem()`, which may overstate usage by counting cache as used. Header gauges, the popup, and overload notifications share this estimate.
 
 Share collection work across requests and browser tabs in the server process. Concurrent requests reuse each collection already in flight, including when its ordinary cache interval has elapsed. Collection remains demand-driven; an idle server does not start resource queries on a timer.
 

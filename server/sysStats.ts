@@ -5,6 +5,7 @@ import { processes as windowsProcesses } from './platform/windows/metrics.ts'
 import { macProcesses } from './platform/macos/metrics.ts'
 import { createGpuCollector, type GpuStat } from './gpu-stats.ts'
 import { resourceSampleCache } from './resource-sample-cache.ts'
+import { readSystemMemory } from './system-memory.ts'
 export { parsePsProcesses } from './platform/macos/metrics.ts'
 export type { GpuStat } from './gpu-stats.ts'
 
@@ -79,19 +80,6 @@ function cpuTemperature(): number | null {
     // 센서 없음 — WSL·컨테이너에서 정상이다
   }
   return null
-}
-
-function memory(): SystemStats['memory'] {
-  const total = os.totalmem()
-  // freemem은 캐시를 쓴 메모리까지 사용 중으로 세서 리눅스에서 항상 과장된다 — MemAvailable이 실제 여유분
-  let available = os.freemem()
-  try {
-    const m = /^MemAvailable:\s+(\d+) kB/m.exec(fs.readFileSync('/proc/meminfo', 'utf8'))
-    if (m) available = Number(m[1]) * 1024
-  } catch {
-    // /proc 없음(비리눅스) — freemem으로 간다
-  }
-  return { total, available, used: Math.max(0, total - available) }
 }
 
 // 리눅스 기본값. sysconf(_SC_CLK_TCK)·getpagesize()를 노드에서 읽을 방법이 없다.
@@ -194,7 +182,7 @@ async function resourceSummary(): Promise<ResourceSummary> {
       loadavg: os.loadavg(),
       temperature: cpuTemperature(),
     },
-    memory: memory(),
+    memory: await readSystemMemory(),
     uptime: os.uptime(),
     hostname: os.hostname(),
   }
