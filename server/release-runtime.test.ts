@@ -188,11 +188,13 @@ test('repository source graph stages without missing imports or optional helper 
 test('npm-only workflow skips runtime builds and verifies the complete existing release', async () => fixture(async (root, output) => {
   const workflow = parseYaml(await fs.readFile(path.join(repository, '.github/workflows/cli-release.yml'), 'utf8'))
   assert.equal(workflow.jobs.runtime.if, 'inputs.publish_npm != true')
+  assert.equal(workflow.jobs.standalone.if, 'inputs.publish_npm != true')
+  assert.ok(workflow.jobs.release.needs.includes('standalone'))
   assert.match(workflow.jobs.release.if, /always\(\)/)
   assert.equal(workflow.jobs.npm.environment, 'npm-publish')
   assert.equal(workflow.jobs.npm.permissions['id-token'], 'write')
   const releaseStep = workflow.jobs.release.steps.find((step: { run?: string }) => step.run)
-  const files = ['mew-runtime-linux-x64.tar.gz', 'mew-runtime-linux-arm64.tar.gz', 'mew-runtime-darwin-x64.tar.gz', 'mew-runtime-darwin-arm64.tar.gz', 'mew-runtime-win32-x64.tar.gz', 'mew-runtime-win32-arm64.tar.gz']
+  const files = ['mew-runtime-linux-x64.tar.gz', 'mew-runtime-linux-arm64.tar.gz', 'mew-runtime-darwin-x64.tar.gz', 'mew-runtime-darwin-arm64.tar.gz', 'mew-runtime-win32-x64.tar.gz', 'mew-runtime-win32-arm64.tar.gz', 'mew-cli-standalone.tar.gz', 'install.sh']
   const fakeRelease = path.join(root, 'published')
   const sums = []
   for (const file of files) {
@@ -225,6 +227,8 @@ for (const line of lines) {
     return exec('/bin/bash', ['-e', '-c', releaseStep.run], { cwd, env: { ...env, ...additional } })
   }
   await run('complete')
+  await write(fakeRelease, 'SHA256SUMS', sums.slice(0, 6).join('\n') + '\n')
+  await assert.rejects(run('legacy-six'), /Command failed/)
   await write(fakeRelease, 'SHA256SUMS', sums[0] + '\n')
   await assert.rejects(run('subset'), /Command failed/)
   await write(fakeRelease, 'SHA256SUMS', sums.join('\n') + '\n')

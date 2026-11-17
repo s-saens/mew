@@ -1,5 +1,5 @@
 ---
-description: "The mew-ide npm installer's prerequisites, unattended first launch, managed database, background operation, and publication status. Includes the package license."
+description: "The mew-ide npm installer's prerequisites, unattended first launch, managed database, background operation, alternative curl entry, and publication status. Includes the package license."
 ---
 
 # Mew CLI
@@ -9,6 +9,10 @@ With Node.js 24 and npm installed, run:
 ```sh
 npx mew-ide
 ```
+
+For a shell installer that supplies its own Node runtime in an existing
+WSL 2/Linux/macOS terminal, or for source setup, see the three installation
+routes in the [project README](https://github.com/s-saens/mew#get-started).
 
 The installer prepares Mew and local Postgres without asking for configuration,
 then opens the first-administrator page in your browser. Windows users start in

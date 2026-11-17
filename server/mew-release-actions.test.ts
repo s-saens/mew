@@ -38,11 +38,14 @@ test('release status and source management actions do not inspect or mutate the 
     assert.equal(status.canUpdate, false)
     assert.equal(status.supported, false)
     assert.equal(status.job, null)
-    assert.match(status.error, /npx @liiiiv\/mew-cli@latest/)
+    assert.match(status.error, /npx mew-ide@latest/)
+    assert.match(status.error, /curl/)
     for (const action of ['build', 'restart', 'update']) {
       const response = await fetch(`${base}/mew-actions/${action}/run`, { method: 'POST' })
       assert.equal(response.status, 409)
-      assert.match((await response.json() as { error: string }).error, /npx @liiiiv\/mew-cli@latest/)
+      const error = (await response.json() as { error: string }).error
+      assert.match(error, /npx mew-ide@latest/)
+      assert.match(error, /curl/)
     }
     assert.equal(await fs.readFile(jobPath, 'utf8'), savedJob)
   } finally {

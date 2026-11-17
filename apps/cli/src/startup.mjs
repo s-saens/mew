@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process'
 import { randomUUID, createHash } from 'node:crypto'
 import { readFileSync as requireRead } from 'node:fs'
 import { serviceArguments } from './daemon.mjs'
+import { wslStartupDefinition, runWslStartupCommands } from './wsl.mjs'
 
 export async function runStartupCommand(command, args, options = {}) {
   return await new Promise((resolve, reject) => {
@@ -93,7 +94,9 @@ const xml = text => String(text).replaceAll('&', '&amp;').replaceAll('<', '&lt;'
 const unitValue = text => `"${String(text).replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%').replaceAll('\n', '\\n')}"`
 const argumentsFor = ({ entry, nodePath, options }) => [nodePath, entry, ...serviceArguments(options)]
 
-export function startupDefinition(config, { platform = process.platform, env = process.env, home = os.homedir() } = {}) {
+export function startupDefinition(config, { platform = process.platform, env = process.env, home = os.homedir(), ...context } = {}) {
+  const wsl = wslStartupDefinition(config, { platform, env, ...context })
+  if (wsl) return wsl
   const hash = createHash('sha256').update(path.resolve(config.options.dataDir)).digest('hex').slice(0, 12)
   const args = argumentsFor(config)
   if (args.some(value => typeof value !== 'string' || value.includes('\0') || value.includes('\r'))) throw new Error('Invalid Mew startup path.')
@@ -114,6 +117,7 @@ export function startupDefinition(config, { platform = process.platform, env = p
 
 export async function registerAutoStart(config, { run = runStartupCommand, ...environment } = {}) {
   const definition = startupDefinition(config, environment)
+  if (definition.kind === 'wsl') { await runWslStartupCommands(definition.registration, run); return { kind: definition.kind, name: definition.name } }
   await fs.mkdir(path.dirname(definition.path), { recursive: true, mode: 0o700 })
   await fs.writeFile(definition.path, definition.body, { mode: 0o600 })
   for (const [command, args] of definition.registration) await run(command, args)
@@ -122,6 +126,7 @@ export async function registerAutoStart(config, { run = runStartupCommand, ...en
 
 export async function unregisterAutoStart(config, { run = runStartupCommand, ...environment } = {}) {
   const definition = startupDefinition(config, environment)
+  if (definition.kind === 'wsl') { await runWslStartupCommands(definition.unregistration, run, 'remove'); return { kind: definition.kind, name: definition.name } }
   if (definition.kind === 'systemd') await run('systemctl', ['--user', 'disable', definition.name])
   await fs.rm(definition.path, { force: true })
   if (definition.kind === 'systemd') await run('systemctl', ['--user', 'daemon-reload'])

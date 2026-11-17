@@ -8,7 +8,7 @@ updated: "2026-10-20"
 status_hash: "24b9ec9b4721cf44a384c60d727d8f59e62a1ffb0c0e48aad1304d2d19c99816"
 files: ["server/mewUpdate.ts", "server/runMewUpdate.ts", "server/updates.ts", "server/updateSessions.ts", "server/runUpdates.ts", "server/updateProcess.ts", "src/components/updates-modal.tsx", "shared/updates.ts"]
 commits: []
-description: "Feature contract covering the update screen opened with Ctrl/Cmd+U; update checks, notifications, individual and batch execution for Mew, standalone agent CLIs, and system tools; and viewing output in preserved tmux sessions. Explains sequential execution, retries after failure, reopening sessions and refreshing the browser after restarting source-based Mew, and the boundary requiring relaunch of the prebuilt CLI."
+description: "Feature contract for the update screen, source update jobs, standalone agent and system-tool updates, and preserved command output. Covers release distributions requiring their original npm or curl installer instead of source build/restart jobs."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -98,4 +98,4 @@ Validation (2026-10-06): Ran related server and isolated Chromium tests, TypeScr
 
 ### Operational Boundaries for the Prebuilt CLI (2026-10-14)
 
-Under `MEW_DISTRIBUTION=release`, Mew status queries do not read or modify Git or source update job files. The server rejects app build, restart, and pull jobs and individual updates of bundled tmux, and instructs users to exit the CLI and rerun `npx mew-ide@latest`. External standalone agents retain the existing individual-update rules and blocking rules while running. Follows the [CLI Distribution Contract](../../development/cli-distribution.md). Isolated API and update validation confirmed that source commands are not called; no actual update, build, or restart was run.
+Under `MEW_DISTRIBUTION=release`, Mew status queries do not read or modify Git or source update job files. The server rejects app build, restart, and pull jobs and individual updates of bundled tmux, and instructs users to stop Mew and rerun their original installer: `npx mew-ide@latest` or the newer published curl script. External standalone agents retain the existing individual-update rules and blocking rules while running. Follows the [CLI Distribution Contract](../../development/cli-distribution.md). Isolated API and update validation confirmed that source commands are not called; no actual source update, application restart, or deployment was run by those fixtures.

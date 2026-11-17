@@ -7,6 +7,7 @@ import { acquireDataLock, checkLegacyInstance } from './lock.mjs'
 import { windowsEnvironment, browserArgs } from './platform/index.mjs'
 import { prepareBrowserDependencies } from './browser-dependencies.mjs'
 import { preparePostgres } from './postgres.mjs'
+import { wslBrowserLaunch } from './wsl.mjs'
 
 export async function checkPort(port) {
   if (!port) return
@@ -17,10 +18,14 @@ export async function checkPort(port) {
   })
 }
 
-export function openBrowser(url, platform = process.platform) {
-  const command = platform === 'win32' ? path.win32.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe') : platform === 'darwin' ? 'open' : 'xdg-open'
-  const child = spawn(command, platform === 'win32' ? browserArgs(url) : [url], { stdio: 'ignore', windowsHide: true })
-  child.on('error', () => {})
+export function openBrowser(url, platform = process.platform, { env = process.env, spawnImpl = spawn, warn = console.error, ...context } = {}) {
+  const wsl = wslBrowserLaunch(url, { platform, env, ...context })
+  const command = wsl?.command || (platform === 'win32' ? path.win32.join(env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe') : platform === 'darwin' ? 'open' : 'xdg-open')
+  const child = spawnImpl(command, wsl?.args || (platform === 'win32' ? browserArgs(url) : [url]), { stdio: 'ignore', windowsHide: true })
+  let warned = false
+  const failed = () => { if (wsl && !warned) { warned = true; warn('[mew] Could not open the Windows browser. Enable Windows interop, then run Mew again to reopen its private setup page.') } }
+  child.on('error', failed)
+  if (wsl) child.once('exit', code => { if (code !== 0) failed() })
   child.unref()
 }
 
@@ -36,7 +41,7 @@ export function runtimeEnvironment(runtime, options, env = process.env) {
     ...(options.databaseUrl ? { DATABASE_URL: options.databaseUrl } : {}),
     MEW_MULTIPLEXER: path.join(runtime, 'bin', process.platform === 'win32' ? 'psmux.exe' : 'tmux'),
     ...(process.platform === 'win32' ? { MEW_WINDOWS_PROCESS_HOST: path.join(runtime, 'native', 'windows', 'process-host.exe') } : {}),
-    PATH: [path.join(runtime, 'bin'), path.join(runtime, 'node_modules', '.bin'), env.PATH || env.Path].filter(Boolean).join(path.delimiter),
+    PATH: [path.join(runtime, 'bin'), path.dirname(process.execPath), path.join(runtime, 'node_modules', '.bin'), env.PATH || env.Path].filter(Boolean).join(path.delimiter),
   }
   return process.platform === 'win32' ? windowsEnvironment(environment) : environment
 }

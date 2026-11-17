@@ -1,7 +1,7 @@
 ---
 title: "Getting started with mew"
 updated: "2026-11-17"
-description: "Source installation and upcoming npx mew-ide delivery with managed Postgres, Windows WSL preparation, login startup, browser administrator setup, and three remote-access choices. Covers platform prerequisites, data preservation, experimental Termux limits, and pending publication."
+description: "Three installation routes: npm, a curl bootstrap in existing WSL/Linux/macOS, and source setup. Covers managed Postgres, login startup, browser administrator creation, platform prerequisites, data preservation, remote access, and pending prebuilt publication."
 ---
 
 # Getting started with mew
@@ -14,7 +14,71 @@ mew opens folders on your computer or server in a browser. Edit Markdown and cod
 
 ## Quick start
 
-[Windows (WSL 2)](#windows-wsl-2) · [macOS](#macos) · [Linux](#linux) · [Remote access](#remote-access)
+Choose one route:
+
+| Route | Prerequisites | Continue with |
+| --- | --- | --- |
+| 1. npm | Node.js 24 and npm; Windows starts in CMD or PowerShell | [Run `npx mew-ide`](#run-with-one-command-after-the-first-release) |
+| 2. curl | Bash, curl, and an existing WSL 2 Ubuntu/Linux/macOS terminal | [Run the shell installer](#install-with-curl-after-the-first-release) |
+| 3. Source | Git and the platform's build prerequisites | [Clone and run setup](#install-from-source) |
+
+**The initial npm package, curl installer release assets, matching runtimes, and clean-platform acceptance remain pending. Until publication, use source installation.** [Release status](../../.mew/docs/operations/cli-release.md).
+
+### Run with one command (after the first release)
+
+Install Node.js 24 and npm, then run:
+
+```bash
+npx mew-ide
+```
+
+The installer uses defaults without asking for a workspace, port, or database connection. It prepares local Postgres and browser prerequisites, starts Mew in the background, and opens administrator creation in your browser. Default access is `http://localhost:5000`; if that port is occupied, Mew selects a nearby available port and opens the actual address. Existing accounts and data are reused.
+
+On Windows x64, run the command in **CMD or PowerShell**. Mew prepares its dedicated WSL environment and opens the Windows browser; you do not enter Ubuntu commands or install Linux Node.js yourself. Windows may require administrator approval and a restart. Login startup launches the owned environment after sign-in. Existing unrelated WSL distributions are preserved.
+
+On Linux/macOS, Mew registers login startup. Run `npx mew-ide` again to reopen it, `npx mew-ide status` to check it, or `npx mew-ide stop` to stop it while preserving data. Use `--foreground` for terminal-owned execution or `--no-autostart` to omit login registration. To update, stop the running instance and run `npx mew-ide@latest`.
+
+After creating the administrator, choose **Mewlink**, **Tailscale**, or **Cloudflare Tunnel** in the remote-access popup. **Menu → Mewlink** opens the same popup later. Provider sign-in is separate from local installation.
+
+Linux uses glibc 2.35+, and macOS requires 15+, on x64/arm64. Browser preparation may require OS authorization and network access. Ordinary Chrome automatic installation on Linux/WSL supports x64; arm64 requires a compatible explicit `MEW_CHROME_EXECUTABLE`. npm may ask permission to download the package; `npx --yes mew-ide` suppresses that npm-owned prompt.
+
+For existing source data on POSIX, stop the old server and pass `--data-dir /path/to/old/mew/.data`. The managed Windows installation owns separate paths and does not adopt another WSL environment. [Runtime and data contract](../../.mew/docs/development/cli-distribution.md) · [Release procedure](../../.mew/docs/operations/cli-release.md)
+
+### Install with curl (after the first release)
+
+Open your existing **WSL 2 Ubuntu terminal**, a Linux terminal, or macOS Terminal and run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/s-saens/mew/main/install.sh | bash
+```
+
+The script downloads a checksum-pinned private Node runtime and the matching standalone Mew launcher into your user directory. You do not install npm, clone the repository, or compile Mew first. It then follows the same default configuration, managed Postgres, background execution, browser administrator creation, and remote-access popup as the npm route. Browser preparation may require sudo or other OS authorization.
+
+In WSL, curl uses the distribution and Linux user you already opened. Windows interoperability must be enabled so Mew can open your Windows browser and register a per-user Windows login task. The task starts this same distribution after Windows sign-in; user systemd is not required. The script does not create another WSL distribution. Keep your projects in the Linux filesystem, such as `~/mew-workspace`.
+
+Native Linux uses user systemd for login startup; macOS uses a user LaunchAgent. The same Linux/macOS versions, CPU architectures, and arm64 Chrome prerequisite listed above apply.
+
+The convenience command is installed at `~/.local/bin/mew-ide`. The script prints its absolute path and does not change your shell profile. If that directory is not on `PATH`, use the full path:
+
+```bash
+~/.local/bin/mew-ide
+~/.local/bin/mew-ide status
+~/.local/bin/mew-ide stop
+```
+
+Running the command again reopens Mew. `stop` preserves account and database data; `disable-autostart` removes Mew's login registration. To update a curl installation, stop it and rerun the curl command after a newer installer is published.
+
+### Install from source
+
+Install the prerequisites for [Windows / WSL 2](#windows-wsl-2), [macOS](#macos), or [Linux](#linux), then clone and build Mew:
+
+```bash
+git clone https://github.com/s-saens/mew.git
+cd mew
+./mew setup
+```
+
+This route builds the app locally and asks for source-installation settings. The following platform steps and [Finish setup](#finish-setup) apply to this route.
 
 ### Windows (WSL 2)
 
@@ -97,7 +161,7 @@ cd mew
 ./mew setup
 ```
 
-On other distributions, install the equivalent packages first. Follow [Finish setup](#finish-setup) above. For a server that should start on boot or accept remote connections, use the [deployment guide](../deployment/native.md).
+On other distributions, install the equivalent packages first. Follow [Finish setup](#finish-setup). For a server that should start on boot or accept remote connections, use the [deployment guide](../deployment/native.md).
 
 #### Termux on Android
 
@@ -107,7 +171,7 @@ These prerequisite steps do not establish Android support. Native npm dependenci
 
 ### Finish setup
 
-During setup, enter:
+For source installation with `./mew setup`, enter:
 
 - **Workspace folder:** the parent folder of your projects. The default is `~/mew-workspace`; each folder inside it becomes a project.
 - **Port:** `5000` by default. If it is busy, setup chooses an available port nearby.
@@ -119,34 +183,12 @@ Setup installs npm dependencies, prepares ordinary Google Chrome and Playwright 
 
 On a fresh installation, open the **private setup link** printed by setup, enter your email, choose a password, and confirm it. Mew creates the administrator and signs you in. Existing installations keep their accounts and show ordinary login. Use **+** in the header to open a project folder, then select a file in the File explorer. [Account setup and recovery](../configuration/accounts.md#first-administrator).
 
-After a reboot, open Ubuntu or Terminal and start mew from its installation folder:
+For this source installation, after a reboot open Ubuntu or Terminal and start Mew from its installation folder:
 
 ```bash
 cd ~/apps/mew
 ./mew start
 ```
-
-### Run with one command (after the first release)
-
-Install Node.js 24 and npm, then run:
-
-```bash
-npx mew-ide
-```
-
-**The initial npm package, matching runtime releases, and clean-platform acceptance remain pending.** Until publication, use the source installation above.
-
-The installer uses defaults without asking for a workspace, port, or database connection. It prepares local Postgres and browser prerequisites, starts Mew, and opens administrator creation in your browser. Default access is `http://localhost:5000`; if that port is occupied, Mew selects a nearby available port and opens the actual address. Existing accounts and data are reused.
-
-On Linux/macOS, Mew runs in the background and registers login startup. Run `npx mew-ide` again to reopen it, `npx mew-ide status` to check it, or `npx mew-ide stop` to stop it while preserving data. Use `--foreground` for terminal-owned execution or `--no-autostart` to omit login registration. To update, stop the running instance and run `npx mew-ide@latest`.
-
-On Windows x64, run the command in **CMD or PowerShell**. Mew prepares its dedicated WSL environment and opens the Windows browser; you do not enter Ubuntu commands or install Linux Node.js yourself. Windows may require administrator approval and a restart. Login startup launches the owned environment after sign-in. Existing unrelated WSL distributions are preserved.
-
-After creating the administrator, choose **Mewlink**, **Tailscale**, or **Cloudflare Tunnel** in the remote-access popup. **Menu → Mewlink** opens the same popup later. Provider sign-in is separate from local installation.
-
-Linux uses glibc 2.35+, and macOS requires 15+, on x64/arm64. Browser preparation may require OS authorization and network access. Ordinary Chrome automatic installation on Linux/WSL supports x64; arm64 requires a compatible explicit `MEW_CHROME_EXECUTABLE`. npm may ask permission to download the package; `npx --yes mew-ide` suppresses that npm-owned prompt.
-
-For existing source data on POSIX, stop the old server and pass `--data-dir /path/to/old/mew/.data`. The managed Windows installation owns separate paths and does not adopt another WSL environment. [Runtime and data contract](../../.mew/docs/development/cli-distribution.md) · [Release procedure](../../.mew/docs/operations/cli-release.md)
 
 <a id="remote-access"></a>
 

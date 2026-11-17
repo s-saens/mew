@@ -1,6 +1,6 @@
 ---
 title: "Single-Command Execution and Prebuilt Distribution"
-description: "Defines unattended mew-ide installation, managed Postgres, persistent background execution and login startup, Windows WSL bootstrap, browser-first administrator setup, and runtime/package boundaries. Publication and clean-platform acceptance remain separate."
+description: "Defines unattended mew-ide execution shared by npm and curl installation, managed Postgres, background/login startup, dedicated and existing Windows WSL paths, browser-first administrator setup, and runtime/package boundaries. Publication and clean-platform acceptance remain separate."
 updated: "2026-11-17"
 상위파일:
   - "architecture.md"
@@ -12,6 +12,13 @@ updated: "2026-11-17"
 After the first release and npm package are published, run `npx mew-ide` from a working folder on a computer with Node.js 24 and npm installed. Installation uses defaults without asking for a workspace, port, or database connection. The launcher downloads the versioned server, UI, dependencies, and terminal binaries, prepares browser prerequisites, and provisions [managed Postgres](managed-postgres.md). Cloning the repository, building the app, installing Docker, and compiling native dependencies are not part of the user flow. Git operations still require Git; external AI providers retain their installation and authentication requirements.
 
 The normal POSIX entry installs a durable copy of the CLI and its dependencies, registers login startup, and starts Mew in the background. The first browser opens when the host is ready. `--foreground` retains terminal-owned execution; `--no-autostart` omits login registration. Windows CMD/PowerShell uses the [managed WSL installation](windows-installer.md). Native Windows host code remains available as a separate implementation, but is not the default npm installation route.
+
+The [curl bootstrap](shell-installation.md) supplies a pinned private Node and
+standalone CLI without host npm, then uses this same execution contract. Inside
+existing WSL 2, login registration uses a per-user Windows task for the current
+distribution and Linux user, and browser opening uses Windows interop. Native
+Linux retains user systemd; macOS retains launchd. Source `./mew setup` remains
+the separate local-build route.
 
 On a fresh installation, choose the administrator email and password in the browser. The [first-administrator contract](first-owner-setup.md) retains the private, locally armed setup capability; ordinary HTTP cannot enable enrollment. After successful creation, one popup presents **Mewlink**, **Tailscale**, and **Cloudflare Tunnel**. The same popup opens from **Menu → Mewlink**. Provider accounts, network permissions, and external sign-in remain under the user's control; installation does not silently register a remote account or expose the host publicly. [Remote access](remote-access.md) owns the provider controls and limits.
 
@@ -53,7 +60,7 @@ The POSIX daemon exposes only a private local socket in a mode-0700 control dire
 
 The runtime then starts `server/cli-host.js` as a separate process. IPC in `cli-host.ts` carries listener addresses, the private first-owner setup URL and refresh requests, public remote status, and explicit legacy owner-creation responses. It does not send registration keys or login-session tokens. The raw setup capability travels only to the trusted launcher and browser, not ordinary logs. The [first-administrator contract](first-owner-setup.md) defines the installer stdin/stdout protocol. Parent termination, IPC disconnection, and SIGINT/SIGTERM cause the host to shut down.
 
-The launcher sets `MEW_DISTRIBUTION=release`. App update status checks in this distribution do not call Git. It rejects source builds, restarts, pull operations, and individual updates to bundled tmux, and directs users to rerun `npx mew-ide@latest`. Existing update boundaries for external agents remain in place. Automatic replacement of the running app is not provided, and npx also handles checking the latest npm version.
+The launcher sets `MEW_DISTRIBUTION=release`. App update status checks in this distribution do not call Git. It rejects source builds, restarts, pull operations, and individual updates to bundled tmux, and directs users to stop Mew and rerun their installation entry: `npx mew-ide@latest` or the newer published curl script. Existing update boundaries for external agents remain in place. Automatic replacement of the running app is not provided, and npx also handles checking the latest npm version.
 
 ## Verification and application
 

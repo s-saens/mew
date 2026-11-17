@@ -38,13 +38,13 @@ test('persistent staging keeps launcher dependencies runnable after the original
 test('login registration uses fixed version paths, private settings, safe quoting, and never starts the app', async t => {
   const root = await temporary(t), commands = []
   const config = { entry: path.join(root, 'fixed', 'mew.mjs'), nodePath: '/node path/node', options: { workspace: '/projects/50% "review"', dataDir: path.join(root, 'data'), cacheDir: path.join(root, 'runtimes'), port: 5000, settingsFile: '/private/settings.env' } }
-  const linux = await registerAutoStart(config, { platform: 'linux', env: { XDG_CONFIG_HOME: root }, run: async (...args) => commands.push(args) })
+  const linux = await registerAutoStart(config, { platform: 'linux', kernel: '6.8.0', env: { XDG_CONFIG_HOME: root }, run: async (...args) => commands.push(args) })
   const body = await fs.readFile(linux.path, 'utf8')
   assert.ok(body.includes('--service') && body.includes('/private/settings.env'))
   assert.ok(body.includes('50%% \\"review\\"'))
   assert.ok(!body.includes('npx') && !body.includes('--port'))
   assert.deepEqual(commands.map(([command, args]) => [command, ...args]), [['systemctl', '--user', 'daemon-reload'], ['systemctl', '--user', 'enable', linux.name]])
-  await unregisterAutoStart(config, { platform: 'linux', env: { XDG_CONFIG_HOME: root }, run: async (...args) => commands.push(args) })
+  await unregisterAutoStart(config, { platform: 'linux', kernel: '6.8.0', env: { XDG_CONFIG_HOME: root }, run: async (...args) => commands.push(args) })
   await assert.rejects(fs.access(linux.path))
   assert.ok(!commands.some(([, args]) => args.includes('start') || args.includes('stop')))
   const mac = startupDefinition({ ...config, options: { ...config.options, workspace: '/projects/A&B <review>', port: 5010, portExplicit: true } }, { platform: 'darwin', home: root })

@@ -1,5 +1,5 @@
 ---
-description: "Mew introduction, current workspace screenshots, and installation entry points. Covers documents, code, agents across eight projects, mobile access, security, and development."
+description: "Mew introduction, current workspace screenshots, and three installation routes: npm, curl in WSL/Linux/macOS, and source setup. Covers documents, code, agents across eight projects, mobile access, security, development, and pending prebuilt publication."
 ---
 
 # mew : my easy workspace
@@ -63,13 +63,25 @@ Also available: [PDF annotation](docs/guides/editor.md#reading-and-annotating-pd
 
 ## Get started
 
-The server runs on **Linux or macOS**. On **Windows**, run it inside **WSL 2** and open it in your Windows browser.
+Mew runs on **Linux or macOS**, including **WSL 2 on Windows**. Choose one installation route:
 
-Choose your platform guide for prerequisites and installation:
+| Route | Run it from | Command |
+| --- | --- | --- |
+| 1. npm | A computer with Node.js 24 and npm; CMD or PowerShell on Windows | `npx mew-ide` |
+| 2. curl | An existing WSL 2 Ubuntu terminal, Linux, or macOS | The one-line command below |
+| 3. Source | A terminal with the [platform prerequisites](docs/guides/getting-started-en.md#install-from-source) | Clone the repository, then `./mew setup` |
 
-[Windows / WSL 2](docs/guides/getting-started-en.md#windows-wsl-2) · [macOS](docs/guides/getting-started-en.md#macos) · [Linux](docs/guides/getting-started-en.md#linux)
+**The npm package, curl installer release assets, and clean-platform acceptance are pending. Use source installation until publication.** [Release status](.mew/docs/operations/cli-release.md).
 
-After installing the prerequisites, clone the repository and run setup:
+The curl route installs a private Node runtime and Mew without requiring npm or Git first:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/s-saens/mew/main/install.sh | bash
+```
+
+Both prebuilt routes prepare Postgres, use default settings, run Mew in the background, and register login startup. On Windows, npm prepares a dedicated WSL environment; curl runs inside the WSL distribution you already opened. The browser opens administrator creation, usually at `http://localhost:5000`. Browser prerequisites may require OS authorization. [Prebuilt installation details](docs/guides/getting-started-en.md#run-with-one-command-after-the-first-release).
+
+For source installation, follow your [Windows / WSL 2](docs/guides/getting-started-en.md#windows-wsl-2), [macOS](docs/guides/getting-started-en.md#macos), or [Linux](docs/guides/getting-started-en.md#linux) prerequisites, then run:
 
 ```bash
 git clone https://github.com/s-saens/mew.git
@@ -77,17 +89,9 @@ cd mew
 ./mew setup
 ```
 
-Setup installs dependencies, asks for your workspace folder, then builds and starts mew. On a fresh installation, create the administrator account in your browser.
+Source setup installs dependencies, asks for configuration, then builds and starts Mew. Create the administrator account through the private setup link, or sign in with an existing account. Open **Add project** in the header's project selector to choose a working folder. [First-use walkthrough](docs/guides/first-steps.md).
 
-1. Open the private setup link printed by setup. Existing installations use the ordinary address, usually `http://localhost:5000`.
-2. Choose the administrator email and password, or sign in with your existing account.
-3. Click the current project in the header, choose **Add project**, open a working folder, and select a file.
-
-[Follow the first-use walkthrough](docs/guides/first-steps.md).
-
-> **Windows installer:** A single-file x64 wizard is implemented in source, including Windows preparation and browser account creation. Its first signed EXE and clean-Windows acceptance are pending. Use the manual Windows guide for now. [Release status](.mew/docs/operations/cli-release.md#windows-installation-wizard).
-
-> **Prebuilt CLI:** The `npx mew-ide` installation flow uses default settings, prepares Postgres, and opens browser administrator setup. Windows starts from CMD or PowerShell and prepares a dedicated WSL environment. Login startup keeps Mew available after reboot and sign-in. The first npm package, matching runtime releases, and clean-platform acceptance are still pending; use source installation until publication. [Installation contract](.mew/docs/development/cli-distribution.md) · [Release status](.mew/docs/operations/cli-release.md).
+> **Windows installer:** A separate single-file x64 wizard is implemented in source. Its first signed EXE and clean-Windows acceptance are pending. [Release status](.mew/docs/operations/cli-release.md#windows-installation-wizard).
 
 ## Open it from another device
 

@@ -13,7 +13,7 @@ import { bootstrapWindows } from '../src/windows-bootstrap.mjs'
 const { version } = JSON.parse(await fs.readFile(new URL('../package.json', import.meta.url), 'utf8'))
 const help = `Mew ${version}
 
-Usage: npx mew-ide [start|status|stop|disable-autostart] [options]
+Usage: mew-ide [start|status|stop|disable-autostart] [options]
 
   --workspace <path>   Working folder (default: current folder)
   --data-dir <path>    Persistent accounts and conversations
@@ -27,7 +27,8 @@ Usage: npx mew-ide [start|status|stop|disable-autostart] [options]
   -h, --help          Show help
   -v, --version       Show version
 
-Node.js 24 and npm are required. Mew prepares local Postgres automatically.
+The npm entry requires Node.js 24 and npm; the curl installer supplies Node.js.
+Mew prepares local Postgres automatically.
 Windows CMD/PowerShell prepares a dedicated WSL environment.
 Run again to reopen Mew. Use stop to stop it without deleting data.
 Existing source data: --data-dir <existing-installation>/.data`

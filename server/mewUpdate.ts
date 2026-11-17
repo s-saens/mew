@@ -11,7 +11,7 @@ export const MEW_UPDATE_SESSION = 'mewcmd-mew-update'
 const UPDATE_JOB_FILE = path.join(stateDir(), 'update-job.json')
 const PID_FILE = path.join(stateDir(), 'mew.pid')
 
-export const RELEASE_UPDATE_MESSAGE = 'CLI 실행을 종료한 뒤 같은 폴더에서 npx mew-ide@latest를 다시 실행하세요. 계정과 작업 데이터는 유지됩니다.'
+export const RELEASE_UPDATE_MESSAGE = '실행 중인 Mew를 중지한 뒤 원래 설치 명령을 다시 실행하세요(npm: npx mew-ide@latest, curl: 설치 스크립트 재실행). 계정과 작업 데이터는 유지됩니다.'
 export function isReleaseDistribution(): boolean {
   return process.env.MEW_DISTRIBUTION === 'release'
 }

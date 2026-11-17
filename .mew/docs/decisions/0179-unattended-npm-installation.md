@@ -1,11 +1,15 @@
 ---
 title: "0179: Install Mew and its database from one npm command"
-description: "Accepts the unscoped mew-ide installer with default configuration, managed Postgres, durable background/login startup, Windows WSL preparation, and one browser remote-access chooser. Preserves private first-owner setup and separates publication from implementation."
+description: "Accepts the unscoped mew-ide installer with default configuration, managed Postgres, durable background/login startup, Windows WSL preparation, and one browser remote-access chooser. ADR 0180 extends delivery with a curl bootstrap and existing-WSL login tasks."
 status: accepted
 date: "2026-11-17"
 ---
 
 # 0179: Install Mew and its database from one npm command
+
+[ADR 0180](0180-shell-bootstrap-installation.md) adds a shell entry and replaces
+the generic POSIX systemd assumption for execution inside existing WSL only.
+The npm and dedicated Windows installation decisions remain in effect.
 
 ## Context
 

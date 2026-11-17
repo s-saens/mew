@@ -96,9 +96,27 @@ jobs:
           path: artifacts/*
           if-no-files-found: error
 
+  standalone:
+    if: inputs.publish_npm != true
+    needs: metadata
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --prefix apps/cli
+      - run: node --test apps/cli/test/standalone-bundle.test.mjs
+      - run: node apps/cli/tools/bundle-standalone.mjs --output artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mew-cli-standalone
+          path: artifacts/*
+          if-no-files-found: error
+
   release:
-    if: always() && github.ref_type == 'tag' && needs.metadata.result == 'success' && (needs.runtime.result == 'success' || inputs.publish_npm == true)
-    needs: [metadata, runtime]
+    if: always() && github.ref_type == 'tag' && needs.metadata.result == 'success' && ((needs.runtime.result == 'success' && needs.standalone.result == 'success') || inputs.publish_npm == true)
+    needs: [metadata, runtime, standalone]
     runs-on: ubuntu-22.04
     environment: cli-release
     permissions:
@@ -118,24 +136,33 @@ jobs:
         run: |
           mkdir -p artifacts
           cd artifacts
+          printf '%s\n' mew-runtime-linux-x64.tar.gz mew-runtime-linux-arm64.tar.gz mew-runtime-darwin-x64.tar.gz mew-runtime-darwin-arm64.tar.gz mew-runtime-win32-x64.tar.gz mew-runtime-win32-arm64.tar.gz mew-cli-standalone.tar.gz install.sh | LC_ALL=C sort > expected-assets
+          expected_assets="$(pwd)/expected-assets"
+          verify_assets() {
+            (
+              cd "$1"
+              awk '{print $2}' SHA256SUMS | LC_ALL=C sort > actual-assets
+              cmp "$expected_assets" actual-assets
+              sha256sum --check --strict SHA256SUMS
+            )
+          }
           if [ "$PUBLISH_NPM" != 'true' ]; then
-            cat ./*.sha256 > SHA256SUMS
-            sha256sum --check --strict SHA256SUMS
+            cat ./*.sha256 | LC_ALL=C sort -k2 > SHA256SUMS
+            verify_assets .
           fi
           if gh release view "$RELEASE_TAG" --repo "$REPOSITORY" > /dev/null 2>&1; then
             mkdir published
-            gh release download "$RELEASE_TAG" --repo "$REPOSITORY" --pattern 'mew-runtime-*.tar.gz' --pattern SHA256SUMS --dir published
-            cd published
-            printf '%s\n' mew-runtime-linux-x64.tar.gz mew-runtime-linux-arm64.tar.gz mew-runtime-darwin-x64.tar.gz mew-runtime-darwin-arm64.tar.gz mew-runtime-win32-x64.tar.gz mew-runtime-win32-arm64.tar.gz | sort > expected-assets
-            awk '{print $2}' SHA256SUMS | sort > actual-assets
-            cmp expected-assets actual-assets
-            sha256sum --check --strict SHA256SUMS
+            gh release download "$RELEASE_TAG" --repo "$REPOSITORY" --pattern 'mew-runtime-*.tar.gz' --pattern mew-cli-standalone.tar.gz --pattern install.sh --pattern SHA256SUMS --dir published
+            verify_assets published
+            if [ "$PUBLISH_NPM" != 'true' ]; then
+              cmp SHA256SUMS published/SHA256SUMS || { echo 'This release version already contains different asset bytes. Bump the CLI version.' >&2; exit 1; }
+            fi
           else
             if [ "$PUBLISH_NPM" = 'true' ]; then
               echo 'Publish the tagged runtime release before publishing its CLI to npm.' >&2
               exit 1
             fi
-            gh release create "$RELEASE_TAG" --repo "$REPOSITORY" --verify-tag --title "mew CLI ${RELEASE_TAG#mew-cli-v}" --generate-notes ./*.tar.gz SHA256SUMS
+            gh release create "$RELEASE_TAG" --repo "$REPOSITORY" --verify-tag --title "mew CLI ${RELEASE_TAG#mew-cli-v}" --generate-notes ./*.tar.gz install.sh SHA256SUMS
           fi
 
   npm:
