@@ -1,13 +1,15 @@
 ---
 title: "Consolidate remote desktop video processing and transmission on a Rust thread"
-description: "Decision to move compressed-frame IPC, JS RTP generation, and timers to a dedicated Rust thread while reusing the existing GPU C ABI. Retains Node authentication, negotiation, input, and existing transport policies, and records installation tools, dependency source preservation, synthetic verification, and the scope unverified on real hardware."
+description: "Decision to move compressed-frame IPC, JS RTP generation, and timers to a dedicated Rust thread while reusing the existing GPU C ABI. Retains Node authentication and negotiation; ADR 0130 subsequently extends Windows input placement and bounded bursts, and records installation tools, dependency source preservation, synthetic verification, and the scope unverified on real hardware."
 created: 2026-10-24
-updated: 2026-10-24
+updated: "2026-11-04"
 ---
 
 ## Status
 
 Accepted. This is a decision based on code and isolated synthetic verification, not a decision confirming production application or a performance advantage on actual GPUs.
+
+[ADR 0130](0130-remote-desktop-latency-and-virtual-modes.md) subsequently moves Windows snapshot validation/injection to Rust callbacks and adds bounded delta-frame bursts, capture wakeups, and virtual display modes. Other OS input placement, frame lifetimes, reference recovery, and quality adaptation remain unchanged.
 
 ## Background
 
