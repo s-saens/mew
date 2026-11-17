@@ -846,7 +846,7 @@ function SessionPicker({
             {sessions?.map((session) => {
               const taken = takenIds.includes(session.sessionId)
               const current = session.sessionId === currentSessionId
-              const attachmentLabels = { image: uiText("(사진)"), video: uiText("(비디오)"), audio: uiText("(음성)"), file: uiText("(파일)") }
+              const attachmentLabels = { image: uiText("(사진)"), video: uiText("(비디오)"), audio: uiText("(음성)"), file: uiText("(파일)"), document: uiText("(문서)") }
               return (
                 <button
                   key={session.sessionId}
