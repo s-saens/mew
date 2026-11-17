@@ -250,11 +250,12 @@ export interface RuntimeSettingView {
   env?: Record<string, string>
 }
 
-/** 설정 팝업이 서버로 보내는 값. 빈 문자열 필드는 저장에서 뺀다 */
+/** Omitted fields are retained; explicit empty overrides and removeEnv clear saved values. */
 export interface RuntimeSettingInput {
-  cmd?: string
-  extraArgs?: string[]
+  cmd?: string | null
+  extraArgs?: string[] | null
   env?: Record<string, string>
+  removeEnv?: string[]
 }
 
 export interface AgentAuthTerminal {

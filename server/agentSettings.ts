@@ -158,12 +158,18 @@ export function writeAgentSetting(runtime: string, input: unknown): AgentRuntime
     extraArgs: cleanExtraArgs(rec.extraArgs),
     env: cleanEnv(rec.env),
   }
+  const removals = rec.removeEnv === undefined ? [] : rec.removeEnv
+  if (!Array.isArray(removals) || removals.length > MAX_ENV_ENTRIES || removals.some(key => typeof key !== 'string' || !ENV_KEY_RE.test(key))) {
+    throw new AgentSettingError('삭제할 환경 변수 이름이 올바르지 않습니다')
+  }
   const settings = readAgentSettings()
   const prev = settings[runtime]
+  const env = { ...prev?.env, ...value.env }
+  for (const key of removals) delete env[key]
   const merged: AgentRuntimeSetting = {
-    cmd: value.cmd ?? prev?.cmd,
-    extraArgs: value.extraArgs ?? prev?.extraArgs,
-    env: { ...prev?.env, ...value.env },
+    cmd: Object.hasOwn(rec, 'cmd') ? value.cmd : prev?.cmd,
+    extraArgs: Object.hasOwn(rec, 'extraArgs') ? value.extraArgs : prev?.extraArgs,
+    env: Object.keys(env).length ? env : undefined,
   }
   // 전부 비었으면 항목 자체를 지운다 — "설정 없음"으로 되돌린 상태다
   if (!merged.cmd && !merged.extraArgs && !merged.env) {

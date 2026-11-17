@@ -69,3 +69,15 @@ test('삭제하면 항목이 사라진다', () => {
   deleteAgentSetting('antigravity')
   assert.equal(describeAgentSetting('antigravity'), null)
 })
+
+
+test('explicit clears and environment removals preserve other secrets', () => {
+  writeAgentSetting('kimi', { cmd: '/custom', extraArgs: ['--debug'], env: { REMOVE_ME: 'secret', KEEP_ME: 'private' } })
+  assert.throws(() => writeAgentSetting('kimi', { removeEnv: ['BAD KEY'] }))
+  writeAgentSetting('kimi', { cmd: null, extraArgs: [], removeEnv: ['REMOVE_ME'] })
+  assert.deepEqual(readAgentSetting('kimi')?.env, { EXTRA: '1', KEEP_ME: 'private' })
+  assert.equal(readAgentSetting('kimi')?.cmd, undefined)
+  assert.equal(readAgentSetting('kimi')?.extraArgs, undefined)
+  writeAgentSetting('kimi', { removeEnv: ['EXTRA', 'KEEP_ME'] })
+  assert.equal(readAgentSetting('kimi'), null)
+})

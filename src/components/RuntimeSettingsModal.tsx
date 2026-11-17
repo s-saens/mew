@@ -41,8 +41,8 @@ export function RuntimeSettingsButton({ runtimeId, label }: { runtimeId: string;
   )
 }
 
-/** env 한 줄 — 키와 값. 값 input은 password 타입(시크릿)과 text(엔드포인트 등)를 같은 줄에서 섞어 쓴다 */
-type EnvRow = { key: string; value: string; secret: boolean }
+/** Saved keys retain their identity so removal can be sent explicitly. */
+type EnvRow = { key: string; value: string; originalKey?: string }
 
 function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string; label: string; onClose: () => void }) {
   const { fetchAgentRuntimeSetting, fetchAgentRuntimes, saveAgentRuntimeSetting, deleteAgentRuntimeSetting, installAgentRuntime, uninstallAgentRuntime, logoutAgentRuntime } = useWorkspaceApi()
@@ -52,6 +52,8 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
   const [extraArgs, setExtraArgs] = useState('')
   const [rows, setRows] = useState<EnvRow[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [removedKeys, setRemovedKeys] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedNote, setSavedNote] = useState(false)
@@ -77,14 +79,13 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
           Object.entries(settings.env ?? {}).map(([key, value]) => ({
             key,
             value,
-            secret: value.startsWith('****'),
+            originalKey: key,
           })),
         )
         setLoaded(true)
       })
       .catch((err: unknown) => {
-        if (alive) setError(err instanceof Error ? err.message : String(err))
-        setLoaded(true)
+        if (alive) { setError(err instanceof Error ? err.message : String(err)); setLoadFailed(true); setLoaded(true) }
       })
     return () => {
       alive = false
@@ -97,16 +98,20 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
 
   useEffect(() => subscribeAgentRuntimes(items => setRuntime(items.find(item => item.id === runtimeId) ?? null)), [runtimeId])
 
-  const addRow = () => setRows((prev) => [...prev, { key: '', value: '', secret: false }])
+  const addRow = () => setRows((prev) => [...prev, { key: '', value: '' }])
   const updateRow = (index: number, patch: Partial<EnvRow>) =>
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)))
-  const removeRow = (index: number) => setRows((prev) => prev.filter((_, i) => i !== index))
+  const removeRow = (index: number) => {
+    const originalKey = rows[index]?.originalKey
+    if (originalKey) setRemovedKeys(prev => [...prev, originalKey])
+    setRows(prev => prev.filter((_, i) => i !== index))
+  }
 
   const buildPayload = (): Record<string, unknown> => {
     const payload: Record<string, unknown> = {}
-    if (runtimeId !== 'antigravity' && cmd.trim()) payload.cmd = cmd.trim()
+    if (runtimeId !== 'antigravity') payload.cmd = cmd.trim() || null
     const args = extraArgs.split(' ').filter((arg) => arg.length > 0)
-    if (runtimeId !== 'claude' && runtimeId !== 'antigravity' && args.length > 0) payload.extraArgs = args
+    if (runtimeId !== 'claude' && runtimeId !== 'antigravity') payload.extraArgs = args
     // env는 통째로 저장하는 게 아니라 **보낸 키만** 갈아끼우는 방식이어야 한다 — 서버에 저장된
     // 시크릿은 마스킹으로 원문을 못 받아 오므로, 건드리지 않은 줄(****로 시작)은 보내지 않고
     // 서버가 기존 값을 유지하게 해야 한다. 그래서 PUT은 "전체 교체"가 아니라 "병합 저장"이다.
@@ -119,6 +124,7 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
       env[key] = value
     }
     if (Object.keys(env).length > 0) payload.env = env
+    if (removedKeys.length) payload.removeEnv = removedKeys.filter(key => !Object.hasOwn(env, key))
     return payload
   }
 
@@ -183,7 +189,9 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
         ) : (
           <div className="space-y-4 px-4 py-3">
             <section>
-              <div className="text-xs text-ink-secondary">{runtime?.installed ? uiText("설치됨") : uiText("설치되지 않음")}</div>
+              <h3 className="text-sm font-medium text-ink">{uiText("설치 및 계정")}</h3>
+              <div className="mt-1 text-xs text-ink-secondary">{runtime ? ((runtimeId === 'codex' || runtimeId === 'claude') ? (runtime.installed ? uiText("연결 프로그램 설치됨") : uiText("연결 프로그램 설치되지 않음")) : (runtime.installed ? uiText("설치됨") : uiText("설치되지 않음"))) : uiText("설치 상태 확인 중…")}</div>
+              {(runtimeId === 'codex' || runtimeId === 'claude') && <p className="mt-1 text-xs text-ink-secondary">{runtimeId === 'codex' ? uiText("Codex는 연결 프로그램 외에 호스트에 설치된 Codex CLI가 필요합니다. 로그인은 별도로 진행하세요.") : uiText("별도 Claude CLI가 없으면 포함된 CLI를 사용합니다. 로그인은 별도로 진행하세요.")}</p>}
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {!runtime?.installed && runtime?.installable && <button type="button" disabled={runtimeBusy} onClick={install} className="rounded bg-accent px-2.5 py-1 text-xs text-ink-on-accent disabled:opacity-40">{uiText("설치")}</button>}
                 {runtime?.installed && <button type="button" disabled={runtimeBusy} onClick={() => window.dispatchEvent(new CustomEvent('mew:open-agent-runtime', { detail: runtimeId }))} className="rounded border border-edge px-2.5 py-1 text-xs text-ink-secondary hover:bg-surface-hover disabled:opacity-40">{uiText("로그인")}</button>}
@@ -193,9 +201,13 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
               <RuntimeInstallProgress runtimeId={runtimeId} busy={installing || runtime?.installing === true} installation={runtime?.installation} />
             </section>
             {runtime?.installed && Object.hasOwn(SUBSCRIPTION_URLS, runtimeId) && <AgentAccountCard runtime={runtimeId} />}
+            <details className="rounded border border-edge px-3 py-2">
+            <summary className="cursor-pointer text-sm font-medium text-ink">{uiText("고급 실행 설정")}</summary>
+            <div className="mt-3 space-y-3">
             {runtimeId !== 'antigravity' && <div>
-              <label className="mb-1 block text-xs font-medium text-ink-secondary">{runtimeId === 'claude' ? uiText("Claude CLI 실행 파일") : uiText("실행 파일")}</label>
+              <label className="mb-1 block text-xs font-medium text-ink-secondary">{runtimeId === 'claude' ? uiText("Claude CLI 실행 파일") : runtimeId === 'codex' ? uiText("Codex 연결 프로그램 실행 파일") : uiText("실행 파일")}</label>
               <input
+                aria-label={runtimeId === 'claude' ? uiText("Claude CLI 실행 파일") : runtimeId === 'codex' ? uiText("Codex 연결 프로그램 실행 파일") : uiText("실행 파일")}
                 value={cmd}
                 onChange={(e) => setCmd(e.target.value)}
                 placeholder={uiText("기본값 사용")}
@@ -205,6 +217,7 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
             {runtimeId !== 'claude' && runtimeId !== 'antigravity' && <div>
               <label className="mb-1 block text-xs font-medium text-ink-secondary">{uiText("추가 인자")}</label>
               <input
+                aria-label={uiText("추가 인자")}
                 value={extraArgs}
                 onChange={(e) => setExtraArgs(e.target.value)}
                 placeholder={uiText("공백으로 구분")}
@@ -224,16 +237,19 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
                 {rows.map((row, i) => (
                   <div key={i} className="flex items-center gap-1">
                     <input
+                      aria-label={uiText("환경 변수 이름")}
+                      readOnly={Boolean(row.originalKey)}
                       value={row.key}
                       onChange={(e) => updateRow(i, { key: e.target.value.toUpperCase() })}
                       placeholder="KEY"
                       className="w-2/5 rounded border border-edge bg-surface px-2 py-1 font-mono text-xs text-ink outline-none placeholder:text-ink-secondary focus:border-edge-bright"
                     />
                     <input
+                      aria-label={uiText("환경 변수 값")}
                       value={row.value}
                       onChange={(e) => updateRow(i, { value: e.target.value })}
                       placeholder={uiText("값")}
-                      type={row.secret && row.value.startsWith('****') ? 'text' : 'text'}
+                      type={row.value.startsWith('****') ? 'text' : 'password'}
                       className="min-w-0 flex-1 rounded border border-edge bg-surface px-2 py-1 font-mono text-xs text-ink outline-none placeholder:text-ink-secondary focus:border-edge-bright"
                     />
                     <button
@@ -253,6 +269,8 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
                   {uiText("키를 변경하려면 전체 값을 입력하세요.")}</div>
               )}
             </div>
+            </div>
+            </details>
             {error && <div className="select-text whitespace-pre-wrap rounded border border-danger/40 bg-surface px-2 py-1.5 text-xs text-danger">{error}</div>}
             {savedNote && <div className="text-xs text-accent">{uiText("저장했습니다.")}</div>}
           </div>
@@ -271,7 +289,7 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
             <button
               type="button"
               onClick={save}
-              disabled={saving || !loaded}
+              disabled={saving || !loaded || loadFailed}
               className="rounded bg-accent px-3 py-1 text-xs text-ink-on-accent hover:bg-accent-strong disabled:opacity-40"
             >
               {saving ? uiText("저장 중…") : uiText("저장")}
