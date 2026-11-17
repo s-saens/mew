@@ -30,6 +30,9 @@ export function createGitAiCommitRouter(store: GitAiCommitStore) {
   router.post('/:id/stop', (req, res, next) => {
     try { const { owner, cwd } = scope(req); store.stop(owner, cwd, String(req.params.id)); res.json({ ok: true }) } catch (error) { next(error) }
   })
+  router.post('/:id/approve', async (req, res, next) => {
+    try { const { owner, cwd } = scope(req); res.json({ job: await store.approve(owner, cwd, String(req.params.id), req.body?.groups) }) } catch (error) { next(error) }
+  })
   router.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     if (error instanceof GitConnectionError) { res.status(error.status).json({ error: error.message, code: error.code, owner: authOf(res.req).email, workspace: res.req.query.workspace }); return }
     res.status(error instanceof GitAiCommitError ? 400 : 500).json({ error: error instanceof Error ? error.message : '자동 커밋에 실패했습니다' })

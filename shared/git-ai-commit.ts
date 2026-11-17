@@ -1,5 +1,5 @@
-export type GitAiCommitState = 'starting' | 'running' | 'committing' | 'completed' | 'failed' | 'cancelled'
-export interface GitCommitGroup { title: string; description: string; files: string[] }
+export type GitAiCommitState = 'starting' | 'running' | 'review' | 'committing' | 'completed' | 'failed' | 'cancelled'
+export interface GitCommitGroup { title: string; description: string; files: string[]; summary?: string }
 export interface GitCommitPlan { commits: GitCommitGroup[]; skipped: { file: string; reason: string }[] }
 export interface GitCommitResult extends GitCommitGroup { hash: string }
 export interface GitAiCommitJob {
@@ -11,6 +11,8 @@ export interface GitAiCommitJob {
   startedAt: number
   finishedAt?: number
   output: string
+  plan?: GitCommitPlan
+  execution?: boolean
   result?: { commits: GitCommitResult[]; skipped: GitCommitPlan['skipped'] }
   error?: string
   truncated: boolean

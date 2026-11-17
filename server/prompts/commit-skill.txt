@@ -38,11 +38,11 @@ If the originals change before committing, reread them and adjust the plan. Pres
 
 ## Execution in the Mew Git Panel
 
-When Mew invokes `mew-commit-plan` mode, return a file-level plan using the provided snapshot and recent commits. Do not directly change Git through tools or commands. Mew validates the response and executes the actual commits in sequence within the same operation. There is no separate step for applying a draft.
+When Mew invokes `mew-commit-plan` mode, return a file-level plan using the provided snapshot and recent commits. Do not directly change Git through tools or commands. Mew validates the response and displays it for review; only work units selected by the user are committed afterward.
 
 - Include only the current repository and selected paths specified in the request. Put each file in only one group. Specify renames using the displayed new path; Mew handles the old path along with it.
 - Assign every selected file exactly once to either `commits` or `skipped` with a reason. Do not unnecessarily increase the number of commits. This mode does not separate hunks within files.
-- Return only a JSON object: `{"commits":[{"title":"제목","description":"설명","files":["경로"]}],"skipped":[{"file":"경로","reason":"남기는 이유"}]}`. The title must be a single line; the description may be an empty string.
+- Return only a JSON object: `{"commits":[{"title":"제목","description":"설명","summary":"검토 설명","files":["경로"]}],"skipped":[{"file":"경로","reason":"남기는 이유"}]}`. The title must be a single line; the description may be an empty string. Explain the change, purpose, and uncertainties in the summary using the requested review language.
 
 ### Full Change Evidence Mode
 

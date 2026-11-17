@@ -14,7 +14,7 @@ export function GitAiCommitDialog({ project, files, onFinished, onClose }: {
   onFinished: () => void
   onClose: () => void
 }) {
-  const { fetchWorkspace, fetchGitAiCommit, startGitAiCommit, stopGitAiCommit } = useWorkspaceApi()
+  const { fetchWorkspace, fetchGitAiCommit, startGitAiCommit, stopGitAiCommit, approveGitAiCommit } = useWorkspaceApi()
   useUiLocale()
   const [workspace, setWorkspace] = useState<string | null>(null)
   const [job, setJob] = useState<GitAiCommitJob | null>(null)
@@ -25,14 +25,16 @@ export function GitAiCommitDialog({ project, files, onFinished, onClose }: {
   const [stopping, setStopping] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reload, setReload] = useState(0)
+  const [selection, setSelection] = useState<{ jobId: string; groups: number[] }>({ jobId: '', groups: [] })
   const alive = useRef(true)
   const retryId = useRef<string | null>(null)
   const notified = useRef('')
   const onFinishedRef = useRef(onFinished)
   onFinishedRef.current = onFinished
   const active = gitAiCommitActive(job)
+  const groups = selection.jobId === job?.id ? selection.groups : []
   useEffect(() => {
-    if (!job || active || notified.current === job.id) return
+    if (!job || active || job.state === 'review' || notified.current === job.id) return
     notified.current = job.id
     onFinishedRef.current()
   }, [job, active])
@@ -84,6 +86,15 @@ export function GitAiCommitDialog({ project, files, onFinished, onClose }: {
     try { await stopGitAiCommit(project, workspace, job.id) }
     catch (err) { if (alive.current) { setError(err instanceof Error ? err.message : String(err)); setStopping(false) } }
   }
+  const approve = async () => {
+    if (!workspace || !job || !groups.length || busy) return
+    setBusy(true); setError(null)
+    try {
+      const result = await approveGitAiCommit(project, workspace, job.id, groups)
+      if (alive.current) setJob(result.job)
+    } catch (err) { if (alive.current) setError(err instanceof Error ? err.message : String(err)) }
+    finally { if (alive.current) setBusy(false) }
+  }
   return (
     <DialogFrame labelledBy="git-ai-title" onClose={onClose} className="flex max-h-[90dvh] max-w-lg flex-col text-ink">
         <div className="flex items-center justify-between border-b border-edge px-4 py-3">
@@ -91,15 +102,24 @@ export function GitAiCommitDialog({ project, files, onFinished, onClose }: {
           <button type="button" onClick={onClose} className="rounded px-3 py-2 text-xs text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-link">{uiText("닫기")}</button>
         </div>
         <div className="min-h-0 space-y-4 overflow-y-auto p-4">
-          <p className="text-xs leading-relaxed text-ink-secondary">{uiText("선택한 파일 {count}개를 Mew 커밋 스킬로 분석해 작업 단위로 나누고 실제 커밋을 만듭니다. 필요하면 여러 커밋으로 나누며 push는 하지 않습니다.", { count: files.length })}</p>
+          <p className="text-xs leading-relaxed text-ink-secondary">{uiText("선택한 파일 {count}개를 작업 단위로 분석합니다. 내용을 확인하고 커밋할 작업을 선택하세요.", { count: job?.files?.length ?? files.length })}</p>
           <p className="text-xs text-ink-secondary">{uiText("지침 파일은 Skills 관리 → Mew → commit에서 편집할 수 있습니다.")}</p>
           {loading ? <p role="status" className="text-sm text-ink-secondary">{uiText("커밋 작업을 확인하는 중…")}</p> : <>
             {error && <div role="alert" className="space-y-2 text-xs text-danger"><p className="whitespace-pre-wrap break-words">{error}</p>{!workspace && <button type="button" onClick={() => setReload(value => value + 1)} className="rounded border border-edge-strong px-3 py-2 text-ink">{uiText("다시 시도")}</button>}</div>}
             {job && <section className="space-y-2" aria-label={uiText("커밋 작업")}>
-              <div role="status" className="text-sm font-medium">{job.agentSetName} · {active ? stopping ? uiText("중단 중…") : job.state === 'committing' ? uiText("커밋 중…") : uiText("변경사항 분석 중…") : job.state === 'completed' ? uiText("자동 커밋 완료") : job.state === 'cancelled' ? uiText("작업 중단됨") : uiText("자동 커밋 실패")}</div>
+              <div role="status" className="text-sm font-medium">{job.agentSetName} · {active ? stopping ? uiText("중단 중…") : job.state === 'committing' ? uiText("커밋 중…") : uiText("변경사항 분석 중…") : job.state === 'review' ? uiText("분석 완료 · 커밋할 작업 선택") : job.state === 'completed' ? uiText("자동 커밋 완료") : job.state === 'cancelled' ? uiText("작업 중단됨") : uiText("자동 커밋 실패")}</div>
               <p className="text-xs text-ink-secondary">{uiText("{time} 기준 변경사항", { time: new Date(job.startedAt).toLocaleString(getUiLocale()) })}</p>
 
               {job.error && <p role="alert" className="whitespace-pre-wrap break-words text-xs text-danger">{job.error}</p>}
+              {job.state === 'review' && job.plan && <>
+                {job.plan.commits.map((group, index) => <div key={index} className="space-y-1 border-b border-edge py-2">
+                  <label className="flex cursor-pointer items-start gap-2 text-sm font-medium"><input type="checkbox" checked={groups.includes(index)} onChange={event => setSelection({ jobId: job.id, groups: event.target.checked ? [...groups, index] : groups.filter(value => value !== index) })} aria-label={`${uiText("작업 선택")} · ${group.title}`} /><span className="break-words">{group.title}</span></label>
+                  {(group.summary || group.description) && <p className="select-text whitespace-pre-wrap break-words text-xs text-ink-secondary">{group.summary || group.description}</p>}
+                  <details className="text-xs text-ink-secondary"><summary className="cursor-pointer py-1">{uiText("포함 파일")} · {group.files.length}</summary>{group.files.map(file => <p key={file} className="select-text break-all">{file}</p>)}</details>
+                </div>)}
+                {!!job.plan.skipped.length && <div className="space-y-1 text-xs text-ink-secondary"><p className="font-medium">{uiText("커밋하지 않는 파일")}</p>{job.plan.skipped.map(item => <p key={item.file} className="select-text break-words">{item.file}: {item.reason}</p>)}</div>}
+                <p className="text-xs text-ink-secondary">{uiText("검토 결과는 다시 열어 확인할 수 있습니다.")}</p>
+              </>}
               {job.result?.commits?.map(commit => <div key={commit.hash} className="space-y-1 border-b border-edge py-2">
                 <p className="select-text break-words text-sm font-medium">{commit.title}</p>
                 <p className="select-text text-xs text-ink-secondary">{commit.hash.slice(0, 8)} · {commit.files.length}{uiText("개 파일")}</p>
@@ -111,12 +131,12 @@ export function GitAiCommitDialog({ project, files, onFinished, onClose }: {
               {job.output && <details className="text-xs text-ink-secondary"><summary className="cursor-pointer py-2">{uiText("진행 로그")}</summary><pre className="max-h-48 select-text overflow-auto whitespace-pre-wrap break-words rounded bg-surface p-3 font-mono text-xs">{job.output}</pre></details>}
               {active && <p className="text-xs text-ink-secondary">{uiText("창을 닫아도 커밋 작업은 계속됩니다. AI 자동 커밋을 다시 열면 확인할 수 있습니다.")}</p>}
             </section>}
-            {!active && !busy && (choosing ? <section aria-label={uiText("에이전트셋 선택")}><h3 className="mb-3 text-xs font-medium text-ink-secondary">{uiText("에이전트셋 선택")}</h3><AgentSetPicker onSelect={choose} onCreated={choose} /></section> : <div className="flex items-center justify-between gap-3 text-xs"><span className="min-w-0 truncate text-ink-secondary">{selected?.name ?? uiText("다음 작업의 에이전트셋을 선택하세요")}</span><button type="button" onClick={() => setChoosing(true)} className="shrink-0 rounded border border-edge-strong px-3 py-2 hover:bg-surface-hover">{uiText("에이전트셋 선택")}</button></div>)}
+            {!active && !busy && job?.state !== 'review' && (choosing ? <section aria-label={uiText("에이전트셋 선택")}><h3 className="mb-3 text-xs font-medium text-ink-secondary">{uiText("에이전트셋 선택")}</h3><AgentSetPicker onSelect={choose} onCreated={choose} /></section> : <div className="flex items-center justify-between gap-3 text-xs"><span className="min-w-0 truncate text-ink-secondary">{selected?.name ?? uiText("다음 작업의 에이전트셋을 선택하세요")}</span><button type="button" onClick={() => setChoosing(true)} className="shrink-0 rounded border border-edge-strong px-3 py-2 hover:bg-surface-hover">{uiText("에이전트셋 선택")}</button></div>)}
           </>}
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-edge p-3">
           {active ? <button type="button" disabled={stopping} onClick={() => void stop()} className="rounded border border-edge-strong px-4 py-2 text-xs hover:bg-surface-hover disabled:opacity-40">{uiText("작업 중단")}</button> : <>
-            <button type="button" disabled={loading || busy || !workspace || !selected || choosing || !files.length} onClick={() => void generate()} className="rounded border border-edge-strong px-4 py-2 text-xs hover:bg-surface-hover disabled:opacity-40">{busy ? uiText("처리 중…") : uiText("자동 커밋 실행")}</button>
+            {job?.state === 'review' ? <><button type="button" disabled={busy} onClick={() => { setJob(null); setSelection({ jobId: '', groups: [] }); setChoosing(true) }} className="rounded border border-edge-strong px-4 py-2 text-xs hover:bg-surface-hover disabled:opacity-40">{uiText("다시 분석")}</button><button type="button" disabled={busy || !groups.length} onClick={() => void approve()} className="rounded border border-edge-strong px-4 py-2 text-xs hover:bg-surface-hover disabled:opacity-40">{busy ? uiText("처리 중…") : uiText("선택한 작업 커밋")}</button></> : <button type="button" disabled={loading || busy || !workspace || !selected || choosing || !files.length} onClick={() => void generate()} className="rounded border border-edge-strong px-4 py-2 text-xs hover:bg-surface-hover disabled:opacity-40">{busy ? uiText("처리 중…") : uiText("변경사항 분석")}</button>}
           </>}
         </div>
     </DialogFrame>

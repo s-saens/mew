@@ -8,7 +8,7 @@ updated: "2026-11-03"
 status_hash: "ad2d450aae96362a9d082f3989ccd04643632b17559700c16044ef32ca54d690"
 files: ["src/components/GitWorkbench.tsx", "src/utils/git-graph.ts", "src/utils/git-graph-branches.ts", "src/components/git-diff-editor.tsx", "src/components/git-changes-menu.tsx", "src/utils/git-diff-tabs.ts", "src/components/git-branch-picker.tsx", "src/components/git-panel.tsx", "src/components/github-account.tsx", "server/github-auth.ts", "server/github-auth-routes.ts", "src/components/git-ai-commit-dialog.tsx", "server/gitWorkbench.ts", "server/git-ai-commit.ts", "server/git-commit-analysis.ts", "server/git-commit-packets.ts", "server/git-diff-codec.ts", "server/git-change-intent.ts", "server/git-change-intent-cli.ts", "server/git-ai-commit-runner.ts", "server/git-ai-commit-routes.ts"]
 commits: []
-description: "Project changes, commit history and graph, diffs, branch operations, worktree switching, and Pull/Push. Defines selected-change commits and discard, plus account approval, scope, and JSON recovery for AI commits by work unit."
+description: "Project changes, commit history and graph, diffs, branch operations, worktree switching, and Pull/Push. Defines selected-change commits and discard, plus AI work-unit analysis, review selection, scope, and JSON recovery."
 상위파일:
   - "MOC.md"
   - "_git-history.md"
@@ -163,7 +163,7 @@ The X remains 28×28px with a 14px icon, shared tooltip, accessible name, and di
 - Pause queries when Git is closed, another mobile panel is selected, another desktop panel is maximized, or the browser is hidden. Requery on visibility/window return. Never duplicate slow requests or accept stale replies after closing, navigation, or manual refresh. Automatic failures retain content, show an error, and retry on the next query.
 ### AI commit execution
 
-- AI auto-commit analyzes only selected files, fixes the agent set's runtime, model, and roles for the task, and creates a plan by work unit in dedicated tmux and ACP sessions; Mew then executes multiple commits.
+- AI commit analyzes only selected files with the chosen agent set and displays work-unit descriptions, paths, and reasons for excluded changes before committing anything. The user selects work units and confirms; Mew commits only those units in order. A review survives closing and reopening the dialog. Files cannot be split into hunks.
 - For malformed plan, intermediate-analysis, or original-content-request JSON, ask to repair only that response up to 2 times and show recovery progress. Handle code fences/comments/trailing commas directly; do not guess missing syntax locally. Recovered replies still need file/fragment omission, duplicate, and scope checks. Failed recovery shows Korean guidance, makes no commit, and preserves staging.
 - Losslessly compress the fixed-snapshot full diff with 3 context lines, sharing repeated lines, prefixes/suffixes, and identical changes without dropping fragments. A single packet needs 1 plan; multiple packets are fully analyzed in parallel pairs before planning.
 - Use intent records only when old/new objects match; never skip full-diff analysis. Size, excerpts, or the former maximum of 3 attempts cannot skip content. Check selected-file coverage/duplicates and post-analysis changes; retain only actual uncertainties with reasons.

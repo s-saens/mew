@@ -936,6 +936,10 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     return mewFetch(gitAiCommitUrl(project, workspace, `/${encodeURIComponent(id)}/stop`), { method: 'POST' }).then(json<{ ok: true }>)
   }
 
+  function approveGitAiCommit(project: string, workspace: string, id: string, groups: number[]): Promise<{ job: GitAiCommitJob }> {
+    return gitFetch(gitAiCommitUrl(project, workspace, `/${encodeURIComponent(id)}/approve`), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ groups }) }, project).then(json<{ job: GitAiCommitJob }>)
+  }
+
   function createSubproject(path: string, project: string): Promise<{ ok: true }> {
     return mewFetch(`/api/subprojects?${projectQs(project)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }),
@@ -2199,6 +2203,7 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     fetchGitAiCommit,
     startGitAiCommit,
     stopGitAiCommit,
+    approveGitAiCommit,
     createSubproject,
     initializeGitRepository,
     fetchGitLog,
@@ -2410,6 +2415,7 @@ export const {
   fetchGitAiCommit,
   startGitAiCommit,
   stopGitAiCommit,
+  approveGitAiCommit,
   createSubproject,
   initializeGitRepository,
   fetchGitLog,

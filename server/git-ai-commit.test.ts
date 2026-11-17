@@ -213,7 +213,7 @@ test('large repeated automatic commits use one complete compressed input and com
       answerPermission: () => {}, cancel: () => {}, disposeAndWait: async () => { disposals++ },
     }
   })
-  const result = store.read(owner, cwd, job.id)
+  const result = await approveAll(store, cwd, job.id)
   assert.equal(result.state, 'completed', result.error)
   assert.equal(plans, 1)
   assert.equal(starts, 1)
@@ -264,7 +264,7 @@ test('unique large changes analyze every packet before one global plan, includin
       answerPermission: () => {}, cancel: () => {}, disposeAndWait: async () => {},
     }
   })
-  const result = store.read(owner, cwd, job.id)
+  const result = await approveAll(store, cwd, job.id)
   assert.equal(result.state, 'completed', result.error)
   assert.equal(calls, expected.length + 1); assert.equal(finalCalls, 1)
   assert.equal(peak, 2, 'independent evidence packets run in bounded parallel contexts')
@@ -291,7 +291,7 @@ test('complete compressed evidence repairs detail requests and rereads immutable
       }, answerPermission: () => {}, cancel: () => {}, disposeAndWait: async () => {},
     }
   })
-  const result = store.read(owner, cwd, job.id)
+  const result = await approveAll(store, cwd, job.id)
   assert.equal(result.state, 'completed', result.error); assert.equal(calls, 3)
 })
 
@@ -335,7 +335,7 @@ test('one malformed evidence packet is repaired with complete source coverage be
       }, answerPermission: () => {}, cancel: () => {}, disposeAndWait: async () => { disposals++ },
     }
   })
-  const result = store.read(owner, cwd, job.id)
+  const result = await approveAll(store, cwd, job.id)
   assert.equal(result.state, 'completed', result.error)
   assert.equal(calls.get(0), 2)
   assert.equal([...calls.values()].reduce((total, count) => total + count, 0), packets.length + 1)
@@ -384,7 +384,7 @@ test('malformed evidence reduction is repaired without losing covered sources', 
       }, answerPermission: () => {}, cancel: () => {}, disposeAndWait: async () => {},
     }
   })
-  const result = store.read(owner, cwd, job.id)
+  const result = await approveAll(store, cwd, job.id)
   assert.equal(result.state, 'completed', result.error)
   assert.equal((await git.status()).files.some(file => file.path === 'file.txt'), false)
 })
@@ -440,7 +440,7 @@ test('invalid plans, permission requests, cancellation and racing edits leave la
         answerPermission: () => {}, cancel: () => {}, disposeAndWait: async () => {},
       }
     })
-    const result = store.read(owner, cwd, job.id)
+    const result = scenario === 'edit' ? await approveAll(store, cwd, job.id) : store.read(owner, cwd, job.id)
     assert.equal(result.state, scenario === 'cancel' ? 'cancelled' : 'failed')
     if (scenario === 'edit') assert.match(result.error!, /달라졌습니다/)
     assert.equal(await git.revparse('HEAD'), head)
@@ -454,6 +454,13 @@ const plan: GitCommitPlan = { commits: [
   { title: 'fix: update file', description: 'Tracked change', files: ['file.txt'] },
   { title: 'feat: add new file', description: '', files: ['new.txt'] },
 ], skipped: [] }
+async function approveAll(store: InstanceType<typeof GitAiCommitStore>, cwd: string, id: string) {
+  const review = store.read(owner, cwd, id)
+  if (review.state !== 'review') return review
+  await store.approve(owner, cwd, id, review.plan!.commits.map((_, index) => index))
+  await runAutomaticCommit(store.directory(owner, cwd, id), async () => { throw new Error('execution must not start another agent') })
+  return store.read(owner, cwd, id)
+}
 async function execute(store: InstanceType<typeof GitAiCommitStore>, cwd: string, id: string, output = plan, before?: () => Promise<void>) {
   let listener: (event: AgentEvent) => void = () => {}
   await runAutomaticCommit(store.directory(owner, cwd, id), async (runtime, actualCwd) => {
@@ -470,7 +477,7 @@ async function execute(store: InstanceType<typeof GitAiCommitStore>, cwd: string
       answerPermission: () => {}, cancel: () => {}, disposeAndWait: async () => {},
     }
   })
-  return store.read(owner, cwd, id)
+  return approveAll(store, cwd, id)
 }
 
 test('malformed small commit plans retry in fresh sessions with the selected model and thinking settings', async () => {
@@ -500,7 +507,7 @@ test('malformed small commit plans retry in fresh sessions with the selected mod
       }, answerPermission: () => {}, cancel: () => {}, disposeAndWait: async () => { disposed.push(number) },
     }
   })
-  const result = store.read(owner, cwd, job.id)
+  const result = await approveAll(store, cwd, job.id)
   assert.equal(result.state, 'completed', result.error)
   assert.equal(result.result!.commits.length, 2)
   assert.equal(starts, 2)
@@ -593,7 +600,7 @@ test('cancellation or racing edits during JSON correction keep changes uncommitt
         }, answerPermission: () => {}, cancel: () => {}, disposeAndWait: async () => { disposals++ },
       }
     })
-    const result = store.read(owner, cwd, job.id)
+    const result = scenario === 'edit' ? await approveAll(store, cwd, job.id) : store.read(owner, cwd, job.id)
     assert.equal(result.state, scenario === 'cancel' ? 'cancelled' : 'failed')
     if (scenario === 'edit') assert.match(result.error!, /달라졌습니다/)
     assert.equal(calls, 2); assert.equal(disposals, 2)
@@ -627,6 +634,31 @@ test('jobs create logical commits, preserve unrelated stage, are idempotent and 
   assert.equal(await git.diff(['--cached', '--', 'excluded.txt']), index)
   assert.match(fs.readFileSync(path.join(cwd, 'excluded.txt'), 'utf8'), /working changes/)
   assert.equal(fs.existsSync(path.join(store.directory(owner, cwd, id), 'input.json')), false)
+})
+
+test('analysis waits for explicit group selection and commits only selected work', async () => {
+  const { cwd, git, store } = await fixture()
+  const head = await git.revparse('HEAD')
+  const job = await store.start(owner, cwd, crypto.randomUUID(), preset)
+  let listener: (event: AgentEvent) => void = () => {}
+  await runAutomaticCommit(store.directory(owner, cwd, job.id), async () => ({
+    attach: callback => { listener = callback; return () => {} }, setModel: async () => {},
+    runOnce: async () => { listener({ type: 'update', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: JSON.stringify(plan) } } }); return 'end_turn' },
+    answerPermission: () => {}, cancel: () => {}, disposeAndWait: async () => {},
+  }))
+  assert.equal((await store.latest(owner, cwd))?.state, 'review')
+  assert.equal(await git.revparse('HEAD'), head)
+  await assert.rejects(store.approve(owner, cwd, job.id, []), /선택/)
+  await assert.rejects(store.approve(owner, cwd, job.id, [0, 0]), /선택/)
+  await assert.rejects(store.approve('other', cwd, job.id, [0]))
+  await store.approve(owner, cwd, job.id, [1])
+  await assert.rejects(store.approve(owner, cwd, job.id, [0]), /계획/)
+  await runAutomaticCommit(store.directory(owner, cwd, job.id), async () => { throw new Error('unexpected agent') })
+  const result = store.read(owner, cwd, job.id)
+  assert.equal(result.state, 'completed', result.error)
+  assert.deepEqual(result.result?.commits.map(commit => commit.files), [['new.txt']])
+  assert.equal(fs.readFileSync(path.join(cwd, 'file.txt'), 'utf8'), 'after\n')
+  assert.deepEqual((await git.status()).modified, ['file.txt'])
 })
 
 test('selected snapshots exclude other files and reject tree, HEAD or index changes before committing', async () => {
@@ -863,6 +895,14 @@ new AgentSideConnection(conn=>({
     let result = job
     while (result.state === 'starting' || result.state === 'running' || result.state === 'committing') {
       assert.ok(Date.now() < deadline, `job timeout: ${result.output}`)
+      await new Promise(resolve => setTimeout(resolve, 100))
+      result = store.read(owner, cwd, job.id)
+    }
+    assert.equal(result.state, 'review', result.error)
+    await store.approve(owner, cwd, job.id, [0])
+    result = store.read(owner, cwd, job.id)
+    while (result.state === 'starting' || result.state === 'running' || result.state === 'committing') {
+      assert.ok(Date.now() < deadline, `commit timeout: ${result.output}`)
       await new Promise(resolve => setTimeout(resolve, 100))
       result = store.read(owner, cwd, job.id)
     }

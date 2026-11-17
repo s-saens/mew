@@ -1,6 +1,14 @@
 // Source-message keys keep shared UI packages independent of the host app.
 // Every entry supplies English, Simplified Chinese and Japanese; the key is Korean.
 export const uiMessages = {
+  "선택한 파일 {count}개를 작업 단위로 분석합니다. 내용을 확인하고 커밋할 작업을 선택하세요.": ["Analyze {count} selected files by work unit. Review the results and choose which work to commit.","按工作单元分析所选的 {count} 个文件。查看结果并选择要提交的工作。","選択した {count} ファイルを作業単位で分析します。内容を確認してコミットする作業を選択してください。"],
+  "분석 완료 · 커밋할 작업 선택": ["Analysis complete · Choose work to commit","分析完成 · 选择要提交的工作","分析完了 · コミットする作業を選択"],
+  "변경사항 분석": ["Analyze changes","分析更改","変更を分析"],
+  "선택한 작업 커밋": ["Commit selected work","提交所选工作","選択した作業をコミット"],
+  "작업 선택": ["Select work","选择工作","作業を選択"],
+  "다시 분석": ["Analyze again","重新分析","再分析"],
+  "커밋하지 않는 파일": ["Files left uncommitted","未提交的文件","コミットしないファイル"],
+  "검토 결과는 다시 열어 확인할 수 있습니다.": ["You can reopen this review later.","之后可以重新打开此审核结果。","後でこの確認画面を開き直せます。"],
   "음성 인식": ["Speech recognition","语音识别","音声認識"],
   "녹음 종료 및 변환": ["Stop and transcribe","停止并转写","停止して文字起こし"],
   "마이크 준비 중…": ["Preparing microphone…","正在准备麦克风…","マイクを準備中…"],
