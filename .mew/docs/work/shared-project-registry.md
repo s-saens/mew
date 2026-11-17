@@ -1,6 +1,6 @@
 ---
 title: "Shared projects and project setup"
-description: "Records shared registry creation, discovery, personal shortcuts, and the November 6 setup and deletion work. Includes the November 7 invisible deletion-error diagnosis and direct four-choice project setup, followed by horizontal icon-and-name presentation and the immediate catalog refresh after deletion."
+description: "Records shared registry creation, discovery, personal shortcuts, and the November 6 setup and deletion work. Includes the November 7 invisible deletion-error diagnosis and direct four-choice project setup, followed by horizontal icon-and-name presentation and the immediate catalog refresh and file-preserving registration removal."
 created: "2026-11-02"
 updated: "2026-11-17"
 ---
@@ -254,3 +254,9 @@ The [navigation contract](../development/ui-project-navigation.md#shared-ui-for-
 A successful permanent deletion now removes the target and its descendants from the open project selection catalog and starts a fresh registry request. Failed or canceled deletion retains the existing rows; removing a personal shortcut remains a separate operation. See the [project selection contract](../features/projects-files-search/opening-projects-tabs-and-groups.md). The browser regression uses mocked deletion and registry responses; no actual project files were deleted.
 
 Local verification passed the project deletion and collapse browser regressions, catalog snapshot tests, the project build, and lint with warnings. The existing full-App deletion fixture failed using the old project row selector; a local selector adjustment reached a separate project setup surface-size assertion failure. The documentation check reported 39 existing link errors. No deployment or server restart was performed.
+
+## Registration removal with optional disk deletion — 2026-11-17
+
+Owners can remove shared project registration and account shortcuts while retaining files, or explicitly select disk deletion in the confirmation. An exclusion prevents discovery and stale account saves from restoring an unregistered subtree; explicit linking restores it. Registration removal uses the recorded path without following a replacement symlink when reconciling active workspaces. A separate non-destructive API avoids sending this request to an older server's permanent deletion endpoint. See [ADR 0187](../decisions/0187-project-registration-removal.md).
+
+Local isolated registry, API, and browser checks passed 25 tests; lint passed with warnings. The documentation checker reported 39 existing link errors. The selected build passed on retry after unrelated concurrent test type errors were resolved; no deployment or server restart was performed. Moving existing projects into the managed root is not implemented: path-keyed account state, active sessions, and Git worktree references require coordinated migration and verification before a filesystem move can be exposed.

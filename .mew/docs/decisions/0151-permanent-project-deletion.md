@@ -1,10 +1,12 @@
 ---
 title: "0151 — Separate shortcut removal from permanent project deletion"
-description: "Adds owner-only permanent deletion of a registered project folder with protected-path validation, shared catalog cleanup, deleted-path tombstones, and account reconciliation. Extends ADR 0118 while preserving shortcut-only removal, and records the explicit confirmation and failure boundaries."
+description: "Adds owner-only permanent deletion of a registered project folder with protected-path validation, shared catalog cleanup, deleted-path tombstones, and account reconciliation. Extends ADR 0118 with permanent deletion and shortcut separation; ADR 0187 supersedes its menu and registration-removal decision."
 created: "2026-11-06"
 updated: "2026-11-06"
 status: accepted
 ---
+
+[ADR 0187](0187-project-registration-removal.md) supersedes the deletion menu and the exclusion of registration-only removal; the permanent folder-deletion safety boundary remains.
 
 ## Context
 

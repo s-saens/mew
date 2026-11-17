@@ -16,7 +16,7 @@ export class ProjectRegistryError extends Error {
 }
 
 type RegisteredProject = { path: string; name: string; managed: boolean; discovered?: boolean }
-type Registry = { version: 1; projects: RegisteredProject[]; myProjects: Record<string, StoredRootProjects>; deletedPaths?: string[] }
+type Registry = { version: 1; projects: RegisteredProject[]; myProjects: Record<string, StoredRootProjects>; deletedPaths?: string[]; excludedPaths?: string[] }
 export type RegistryProject = RegisteredProject & { mine: boolean; icon: string | null; parentPath?: string }
 const accountKey = (account: string) => account.trim().toLowerCase()
 const validPath = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 4096 && !value.includes('\0') && path.isAbsolute(value)
@@ -60,6 +60,7 @@ export class ProjectRegistry {
       const state = parse(raw) as Registry
       if (!state || state.version !== 1 || !Array.isArray(state.projects) || !state.myProjects || typeof state.myProjects !== 'object' || Array.isArray(state.myProjects)) throw new Error('Invalid registry')
       if (state.deletedPaths !== undefined && (!Array.isArray(state.deletedPaths) || !state.deletedPaths.every(validPath))) throw new Error('Invalid deleted paths')
+      if (state.excludedPaths !== undefined && (!Array.isArray(state.excludedPaths) || !state.excludedPaths.every(validPath))) throw new Error('Invalid excluded paths')
       for (const project of state.projects) {
         if (!project || !validPath(project.path) || typeof project.name !== 'string' || typeof project.managed !== 'boolean' || (project.discovered !== undefined && typeof project.discovered !== 'boolean')) throw new Error('Invalid project')
       }
@@ -72,6 +73,10 @@ export class ProjectRegistry {
     } catch {
       throw new DataFileError('프로젝트 목록이 손상되었습니다: projects.yaml')
     }
+  }
+
+  private excluded(state: Registry, directory: string): boolean {
+    return (state.excludedPaths ?? []).some(root => withinPath(root, directory))
   }
 
   private include(state: Registry, directory: string, managed = false): RegisteredProject {
@@ -96,7 +101,7 @@ export class ProjectRegistry {
   writeMine(account: string, value: StoredRootProjects): StoredRootProjects {
     const state = this.read()
     const deleted = new Set(state.deletedPaths ?? [])
-    const paths = value.paths.filter(directory => !deleted.has(path.resolve(directory)))
+    const paths = value.paths.filter(directory => !deleted.has(path.resolve(directory)) && !this.excluded(state, path.resolve(directory)))
     for (const directory of paths) { assertNotServerDataPath(directory); this.include(state, directory) }
     const saved = { ...value, paths, icons: Object.fromEntries(Object.entries(value.icons).filter(([directory]) => !deleted.has(path.resolve(directory)))), ...(value.groups ? { groups: normalizeProjectTabLayout(paths, value.groups).groups } : {}) }
     state.myProjects[accountKey(account)] = saved
@@ -114,14 +119,14 @@ export class ProjectRegistry {
     for (const entry of managed) {
       if (!entry.isDirectory() || entry.name.startsWith('.')) continue
       const directory = path.join(this.managedRoot, entry.name)
-      if (this.pendingDirectories.has(directory)) continue
+      if (this.pendingDirectories.has(directory) || this.excluded(state, directory)) continue
       try { assertNotServerDataPath(directory) } catch { continue }
       const canonical = fs.realpathSync(directory)
       if (!state.projects.some(project => project.path === canonical)) { this.include(state, canonical, true); changed = true }
     }
     for (const root of [...state.projects].filter(project => !project.discovered)) {
       for (const directory of discoverNestedProjects(root.path, this.pendingDirectories)) {
-        if (!state.projects.some(project => project.path === directory)) {
+        if (!this.excluded(state, directory) && !state.projects.some(project => project.path === directory)) {
           this.include(state, directory).discovered = true
           changed = true
         }
@@ -177,7 +182,7 @@ export class ProjectRegistry {
       signal.throwIfAborted()
       if (!entry.isDirectory() || entry.name.startsWith('.')) continue
       const directory = path.join(this.managedRoot, entry.name)
-      if (this.pendingDirectories.has(directory)) continue
+      if (this.pendingDirectories.has(directory) || this.excluded(initial, directory)) continue
       try { assertNotServerDataPath(directory) } catch { continue }
       try {
         managed.push(await fs.promises.realpath(directory))
@@ -203,7 +208,7 @@ export class ProjectRegistry {
       try { return fs.lstatSync(directory).isDirectory() && fs.realpathSync(directory) === directory } catch { return false }
     }
     for (const directory of managed) {
-      if (available(directory) && !state.projects.some(project => project.path === directory)) {
+      if (available(directory) && !this.excluded(state, directory) && !state.projects.some(project => project.path === directory)) {
         this.include(state, directory, true)
         changed = true
       }
@@ -211,7 +216,7 @@ export class ProjectRegistry {
     for (const [root, directories] of nested) {
       if (!state.projects.some(project => project.path === root) || !available(root)) continue
       for (const directory of directories) {
-        if (available(directory) && !state.projects.some(project => project.path === directory)) {
+        if (available(directory) && !this.excluded(state, directory) && !state.projects.some(project => project.path === directory)) {
           this.include(state, directory).discovered = true
           changed = true
         }
@@ -249,6 +254,7 @@ export class ProjectRegistry {
     } catch { throw new ProjectRegistryError('프로젝트 폴더를 찾을 수 없습니다', 404) }
     assertNotServerDataPath(canonical)
     const state = this.read()
+    state.excludedPaths = state.excludedPaths?.filter(excluded => !withinPath(excluded, canonical))
     const project = this.include(state, canonical)
     const key = accountKey(account), mine = state.myProjects[key] ?? { paths: [], icons: {} }
     if (!mine.paths.includes(project.path)) mine.paths.push(project.path)
@@ -269,26 +275,30 @@ export class ProjectRegistry {
     return state.myProjects[key]
   }
 
-  /** Permanently remove one registered directory and every shortcut into its tree. */
-  delete(directory: unknown): { removedPaths: string[]; affectedAccounts: string[] } {
+  /** Remove a registered tree and optionally delete its files. */
+  delete(directory: unknown, removeFiles = true): { removedPaths: string[]; affectedAccounts: string[] } {
     if (!validPath(directory)) throw new ProjectRegistryError('프로젝트 경로가 올바르지 않습니다')
     const state = this.read(), normalized = path.resolve(directory)
     if (!state.projects.some(project => project.path === normalized)) throw new ProjectRegistryError('등록되지 않은 프로젝트입니다', 404)
-    let canonical: string
-    try {
-      canonical = fs.realpathSync(normalized)
-      if (!fs.statSync(canonical).isDirectory()) throw new Error('Not a directory')
-    } catch { throw new ProjectRegistryError('프로젝트 폴더를 찾을 수 없습니다', 404) }
-    if (canonical !== normalized) throw new ProjectRegistryError('프로젝트 경로가 변경되었습니다. 다시 연결한 후 삭제하세요.', 409)
-    const home = fs.realpathSync(os.homedir()), source = fs.realpathSync(path.resolve(import.meta.dirname, '..'))
-    const metadata = fs.realpathSync(path.dirname(this.file))
-    const managed = path.resolve(this.managedRoot)
-    const managedContent = withinPath(metadata, managed) && metadata !== managed && withinPath(managed, canonical)
-    if (canonical === path.parse(canonical).root || withinPath(canonical, home) || withinPath(canonical, source)
-      || containsServerDataPath(canonical) || withinPath(canonical, metadata) || withinPath(metadata, canonical) && !managedContent) {
-      throw new ProjectRegistryError('보호된 폴더는 프로젝트에서 삭제할 수 없습니다.', 403)
+    let canonical = normalized
+    if (removeFiles) {
+      try {
+        canonical = fs.realpathSync(normalized)
+        if (!fs.statSync(canonical).isDirectory()) throw new Error('Not a directory')
+      } catch { throw new ProjectRegistryError('프로젝트 폴더를 찾을 수 없습니다', 404) }
+      if (canonical !== normalized) throw new ProjectRegistryError('프로젝트 경로가 변경되었습니다. 다시 연결한 후 삭제하세요.', 409)
     }
-    assertNotServerDataPath(canonical)
+    if (removeFiles) {
+      const home = fs.realpathSync(os.homedir()), source = fs.realpathSync(path.resolve(import.meta.dirname, '..'))
+      const metadata = fs.realpathSync(path.dirname(this.file))
+      const managed = path.resolve(this.managedRoot)
+      const managedContent = withinPath(metadata, managed) && metadata !== managed && withinPath(managed, canonical)
+      if (canonical === path.parse(canonical).root || withinPath(canonical, home) || withinPath(canonical, source)
+        || containsServerDataPath(canonical) || withinPath(canonical, metadata) || withinPath(metadata, canonical) && !managedContent) {
+        throw new ProjectRegistryError('보호된 폴더는 프로젝트에서 삭제할 수 없습니다.', 403)
+      }
+      assertNotServerDataPath(canonical)
+    }
     if ([...this.pendingDirectories].some(pending => withinPath(canonical, pending))) throw new ProjectRegistryError('프로젝트 작업이 진행 중입니다. 완료 후 다시 시도하세요.', 409)
     const affected = (candidate: string) => withinPath(canonical, path.resolve(candidate))
     const removedPaths = state.projects.filter(project => affected(project.path)).map(project => project.path)
@@ -301,7 +311,8 @@ export class ProjectRegistry {
       const icons = Object.fromEntries(Object.entries(mine.icons).filter(([directory]) => !affected(directory)))
       state.myProjects[account] = { ...mine, paths, icons, ...(mine.groups ? { groups: normalizeProjectTabLayout(paths, mine.groups).groups } : {}) }
     }
-    fs.rmSync(canonical, { recursive: true })
+    if (removeFiles) fs.rmSync(canonical, { recursive: true })
+    else state.excludedPaths = [...new Set([...(state.excludedPaths ?? []), canonical])]
     this.write(state)
     return { removedPaths, affectedAccounts }
   }

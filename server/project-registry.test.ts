@@ -213,6 +213,29 @@ test('HTTP discovery cannot restore a project deleted while a captured descendan
   } finally { release() }
 })
 
+test('in-flight discovery cannot restore a project unregistered while files remain', async t => {
+  const store = fixture(), root = path.join(temporary, `async-unregistered-${sequence}`), child = path.join(root, 'child')
+  fs.mkdirSync(path.join(child, '.mew'), { recursive: true })
+  store.link('a@example.test', root)
+  const readdir = fs.promises.readdir.bind(fs.promises)
+  let release!: () => void, scanning!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  const started = new Promise<void>(resolve => { scanning = resolve })
+  t.mock.method(fs.promises, 'readdir', async (directory: fs.PathLike, options: { withFileTypes: true }) => {
+    if (directory === child) { scanning(); await held }
+    return readdir(directory, options)
+  })
+  try {
+    const listing = store.listAsync('a@example.test')
+    await started
+    store.delete(root, false)
+    release()
+    assert.deepEqual(await listing, [])
+    assert.equal(fs.existsSync(child), true)
+    assert.equal(store.has(child), false)
+  } finally { release() }
+})
+
 test('My Projects drops orphan shortcuts after global catalog removal without re-registering them', async () => {
   const store = fixture(), first = await store.create('a@example.test', 'first'), second = await store.create('a@example.test', 'second')
   const ledger = parse(fs.readFileSync(store.file, 'utf8'))
@@ -354,4 +377,21 @@ test('filesystem deletion failure preserves catalog and shortcuts for recovery',
   assert.throws(() => store.delete(created.path), /Fixture permission denied/)
   assert.equal(fs.readFileSync(store.file, 'utf8'), snapshot)
   assert.equal(fs.existsSync(created.path), true)
+})
+
+test('unregister preserves files, excludes discovery, prevents stale saves, and permits explicit relinking', async () => {
+  const store = fixture(), account = 'unregister-owner@example.test'
+  const created = await store.create(account, 'preserved', false)
+  const child = path.join(created.path, 'nested')
+  fs.mkdirSync(path.join(child, '.mew'), { recursive: true })
+  fs.writeFileSync(path.join(created.path, 'keep.txt'), 'kept')
+  store.link('other@example.test', child)
+  const stale = { paths: [created.path, child], icons: {} }
+  assert.deepEqual(new Set(store.delete(created.path, false).removedPaths), new Set([created.path, child]))
+  assert.equal(fs.readFileSync(path.join(created.path, 'keep.txt'), 'utf8'), 'kept')
+  assert.equal(store.list(account).some(project => project.path === created.path || project.path === child), false)
+  assert.equal((await store.listAsync(account)).some(project => project.path === created.path || project.path === child), false)
+  assert.deepEqual(store.writeMine(account, stale).paths, [])
+  store.link(account, created.path)
+  assert.equal(store.list(account).some(project => project.path === created.path), true)
 })

@@ -2034,10 +2034,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             onIconChange={changeRootProjectIcon}
             onReorder={setOpenProjectPaths}
             onRemove={path => setOpenProjectPaths(previous => previous.filter(candidate => candidate !== path))}
-            onDelete={async (path, notifyDeleted) => {
+            onDelete={async (path, notifyDeleted, deleteFiles) => {
               if (!isOwner || projectOpeningRef.current) throw new Error(projectDeleteCopy(locale).unavailable)
               await rootProjectSaveQueue.current
-              const result = await deleteRegisteredProject(path)
+              const result = await deleteRegisteredProject(path, deleteFiles)
               notifyDeleted()
               rootTreeCache.current.clear()
               rootProjectIconsCache.current.clear()

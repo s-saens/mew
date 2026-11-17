@@ -283,13 +283,14 @@ export function writeActiveWorkspace(email: string, root: string, projectPath = 
 }
 
 /** Read and validate account state before deletion, then clear active roots only on success. */
-export function prepareDeletedProjectWorkspaces(directory: string): () => string[] {
+export function prepareDeletedProjectWorkspaces(directory: string, resolveAliases = true): () => string[] {
   const all = readAll(), affected: string[] = []
   const canonical = (value: string) => {
     try { return fs.realpathSync(value) } catch { return path.resolve(value) }
   }
-  const root = canonical(directory)
-  const deleted = (value: string | undefined) => validPath(value) && withinPath(root, canonical(value))
+  const normalize = resolveAliases ? canonical : path.resolve
+  const root = normalize(directory)
+  const deleted = (value: string | undefined) => validPath(value) && withinPath(root, normalize(value))
   for (const [account, saved] of Object.entries(all)) {
     if (!deleted(saved.activeWorkspace) && !deleted(saved.activeProjectPath)) continue
     const next = { ...saved }

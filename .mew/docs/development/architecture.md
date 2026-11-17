@@ -1,6 +1,6 @@
 ---
 title: "App Startup, Server Architecture, and State Files"
-description: "Server and CLI entry points, state-file ownership, shared project catalogs, immediate snapshots, managed cloning, asynchronous nested discovery, and per-account active roots. Defines personal shortcuts, project deletion and cleanup, protected paths, browser startup ownership, and legacy account selection alongside explicit workspace sessions."
+description: "Server and CLI entry points, state-file ownership, shared project catalogs, immediate snapshots, managed cloning, asynchronous nested discovery, and per-account active roots. Defines personal shortcuts, project registration removal, deletion and cleanup, protected paths, browser startup ownership, and legacy account selection alongside explicit workspace sessions."
 updated: "2026-11-16"
 상위파일:
   - "MOC.md"
@@ -97,7 +97,7 @@ myProjects:
     icons: {}
 ```
 
-`projects` is global; optional `discovered: true` identifies a nested project first found by catalog discovery. API rows add `parentPath` for the nearest registered ancestor; this relationship is computed from paths rather than stored as another ledger. `myProjects` keys are normalized local account IDs, and each value retains the compatible `StoredRootProjects` shape (`paths`, legacy `icons`, and optional `groups`). Icons displayed in the UI are still read from each project's `.mew/project-icon.json`; no group UI is restored. Removing a shortcut never removes the global entry, another account's shortcuts, or files. Permanent folder deletion is a separate owner-only operation. Missing directories remain listed unless explicitly deleted through that operation, so an unavailable mount or migrated entry is not silently discarded.
+`projects` is global; optional `discovered: true` identifies a nested project first found by catalog discovery. API rows add `parentPath` for the nearest registered ancestor; this relationship is computed from paths rather than stored as another ledger. `myProjects` keys are normalized local account IDs, and each value retains the compatible `StoredRootProjects` shape (`paths`, legacy `icons`, and optional `groups`). Icons displayed in the UI are still read from each project's `.mew/project-icon.json`; no group UI is restored. Removing a shortcut never removes the global entry, another account's shortcuts, or files. Shared registration removal and permanent folder deletion are owner-only operations. Missing directories remain listed unless explicitly deleted through that operation, so an unavailable mount or migrated entry is not silently discarded.
 
 My Projects is a subset of the catalog. Reading a personal list removes paths absent from `projects`, while retaining registered folders that are temporarily unavailable. The compatible personal-list write still registers supplied paths for legacy browser recovery, except exact paths retained in the deletion tombstones described below.
 
@@ -117,6 +117,7 @@ When YAML is missing, its first read migrates all accounts' `rootProjects` from 
 | `POST /api/project-registry` with `{ mode: "clone", url }` | Clones a public GitHub/GitLab HTTPS repository or an account-authorized private GitHub repository into the managed root, registers it, and pins it for the caller. Returns `{ project, state }`. |
 | `GET /api/project-registry/repositories` | Returns the caller’s `{ connected, repositories: [{ name, fullName, url, private }] }` GitHub repository list, including permitted organization/private repositories across all pages. Disconnected accounts receive `false` and an empty list; responses are no-store. |
 | `PUT /api/project-registry/mine` with `{ path, added }` | Adds or removes only the caller's shortcut and returns `{ state }`. |
+| `DELETE /api/project-registry/registration` with `{ path }` | Owner-only: removes the project tree from the catalog and all accounts without deleting files. |
 | `DELETE /api/project-registry` with `{ path }` | Owner-only: permanently deletes the registered folder and registered descendants, removes all accounts' related shortcuts and compatibility metadata, and returns `{ ok: true, removedPaths, state }` with the caller's resulting `StoredRootProjects` or `null`. |
 | `GET/PUT /api/user-ui/root-projects` | Compatible personal-list API backed by YAML instead of the old JSON field. |
 
@@ -127,6 +128,8 @@ Managed cloning derives the destination name from the repository basename, rejec
 The project selection panel uses `ProjectAddInline` for name-only creation, cloning, and importing. Its import branch embeds `ProjectCatalogPanel` for the shared workspace hierarchy or opens `LinkProjectDialog` for server-folder browsing. Empty personal lists show this panel without mounting project tools or the Dock. The secondary agent-assisted action opens `ProjectCreationAgentDialog`, which hosts the normal `AgentPanel` for discovery and documentation after managed creation. [The project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md), [agent sessions](agent-sessions.md#agent-assisted-project-creation), and [ADR 0118](../decisions/0118-shared-project-registry.md) own their behavior and rationale.
 
 ### Permanent project deletion
+
+The owner can also remove registration without deleting the folder using the separate `DELETE /api/project-registry/registration` endpoint. It removes the registered target and descendants, account shortcuts, and affected active roots, and records an `excludedPaths` subtree to prevent automatic discovery or stale shortcut saves from re-registering the folder. Explicit linking clears an applicable exclusion. Registration-only removal reconciles lexical paths so a replaced symlink cannot clear another project’s active workspace. The separate endpoint prevents an older server from interpreting a file-preserving request as permanent deletion. [ADR 0187](../decisions/0187-project-registration-removal.md) extends the deletion decision.
 
 `DELETE /api/project-registry` is separate from removing a personal shortcut. It accepts an explicitly registered canonical project path and recursively deletes the real directory, including uncommitted files and nested projects. Both managed and linked folders use this boundary. After successful folder deletion, remove the target and every registered descendant from `projects`, all accounts' personal paths, and matching legacy icon/group references. The caller receives the removed registered paths and their remaining shortcut state.
 

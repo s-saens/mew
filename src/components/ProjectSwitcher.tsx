@@ -38,7 +38,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   onOpen: () => void
   onPreview?: (path: string) => void
   onRemove?: (path: string) => void
-  onDelete?: (path: string, onDeleted: () => void) => Promise<void>
+  onDelete?: (path: string, onDeleted: () => void, deleteFiles: boolean) => Promise<void>
   onReorder?: (paths: string[]) => void
   sidebarHost?: HTMLElement | null
   sidebarEnabled?: boolean
@@ -71,7 +71,6 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   const lastSelectionSignal = useRef(0)
   const [contextMenu, setContextMenu] = useState<{ path: string; x: number; y: number; trigger: HTMLElement | null; container: HTMLElement | null } | null>(null)
   const [editingPath, setEditingPath] = useState<string | null>(null)
-  const [deleteChoices, setDeleteChoices] = useState(false)
   const [deletingPath, setDeletingPath] = useState<string | null>(null)
   const [deletedProject, setDeletedProject] = useState<{ path: string } | null>(null)
   const iconTitleId = useId()
@@ -108,7 +107,6 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   }
   function openContextMenu(path: string, x: number, y: number, origin: HTMLElement | null = trigger.current) {
     cancelHold()
-    setDeleteChoices(false)
     setContextMenu({ path, x, y, trigger: origin, container: origin?.closest<HTMLElement>('[role="dialog"]') ?? null })
   }
   function focusList(list: HTMLElement | null) {
@@ -363,21 +361,14 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
     </ActionMenu>)}
     {contextMenu && canChangeIcon && <ActionMenu key="project-actions" x={contextMenu.x} y={contextMenu.y} label={labelOf(contextMenu.path)} ref={contextMenuElement} trigger={contextMenu.trigger}
       portalContainer={contextMenu.container} onClose={() => setContextMenu(null)}>
-      {deleteChoices ? <>
-        {canOpen && onRemove && paths.includes(contextMenu.path) && <ActionMenuItem icon={<Xmark />} onClick={() => onRemove(contextMenu.path)}>{deleteCopy.removeFromMine}</ActionMenuItem>}
-        {canDelete && onDelete && <ActionMenuItem icon={<Trash />} danger onClick={() => setDeletingPath(contextMenu.path)}>{deleteCopy.permanently}</ActionMenuItem>}
-      </> : <>
-        <ActionMenuItem icon={<EditPencil />} onClick={() => editIcon(contextMenu.path)}>{t('project.edit')}</ActionMenuItem>
-        {canOpen && (onRemove || canDelete && onDelete) && <ActionMenuItem icon={<Trash />} closeOnSelect={false} onClick={() => {
-          setDeleteChoices(true)
-          requestAnimationFrame(() => contextMenuElement.current?.querySelector<HTMLButtonElement>('[data-action-menu-item]')?.focus({ preventScroll: true }))
-        }}>{deleteCopy.remove}</ActionMenuItem>}
-      </>}
+      <ActionMenuItem icon={<EditPencil />} onClick={() => editIcon(contextMenu.path)}>{t('project.edit')}</ActionMenuItem>
+      {canOpen && onRemove && paths.includes(contextMenu.path) && <ActionMenuItem icon={<Xmark />} onClick={() => onRemove(contextMenu.path)}>{deleteCopy.removeFromMine}</ActionMenuItem>}
+      {canDelete && onDelete && <ActionMenuItem icon={<Trash />} danger onClick={() => setDeletingPath(contextMenu.path)}>{deleteCopy.remove}</ActionMenuItem>}
     </ActionMenu>}
-    {deletingPath && canDelete && onDelete && <ProjectDeleteDialog path={deletingPath} onDelete={async path => {
+    {deletingPath && canDelete && onDelete && <ProjectDeleteDialog path={deletingPath} onDelete={async (path, deleteFiles) => {
       let notified = false
       const notifyDeleted = () => { if (!notified) { notified = true; setDeletedProject({ path }) } }
-      await onDelete(path, notifyDeleted)
+      await onDelete(path, notifyDeleted, deleteFiles)
       notifyDeleted()
     }} onClose={() => setDeletingPath(null)} />}
     {editingPath && canChangeIcon && <DialogFrame labelledBy={iconTitleId} onClose={() => setEditingPath(null)}>

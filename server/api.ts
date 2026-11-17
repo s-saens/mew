@@ -549,19 +549,21 @@ export function createApiApp() {
     } catch (err) { handleError(res, err) }
   })
 
-  app.delete('/project-registry', requireRole('owner'), (req, res) => {
+  function removeRegisteredProject(deleteFiles: boolean) { return (req: express.Request, res: express.Response) => {
     try {
       const directory = req.body?.path
       if (typeof directory !== 'string' || !path.isAbsolute(directory)) throw new ProjectRegistryError('프로젝트 경로가 올바르지 않습니다')
-      const clearWorkspaces = prepareDeletedProjectWorkspaces(directory)
-      const { removedPaths, affectedAccounts } = projectRegistry.delete(directory)
+      const clearWorkspaces = prepareDeletedProjectWorkspaces(directory, deleteFiles)
+      const { removedPaths, affectedAccounts } = projectRegistry.delete(directory, deleteFiles)
       const activeAccounts = clearWorkspaces()
       for (const account of activeAccounts) broadcastAccount(account, { type: 'workspace' })
       for (const account of new Set([...affectedAccounts, ...activeAccounts])) broadcastAccount(account, { type: 'projects-deleted' })
       broadcast({ type: 'projects' })
       res.json({ ok: true, removedPaths, state: projectRegistry.readMine(authOf(req).email!) })
     } catch (err) { handleError(res, err) }
-  })
+  } }
+  app.delete('/project-registry/registration', requireRole('owner'), removeRegisteredProject(false))
+  app.delete('/project-registry', requireRole('owner'), removeRegisteredProject(true))
 
   app.use('/user-ui', createUserUiRouter(handleError))
 

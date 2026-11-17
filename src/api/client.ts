@@ -1096,8 +1096,8 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     }).then(json<{ ok: true }>)
   }
 
-  function deleteRegisteredProject(path: string): Promise<{ ok: true; removedPaths: string[]; state: RootProjectTabState | null }> {
-    return mewFetch('/api/project-registry', {
+  function deleteRegisteredProject(path: string, deleteFiles = true): Promise<{ ok: true; removedPaths: string[]; state: RootProjectTabState | null }> {
+    return mewFetch(deleteFiles ? '/api/project-registry' : '/api/project-registry/registration', {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }),
     }).then(json<{ ok: true; removedPaths: string[]; state: RootProjectTabState | null }>)
   }
