@@ -87,5 +87,5 @@ If one account is compromised, the blast radius is \*\*"all projects in this wor
 
 - repos.md (`이전 Liiiiv 문서: ops/repos.md`) — list of workspace folders accessed by mew
 - [ADR 0023](decisions/0023-mew-selfhost-packaging-repo.md) — decision to organize mew as a self-contained repository suitable for public release. This is the rationale for moving the permission model's canonical source to the repository's `SECURITY.md`. When running in a container, the shell described in §"What this boundary means" above is restricted to **inside the container + one mounted folder**. **Our production server on port 5000 is still a host process, so the facts below remain valid**
-- [mew ADR map](../decisions/README.md) — current decisions on agent panel, session, and CLI permissions. The removal decision in [ADR 0014](decisions/0014-mew-agent-panel-removal.md) was superseded by [ADR 0034](decisions/0034-mew-agent-panel-acp-reintroduction.md)
+- [mew ADR map](../decisions/MOC.md) — current decisions on agent panel, session, and CLI permissions. The removal decision in [ADR 0014](decisions/0014-mew-agent-panel-removal.md) was superseded by [ADR 0034](decisions/0034-mew-agent-panel-acp-reintroduction.md)
 - company/services.md (`이전 Liiiiv 문서: company/services.md`) — external service and account inventory

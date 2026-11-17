@@ -152,15 +152,6 @@ For documentation work, follow the [writing rules](.mew/docs/README.md); agents 
 
 ## License
 
-[Mew Source Available License 1.0](LICENSE). Personal and internal business use,
-including paid work and private modifications, is permitted. Selling Mew or
-modified versions, or offering them as paid hosting or SaaS, requires a separate
-commercial license. Renaming or bundling Mew does not remove these restrictions.
-You retain the rights to your own documents, code, and other output.
+[Mew Source Available License 1.0](LICENSE). Personal and internal business use, including paid work and private modifications, is permitted. Selling Mew or modified versions, or offering them as paid hosting or SaaS, requires a separate commercial license. Renaming or bundling Mew does not remove these restrictions. You retain the rights to your own documents, code, and other output.
 
-The project owner retains commercial rights to code they own or are authorized
-to license. Third-party licenses and rights already granted for earlier MIT
-releases remain in effect. Mew is source-available with commercial restrictions.
-See the [license decision](.mew/docs/decisions/0053-source-available-license.md) for the
-scope and [contribution requirements](docs/development/contributing.md) before
-submitting changes.
+The project owner retains commercial rights to code they own or are authorized to license. Third-party licenses and rights already granted for earlier MIT releases remain in effect. Mew is source-available with commercial restrictions. See the [license decision](.mew/docs/decisions/0053-source-available-license.md) for the scope and [contribution requirements](docs/development/contributing.md) before submitting changes.

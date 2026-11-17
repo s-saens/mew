@@ -13,7 +13,7 @@ Shared documentation policies 0012, 0070, and 0132 referenced by existing decisi
 
 Preserved the meaning of numbers, dates, bodies, and subsequent decisions, and adjusted document links to locations within the Mew repository. References to company-only documents that were not migrated retain their source paths as text. Records without a description received frontmatter explaining that they are migrated decisions, and old `desc` values were preserved in `legacy_description`.
 
-Do not infer current contracts from adoption status or workspace policies at the time. Current guidance follows the [Independent Project Decision](../../decisions/0001-independent-project.md), [Documentation Rules](../../README.md), and the owning documents for features, development, and operations. Write subsequent decisions in [Mew Decision Records](../../decisions/README.md).
+Do not infer current contracts from adoption status or workspace policies at the time. Current guidance follows the [Independent Project Decision](../../decisions/0001-independent-project.md), [Documentation Rules](../../README.md), and the owning documents for features, development, and operations. Write subsequent decisions in [Mew Decision Records](../../decisions/MOC.md).
 
 History is excluded from the default description list. When historical rationale is needed, use `node server/document-descriptions.ts --all` to find paths and descriptions, and read only the relevant records.
 

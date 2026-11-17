@@ -39,7 +39,7 @@ Run repository-owned checks from the root:
 npm run check:docs
 ```
 
-This checks descriptions, including history, and local links. MOC registration is optional. Follow the [documentation rules](../README.md) and [feature ownership rules](../features/README.md); use `node server/document-descriptions.ts` to choose current owners before reading bodies. Update affected contracts, descriptions, and links with implementation changes. New decisions belong in [Mew's decision records](../decisions/README.md); imported records remain in history.
+This checks descriptions, including history, and local links. MOC registration is optional. Follow the [documentation rules](../README.md) and [feature ownership rules](../features/README.md); use `node server/document-descriptions.ts` to choose current owners before reading bodies. Update affected contracts, descriptions, and links with implementation changes. New decisions belong in [Mew's decision records](../decisions/MOC.md); imported records remain in history.
 
 If this clone still uses a Liiiiv shared hook, remove that local setting with `git config --local --unset core.hooksPath`. Mew owns its rules and checks.
 

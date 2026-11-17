@@ -20,7 +20,7 @@ The default desktop layout keeps project navigation, the editor, and tools withi
 
 Markdown opens in **Hotview**, where you edit headings, checklists, tables, and code blocks as they render. Switch to **Plain** to edit the source. Files save automatically; recording a Git commit remains a separate action. [Document editing](editor.md) · [Projects and files](projects.md).
 
-## Follow eight projects at once
+## Follow multiple projects at once
 
 ![Mew in multi-project mode with eight independent agent panels for Atlas Web, Orbit API, Studio UI, Beacon Docs, Pulse Analytics, Horizon Mobile, Nimbus Infra, and Meadow Notes](../assets/screenshots/multi-project.png)
 
@@ -42,10 +42,15 @@ Open **Git** from the Dock to inspect changed files and commit history. Select a
 
 ## Continue from your phone
 
-<p>
-  <img src="../assets/screenshots/mobile.png" width="360" alt="Atlas Web's launch plan in Mew's mobile layout, with the bottom Dock and capybara Mewpet">
-  <img src="../assets/screenshots/mobile-agent.png" width="360" alt="An Atlas Web agent conversation in Mew's mobile layout, with English example responses and the message composer">
-</p>
+<br/>
+
+<img src="../assets/screenshots/mobile.png" alt="Atlas Web's launch plan in Mew's mobile layout, with the bottom Dock and capybara Mewpet" width="360">
+
+<br/>
+
+<img src="../assets/screenshots/mobile-agent.png" alt="An Atlas Web agent conversation in Mew's mobile layout, with English example responses and the message composer" width="360">
+
+<br/>
 
 Read and edit the same files from a narrow screen. One panel fills the available space, and the bottom Dock switches between the editor, files, agents, and other tools.
 
