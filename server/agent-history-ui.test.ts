@@ -107,6 +107,22 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       const timedHeader = page.locator('[data-agent-turn-header]').filter({ has: page.getByText(/^Answer 40 /) })
       await timedHeader.scrollIntoViewIfNeeded()
       await timedHeader.screenshot({ path: `/tmp/mew-answer-header-${width}-${dark ? 'dark' : 'light'}.png` })
+      const lineAlignment = await timedHeader.evaluate(el => {
+        const dot = el.querySelector('[aria-label]:not(button)')!.getBoundingClientRect()
+        const text = el.querySelector('[data-agent-summary]')!.firstChild!
+        const range = el.ownerDocument.createRange()
+        const lines: { left: number; top: number }[] = []
+        for (let i = 0; i < (text.textContent?.length ?? 0); i++) {
+          range.setStart(text, i); range.setEnd(text, i + 1)
+          const rect = range.getBoundingClientRect()
+          if (!lines.some(line => Math.abs(line.top - rect.top) < 1)) lines.push({ left: rect.left, top: rect.top })
+          if (lines.length === 2) break
+        }
+        return { dot: dot.left, lines }
+      })
+      assert.equal(lineAlignment.lines.length, 2, 'long summary wraps onto a second line')
+      assert.ok(lineAlignment.lines[0].left > lineAlignment.dot + 6, 'first line follows the status dot')
+      assert.ok(Math.abs(lineAlignment.lines[1].left - lineAlignment.dot) < 1, 'second line starts beneath the status dot')
       assert.equal(await timedHeader.locator('..').locator('[data-agent-duration]').count(), 0, 'collapsed answers hide duration')
       assert.equal(await timedHeader.getByRole('button', { name: '이 답변 복사', exact: true }).count(), 0, 'collapsed answers hide copy')
       assert.equal(await timedHeader.locator('button[aria-expanded] svg').count(), 0, 'answer has no disclosure icon')

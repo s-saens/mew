@@ -5240,16 +5240,17 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
             }}
             className={`flex min-w-0 text-left text-xs text-ink-secondary hover:text-ink ${open ? 'flex-1 self-stretch items-center gap-1.5 px-2.5' : 'w-full items-start gap-2 px-3 py-2'}`}
           >
-            <span
-              className={`shrink-0 rounded-full ${open ? 'size-1.25' : 'mt-1 h-1.5 w-1.5'} ${BUBBLE_DOT[state]}`}
+            {open && <span
+              className={`shrink-0 rounded-full size-1.25 ${BUBBLE_DOT[state]}`}
               title={BUBBLE_LABEL[state]}
               aria-label={BUBBLE_LABEL[state]}
-            />
+            />}
             {open ? <>
               <span className="sr-only">{summary}</span>
             </> : (
               <span className="min-w-0 flex-1 line-clamp-2 break-words [overflow-wrap:anywhere] text-ink">
                 <span aria-hidden="true" className="float-right h-[1lh]" style={{ width: actionSpace }} />
+                <span className={`mr-2 inline-block h-1.5 w-1.5 rounded-full align-middle ${BUBBLE_DOT[state]}`} title={BUBBLE_LABEL[state]} aria-label={BUBBLE_LABEL[state]} />
                 <span data-agent-summary className="select-text">{waitingForReply
                   ? <AgentReplyPending label={t('common.loading')} active={loadingActive} /> : summary}</span>
               </span>
