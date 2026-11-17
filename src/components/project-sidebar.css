@@ -9,7 +9,7 @@
 .mew-project-sidebar-body { display: flex; flex: 1; min-width: 0; flex-direction: column; }
 .mew-project-sidebar-heading {
   display: flex;
-  height: 36px;
+  height: calc(var(--spacing) * 9);
   flex-shrink: 0;
   align-items: center;
   gap: 6px;

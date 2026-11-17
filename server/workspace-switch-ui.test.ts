@@ -486,6 +486,14 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
         if (width >= 768) {
           await page.locator('button[data-project-switcher]:not([aria-haspopup])').click()
           await page.locator('[data-project-sidebar]').waitFor()
+          for (const size of [16, 20, 24]) {
+            await page.locator('html').evaluate((element, fontSize) => { element.style.fontSize = `${fontSize}px` }, size)
+            const heading = (await page.locator('[data-project-sidebar] .mew-project-sidebar-heading').boundingBox())!
+            const explorer = (await page.locator('[data-explorer-search-bar]').boundingBox())!
+            assert.equal(heading.y, explorer.y, `${size}px root font aligns title bar tops`)
+            assert.equal(heading.height, explorer.height, `${size}px root font keeps project and explorer title bars aligned`)
+          }
+          await page.locator('html').evaluate(element => { element.style.fontSize = '' })
         } else {
           assert.equal(await page.locator('[data-project-sidebar]').count(), 0)
         }
