@@ -144,6 +144,10 @@ export const handleDemoSettings: DemoHttpHandler = ({ store, request, url, body,
     if (method === 'PUT') store.setState(route, body)
     return demoJson({ settings: store.getState(route, { modelId: 'demo-model' }) })
   }
+  if (route === '/api/agent-task-bindings') {
+    if (method === 'PUT') store.setState('agent-task-bindings', body.bindings)
+    return demoJson({ bindings: store.getState('agent-task-bindings', {}) })
+  }
   if (route === '/api/agent-sets') {
     requireMethod(request, 'GET', 'PUT')
     if (method === 'PUT') store.setState('agent-sets', body.sets)

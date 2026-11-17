@@ -1,7 +1,7 @@
 ---
 title: "Agent Runtime Settings"
-description: "Explains saving runtime settings and model defaults per Mew account; installation progress logs, authentication, accounts, and subscriptions for ACP and terminal agents; retained model and permission defaults and the composer Save icon’s prompt-draft behavior; separate model and effort selection for Codex and Antigravity; and the scope of Prime settings. Distinguishes Windows CMD shim and PowerShell execution from provider-specific automatic installation restrictions. Browser authentication and subscription management use a standalone login video screen instead of DOM relay."
-updated: "2026-10-31"
+description: "Explains first-run and menu agent setup, runtime installation, and saving runtime settings and model defaults per Mew account; installation progress logs, authentication, accounts, and subscriptions for ACP and terminal agents; retained model and permission defaults and the composer Save icon’s prompt-draft behavior; separate model and effort selection for Codex and Antigravity; and the scope of Prime settings. Distinguishes Windows CMD shim and PowerShell execution from provider-specific automatic installation restrictions. Browser authentication and subscription management use a standalone login video screen instead of DOM relay."
+updated: "2026-11-17"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -9,6 +9,8 @@ updated: "2026-10-31"
 [Installation and execution](../guides/getting-started-ko.md)
 
 ## Installation, Login, and Subscriptions
+
+After creating the first administrator, **Agent Set** opens before remote-access setup. Owners can reopen it through **Menu → Agent Set**. The popup lists ACP runtimes and their installation status, offers installation where supported, and opens runtime settings. Create or edit agent sets in the same popup, then assign defaults for the Mew assistant, AI Commit, scheduled tasks, and Create with AI. These defaults are shared across the installation; individual tasks can use another set. Choose manual selection to leave a task unassigned. Installing a runtime and signing in to its provider are separate steps.
 
 On native Windows, `.exe` and `.cmd` are located through PATH and PATHEXT, and the pinned ACP adapters' npm CMD shims and child processes are invoked through the Windows execution layer. A PowerShell wrapper records the login completion code. Automatic installation buttons are not provided for Cursor and Prime, which have only Unix installation scripts registered, or for Antigravity, which currently has no registered official Windows distribution. For providers configured with a separate Windows executable, check the provider's contract for actual ACP and authentication support. Shared mew support and provider-specific compatibility and public release gates follow the [native Windows contract](../../.mew/docs/development/windows-native.md).
 

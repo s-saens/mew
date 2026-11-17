@@ -1,7 +1,7 @@
 ---
 title: "Getting started with mew"
 updated: "2026-11-17"
-description: "Three installation routes: npm, a curl bootstrap in existing WSL/Linux/macOS, and source setup. Covers managed Postgres, login startup, browser administrator creation, platform prerequisites, data preservation, remote access, and pending prebuilt publication."
+description: "Three installation routes: npm, a curl bootstrap in existing WSL/Linux/macOS, and source setup. Covers managed Postgres, login startup, browser administrator creation, initial agent setup, platform prerequisites, data preservation, remote access, and pending prebuilt publication."
 ---
 
 # Getting started with mew
@@ -38,7 +38,7 @@ On Windows x64, run the command in **CMD or PowerShell**. Mew prepares its dedic
 
 On Linux/macOS, Mew registers login startup. Run `npx mew-ide` again to reopen it, `npx mew-ide status` to check it, or `npx mew-ide stop` to stop it while preserving data. Use `--foreground` for terminal-owned execution or `--no-autostart` to omit login registration. To update, stop the running instance and run `npx mew-ide@latest`.
 
-After creating the administrator, choose **Mewlink**, **Tailscale**, or **Cloudflare Tunnel** in the remote-access popup. **Menu → Mewlink** opens the same popup later. Provider sign-in is separate from local installation.
+After creating the administrator, configure agents in **Agent Set**, then choose **Mewlink**, **Tailscale**, or **Cloudflare Tunnel** in the remote-access popup. Reopen agent setup from **Menu → Agent Set**. **Menu → Mewlink** opens the same popup later. Provider sign-in is separate from local installation.
 
 Linux uses glibc 2.35+, and macOS requires 15+, on x64/arm64. Browser preparation may require OS authorization and network access. Ordinary Chrome automatic installation on Linux/WSL supports x64; arm64 requires a compatible explicit `MEW_CHROME_EXECUTABLE`. npm may ask permission to download the package; `npx --yes mew-ide` suppresses that npm-owned prompt.
 

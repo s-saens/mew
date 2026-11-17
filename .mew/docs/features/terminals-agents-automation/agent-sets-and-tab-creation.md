@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Agent Sets and Tab Creation"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-05"
+updated: "2026-11-17"
 status_hash: "3e9a3293848b77d07af2e0bbeb65a930bb54c18ce2da6a1b7543c145fb06a0b9"
 files: ["src/components/AgentPanel.tsx", "src/components/AgentSetPicker.tsx", "server/agentSets.ts", "server/agentCwd.ts"]
 commits: []
-description: "Runtime/model/effort/role presets, agent sets, and project tabs. Covers exact-model restoration, tab creation and ordering, tab-bar focus indication, keyboard-aware input focus, shortcuts and swipes, AI Commit, and file AI actions that prepare titled reference-only drafts without submitting them."
+description: "First-run and menu agent setup, installation-wide task defaults, runtime/model/effort/role presets, agent sets, and project tabs. Covers exact-model restoration, tab creation and ordering, tab-bar focus indication, keyboard-aware input focus, shortcuts and swipes, AI Commit, and file AI actions that prepare titled reference-only drafts without submitting them."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -26,7 +26,8 @@ description: "Runtime/model/effort/role presets, agent sets, and project tabs. C
 - Save pending editable content before opening the runtime/agent set picker. [Task documents](../projects-files-search/task-panel-list-calendar-and-gantt.md#requirements) retain stable-ID resolution across title renames and completion moves. Project changes cancel preparation. Keep the request pending without creating a tab or runtime connection until selection. Then create the conversation in the current root project, retain the selected preset, and seed the existing input-draft storage before mounting the composer.
 - The draft contains exactly one [titled file reference](agent-input-mentions-skills-and-attachments.md#titled-file-references), with no predefined instructions. Use the current Markdown frontmatter title, falling back to its filename without `.md`; other formats use the complete filename. Use the same title for the conversation and preserve it during automatic labeling. The user adds any instructions and sends explicitly. Consume each request once and keep `initialDraft` outside persisted `AgentTab` state; connection readiness, rerenders, and restoration never send it. Project/account switching and activating an existing conversation discard pending file requests. External requests that already specify a runtime, including Mewcat work drafts, retain their direct-tab behavior. See the [implementation record](../../work/task-agent-integration.md).
 
-- Provide agent set creation, editing, and selection, along with per-project tab and tab name management.
+- Provide agent set creation, editing, and selection, along with per-project tab and tab name management. After first-owner creation, show agent setup before remote-access setup; owners can reopen it from **Menu → Agent Set**. The popup lists ACP runtime installation status, supported installation and runtime settings alongside agent set management.
+- Owners can assign an existing set as the installation-wide default for the Mew assistant, AI Commit, scheduled tasks, and Create with AI. An unassigned task retains its existing selection flow. Individual tasks can use another set. Deleting a set leaves its task assignments unassigned. Agent-authorized users can read the defaults; only owners can change them.
 - Switching with `Ctrl/Cmd+1…9` or the previous/next tab shortcuts also moves keyboard focus to the selected tab. Pressing `Ctrl/Cmd+W` afterward closes the active tab in the same agent group. Closing uses the same last pointerdown/focusin target as new-tab creation and restoration, so selecting an empty agent area does not close an editor tab even if actual focus remains in the editor or moves to body. Do not close tabs for hidden, inert, or removed targets, or during a modal, IME composition, or repeated input.
 - When the agent or terminal tab bar itself has visible focus, draw its focus border above the panel handle and tabs without intercepting pointer input.
 - Pressing `Ctrl/Cmd+N`, `Ctrl/Cmd+T`, or `Alt+N` in an agent panel, including a new-file shortcut reassigned in settings, opens the same runtime/agent set selection screen as that group's `+`. This also works in conversation input, the tab bar, detached panels, and CLI TUIs; in the editor and file explorer, it opens the existing new-file name input. Do not open a new tab during a modal, IME composition, or key repeat. Fullscreen conditions for browser-reserved keys follow the [Common Shortcut Contract](../../development/ui-editor-input.md#focus-based-tab-shortcuts).

@@ -1,4 +1,5 @@
 import type { AgentExecutionOptions } from '../../shared/agent-execution-options'
+import type { AgentTaskBindings } from '../../shared/agent-task-bindings'
 import type { ProjectAction, ProjectActionArtifact, ProjectActionRun, ProjectActionsState } from '../../shared/project-actions'
 import type { ProjectPipeline, ProjectPipelineRun, ProjectPipelinesState } from '../../shared/project-pipelines'
 import type { ReleaseProviderRun, ReleaseProvidersState, SaveReleaseConnection } from '../../shared/release-providers'
@@ -697,6 +698,13 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
 
   function fetchAgentSets(): Promise<{ sets: AgentSet[] }> {
     return mewFetch('/api/agent-sets').then(json<{ sets: AgentSet[] }>)
+  }
+
+  function fetchAgentTaskBindings(): Promise<{ bindings: AgentTaskBindings }> {
+    return mewFetch('/api/agent-task-bindings').then(json<{ bindings: AgentTaskBindings }>)
+  }
+  function saveAgentTaskBindings(bindings: AgentTaskBindings): Promise<{ bindings: AgentTaskBindings }> {
+    return mewFetch('/api/agent-task-bindings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bindings }) }).then(json<{ bindings: AgentTaskBindings }>)
   }
 
   function fetchAgentModels(runtime: string, signal?: AbortSignal): Promise<{ models: AgentModelOption[]; thinking?: AgentThinkingOption | null }> {
@@ -2167,6 +2175,8 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     saveWorkspaceUi,
     fetchProjects,
     fetchAgentSets,
+    fetchAgentTaskBindings,
+    saveAgentTaskBindings,
     fetchAgentModels,
     saveAgentSets,
     resolveAgentFileLink,
@@ -2379,6 +2389,8 @@ export const {
   saveWorkspaceUi,
   fetchProjects,
   fetchAgentSets,
+  fetchAgentTaskBindings,
+  saveAgentTaskBindings,
   fetchAgentModels,
   saveAgentSets,
   resolveAgentFileLink,

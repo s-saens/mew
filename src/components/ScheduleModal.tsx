@@ -134,7 +134,7 @@ function ScheduleFields({ cron, disabled, onChange }: { cron: string; disabled: 
 }
 
 export function ScheduleModal({ onClose }: { onClose: () => void }) {
-  const { fetchSchedules, fetchProjects, saveSchedules, runSchedule } = useWorkspaceApi()
+  const { fetchSchedules, fetchProjects, saveSchedules, runSchedule, fetchAgentTaskBindings } = useWorkspaceApi()
   useUiLocale()
   const [jobs, setJobs] = useState<AgentJobView[] | null>(null)
   const [agentSets, setAgentSets] = useState<AgentSet[]>([])
@@ -146,6 +146,8 @@ export function ScheduleModal({ onClose }: { onClose: () => void }) {
   const [session, setSession] = useState<AgentJobView | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [defaultSetId, setDefaultSetId] = useState<string | undefined>()
+  const [bindingsLoaded, setBindingsLoaded] = useState(false)
 
   // 서버가 세션 실행 여부(running)까지 계산해 주므로, 실행·종료 뒤에는 목록을 다시 받아 온다.
   // 편집 중인 내용은 아직 저장 전이라 덮이면 안 되므로 여기서는 세션 상태만 갈아 끼운다.
@@ -168,6 +170,7 @@ export function ScheduleModal({ onClose }: { onClose: () => void }) {
   }, [fetchSchedules])
 
   useEffect(() => {
+    void fetchAgentTaskBindings().then(({ bindings }) => setDefaultSetId(bindings.schedule)).catch(() => {}).finally(() => setBindingsLoaded(true))
     fetchSchedules()
       .then((res) => {
         setJobs(res.jobs)
@@ -179,7 +182,7 @@ export function ScheduleModal({ onClose }: { onClose: () => void }) {
     fetchProjects()
       .then((list) => setProjects(list.map((p) => p.name)))
       .catch(() => setProjects([]))
-  }, [fetchSchedules, fetchProjects])
+  }, [fetchSchedules, fetchProjects, fetchAgentTaskBindings])
 
   useOverlayDismiss(() => { if (!busy) onClose() })
 
@@ -350,9 +353,11 @@ export function ScheduleModal({ onClose }: { onClose: () => void }) {
 
             <button
               type="button"
-              disabled={busy || jobs === null}
+              disabled={busy || jobs === null || !bindingsLoaded}
               onClick={() => {
                 const job = newJob()
+                const set = agentSets.find(item => item.id === defaultSetId)
+                if (set) { job.agentSet = set; job.agent = set.runtime }
                 setJobs((prev) => [...(prev ?? []), job])
                 setOpenId(job.id)
               }}

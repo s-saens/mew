@@ -11,7 +11,7 @@ import { panelModelState, splitModelVariant, hasModelEffort } from '../../shared
 const AGENT_SET_RUNTIMES = RUNTIMES.filter((runtime) => runtime.surface === 'acp')
 
 /** 새 탭 선택기의 에이전트셋 목록. 셋은 별도 작업자가 아니라 탭 시작 프리셋이다. */
-export function AgentSetPicker({ onSelect, onCreated }: { onSelect: (set: AgentSet) => void; onCreated?: (set: AgentSet) => void }) {
+export function AgentSetPicker({ onSelect, onCreated, manageOnly = false, defaultRuntime }: { onSelect: (set: AgentSet) => void; onCreated?: (set: AgentSet) => void; manageOnly?: boolean; defaultRuntime?: string }) {
   const { saveAgentSets } = useWorkspaceApi()
   const { t } = useI18n()
   const [sets, setSets] = useState<AgentSet[] | null>(cachedAgentSets)
@@ -36,6 +36,7 @@ export function AgentSetPicker({ onSelect, onCreated }: { onSelect: (set: AgentS
       const others = (sets ?? []).filter((set) => set.id !== next.id)
       const { sets: saved } = await saveAgentSets([...others, next])
       updateAgentSetsCache(saved)
+      window.dispatchEvent(new Event('mew:agent-task-bindings-changed'))
       setEditing(null)
       if (!sets?.some(set => set.id === next.id)) onCreated?.(saved.find(set => set.id === next.id)!)
     } catch (err) {
@@ -47,6 +48,7 @@ export function AgentSetPicker({ onSelect, onCreated }: { onSelect: (set: AgentS
     try {
       const { sets: saved } = await saveAgentSets((sets ?? []).filter((set) => set.id !== id))
       updateAgentSetsCache(saved)
+      window.dispatchEvent(new Event('mew:agent-task-bindings-changed'))
       setEditing(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -64,18 +66,18 @@ export function AgentSetPicker({ onSelect, onCreated }: { onSelect: (set: AgentS
             return (
               <div key={set.id} className="flex min-h-14 items-center gap-3 rounded-md border border-edge bg-surface px-3 py-2">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center text-ink-secondary"><runtime.Glyph /></span>
-                <button type="button" onClick={() => onSelect(set)} className="min-w-0 flex-1 text-left">
+                <button type="button" onClick={() => manageOnly ? setEditing(set) : onSelect(set)} className="min-w-0 flex-1 text-left">
                   <div className="truncate text-sm text-ink">{set.name}</div>
                   <div className="truncate text-xs text-ink-muted">{runtime.label}{set.modelId ? ` · ${set.modelId}` : ''}{set.thinkingId ? ` · ${set.thinkingId}` : ''}</div>
                 </button>
                 <button type="button" onClick={() => setEditing(set)} className="rounded px-2 py-1 text-xs text-ink-secondary hover:bg-surface-raised hover:text-ink">{t('agentSet.edit')}</button>
-                <button type="button" onClick={() => onSelect(set)} className="rounded px-2.5 py-1 text-xs text-accent hover:bg-surface-raised">{t('agentSet.use')}</button>
+                {!manageOnly && <button type="button" onClick={() => onSelect(set)} className="rounded px-2.5 py-1 text-xs text-accent hover:bg-surface-raised">{t('agentSet.use')}</button>}
               </div>
             )
           })}
           <button
             type="button"
-            onClick={() => setEditing({ id: uuid(), name: '', role: '', runtime: AGENT_SET_RUNTIMES[0].id, modelId: '' })}
+            onClick={() => setEditing({ id: uuid(), name: '', role: '', runtime: AGENT_SET_RUNTIMES.some(runtime => runtime.id === defaultRuntime) ? defaultRuntime! : AGENT_SET_RUNTIMES[0].id, modelId: '' })}
             className="flex min-h-14 items-center rounded-md border border-dashed border-edge px-3 text-left text-sm text-ink-secondary hover:bg-surface hover:text-ink"
           >
             {t('agentSet.add')}

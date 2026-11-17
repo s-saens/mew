@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { MewcatAction, MewcatActionRequest } from '../../shared/mewcat-assistant'
 import type { AgentEvent } from '../utils/agentFold'
 import { useI18n } from '../i18n'
+import type { AgentSet } from '../api/client'
 import { AUTOMATIC_RETRY_LIMIT } from '../utils/recovery-policy'
 
 export interface AssistantMessage { role: 'user' | 'assistant'; text: string }
@@ -22,7 +23,7 @@ export function appendAssistantEvent(messages: AssistantMessage[], event: AgentE
 }
 
 export interface MewcatAssistantOptions {
-  account: string; enabled: boolean; runtime: string | null; projectRoot: string | null
+  account: string; enabled: boolean; runtime: string | null; projectRoot: string | null; preset?: AgentSet | null
   onAction: (action: MewcatAction) => Promise<void>
 }
 
@@ -43,25 +44,31 @@ export function useMewcatAssistant(options: MewcatAssistantOptions) {
   const [permission, setPermission] = useState<Extract<AgentEvent, { type: 'permission' }> | null>(null)
   const [action, setAction] = useState<MewcatAction['kind'] | null>(null)
   const [retry, setRetry] = useState(0)
+  const presetKey = options.preset ? JSON.stringify([options.preset.id, options.preset.modelId, options.preset.role, options.preset.thinkingId, options.preset.thinkingConfigId]) : ''
   const send = (message: object) => {
     if (socket.current?.readyState !== WebSocket.OPEN) return false
     socket.current.send(JSON.stringify(message)); return true
   }
   useEffect(() => {
-    const scope = JSON.stringify([options.account, options.runtime, options.enabled])
+    const scope = JSON.stringify([options.account, options.runtime, options.enabled, presetKey])
     if (messageScope.current !== scope) { messageScope.current = scope; setMessages([]) }
     setReady(false); setConnecting(false); setBusy(false); setLogin(false); setError(null); setPermission(null); needsAuth.current = false
     if (!options.enabled || !options.runtime) return
     let closed = false, terminal = false, attempts = 0
     let ws: WebSocket | null = null, reconnectTimer: ReturnType<typeof setTimeout> | undefined
-    const browserKey = `mew:mewcat-browser:${options.account}`
-    let browser = browserIdentity.current?.account === options.account ? browserIdentity.current.id : ''
+    const browserKey = `mew:mewcat-browser:${options.account}${presetKey ? `:${presetKey}` : ''}`
+    const browserScope = options.account + presetKey
+    let browser = browserIdentity.current?.account === browserScope ? browserIdentity.current.id : ''
     try { browser = globalSessionStorage().getItem(browserKey) ?? browser } catch { /* Memory-only fallback. */ }
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(browser)) browser = uuid()
     try { globalSessionStorage().setItem(browserKey, browser) } catch { /* Memory-only fallback. */ }
-    browserIdentity.current = { account: options.account, id: browser }
+    browserIdentity.current = { account: browserScope, id: browser }
     const sessionKey = `mew:mewcat-session:${options.account}:${browser}:${options.runtime}`
-    const query = new URLSearchParams({ runtime: options.runtime, tab: 'mewcat', mewcat: browser })
+    const query = new URLSearchParams({ runtime: options.runtime, tab: 'mewcat', mewcat: browser,
+      ...(options.preset?.modelId ? { model: options.preset.modelId } : {}),
+      ...(options.preset?.role ? { role: options.preset.role } : {}),
+      ...(options.preset?.thinkingId && options.preset.thinkingConfigId ? { thinking: options.preset.thinkingId, thinkingConfig: options.preset.thinkingConfigId } : {}),
+    })
     try { const resume = scopedBrowserStorage().getItem(sessionKey); if (resume) query.set('resume', resume) } catch { /* No stored session. */ }
     const context = () => ({ type: 'mewcat_context', context: { projectRoot: latest.current.projectRoot, locale: latest.current.locale } })
     const receive = (event: AgentEvent) => {
@@ -137,7 +144,7 @@ export function useMewcatAssistant(options: MewcatAssistantOptions) {
     document.addEventListener('visibilitychange', onVisible)
     connect()
     return () => { closed = true; clearTimeout(reconnectTimer); window.removeEventListener('mew:mewcat-agent-ready', runtimeReady); window.removeEventListener('online', reconnectNow); document.removeEventListener('visibilitychange', onVisible); ws?.close(); if (socket.current === ws) socket.current = null }
-  }, [options.account, options.enabled, options.runtime, retry])
+  }, [options.account, options.enabled, options.runtime, presetKey, retry])
   useEffect(() => { send({ type: 'mewcat_context', context: { projectRoot: options.projectRoot, locale } }) }, [options.projectRoot, locale])
   return { messages, ready, connecting, busy, login, error, permission, action,
     ask: (text: string) => {

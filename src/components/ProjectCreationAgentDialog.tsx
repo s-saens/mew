@@ -1,4 +1,4 @@
-import { useId, useState, type ComponentProps } from 'react'
+import { useId, useMemo, useState, type ComponentProps } from 'react'
 import { DialogFrame } from '@mew/ui'
 import { useI18n } from '../i18n'
 import { WORKSPACE_PROJECT } from '../utils/active-project'
@@ -7,6 +7,7 @@ import type { RequestedAgentTab } from '../utils/agentTabs'
 import { AgentPanel } from './AgentPanel'
 import { PanelCloseButton } from './panel-close-button'
 import { projectSettingPrompt } from '../utils/project-setting-prompt'
+import { useAgentTaskSet } from '../hooks/use-agent-task-set'
 
 export function ProjectCreationAgentDialog({ projectPath, projectName, setupTitle, cacheAccount, onOpenFile, onClose }: {
   projectPath: string
@@ -19,11 +20,11 @@ export function ProjectCreationAgentDialog({ projectPath, projectName, setupTitl
   const { t } = useI18n()
   const title = setupTitle ?? t('project.createWithAgent')
   const titleId = useId()
-  const [requestedTab] = useState<RequestedAgentTab>(() => ({
-    id: uuid(), label: projectName, runtime: null, cwd: projectPath, renamed: true,
-  }))
+  const { loaded, set } = useAgentTaskSet('projectCreation')
+  const [tabId] = useState(uuid)
+  const requestedTab = useMemo<RequestedAgentTab>(() => ({ id: tabId, label: projectName, runtime: set?.runtime ?? null, cwd: projectPath, renamed: true, ...(set ? { preset: set } : {}) }), [tabId, projectName, projectPath, set])
   const [startupPrompt] = useState(() => ({
-    tabId: requestedTab.id,
+    tabId,
     displayText: title,
     text: projectSettingPrompt(projectName, setupTitle !== undefined),
   }))
@@ -34,9 +35,9 @@ export function ProjectCreationAgentDialog({ projectPath, projectName, setupTitl
       <PanelCloseButton aria-label={t('common.close')} onClick={onClose} />
     </header>
     <div className="min-h-0 flex-1">
-      <AgentPanel embedded requestedTab={requestedTab} startupPrompt={startupPrompt} cacheAccount={cacheAccount}
+      {loaded && <AgentPanel embedded requestedTab={requestedTab} startupPrompt={startupPrompt} cacheAccount={cacheAccount}
         project={WORKSPACE_PROJECT} workspacePath={projectPath} workingPath={projectPath} allowTerminal={false}
-        tree={[]} focusedFilePath={null} onOpenFile={onOpenFile ?? (() => undefined)} onClose={onClose} />
+        tree={[]} focusedFilePath={null} onOpenFile={onOpenFile ?? (() => undefined)} onClose={onClose} />}
     </div>
   </DialogFrame>
 }

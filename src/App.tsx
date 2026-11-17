@@ -23,6 +23,7 @@ import { GitLoginDialog } from './components/github-account'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useRefreshTasks } from './hooks/use-refresh-tasks'
+import { useAssistantTaskSet } from './hooks/use-agent-task-set'
 import { projectWorkspaceView } from './utils/project-workspace-view'
 import { useFocusedWorkspacePanel } from './hooks/use-focused-workspace-panel'
 import { defaultCapabilities } from '../shared/access-policy'
@@ -124,6 +125,7 @@ const AccountSettingsModal = deferredDialog(async () => ({ default: (await impor
 const SettingsModal = deferredDialog(async () => ({ default: (await import('./components/SettingsModal')).SettingsModal }), { title: t => t('settings.title'), size: 'settings', className: 'flex flex-col', overlayClassName: 'z-[var(--layer-settings)]' })
 const AdminSettingsModal = deferredDialog(async () => ({ default: (await import('./components/AdminSettingsModal')).AdminSettingsModal }), { title: t => t('admin.title'), size: 'settings', className: 'flex flex-col' })
 const RemoteAccessModal = deferredDialog(async () => ({ default: (await import('./components/remote-access-settings')).RemoteAccessModal }), { title: () => 'Mewlink', className: 'flex max-h-[90dvh] max-w-lg flex-col' })
+const AgentSetupModal = deferredDialog(async () => ({ default: (await import('./components/AgentSetupModal')).AgentSetupModal }), { title: () => 'Agent Set', className: 'flex max-h-[90dvh] max-w-2xl flex-col' })
 const DatabaseListModal = deferredDialog(async () => ({ default: (await import('./components/DatabaseListModal')).DatabaseListModal }), { title: t => t('header.database'), className: 'flex h-[80dvh] max-w-4xl flex-col' })
 const SystemStatsModal = deferredDialog(async () => ({ default: (await import('./components/SystemStatsModal')).SystemStatsModal }), { title: t => t('header.systemResources'), className: 'flex max-h-[80vh] max-w-md flex-col' })
 const ScheduleModal = deferredDialog(async () => ({ default: (await import('./components/ScheduleModal')).ScheduleModal }), { title: t => t('header.scheduledTasks'), className: 'flex max-h-[90dvh] max-w-2xl flex-col' })
@@ -401,17 +403,20 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     setBrowserOpen(false); setBrowserUrl(caps.nativeBrowser ? 'about:blank' : '')
     setMobilePanelStack(stack => closeMobilePanel(stack, 'browser'))
   }, [auth.email, caps.nativeBrowser, api])
+  const { set: assistantSet, loaded: assistantSetLoaded, override: overrideAssistantSet, reset: resetAssistantSet } = useAssistantTaskSet()
   const [mewcatRuntime, setMewcatRuntime] = useState<string | null>(null)
   const [mewcatPicker, setMewcatPicker] = useState(false)
   const mewcatRuntimeRef = useRef(mewcatRuntime)
-  mewcatRuntimeRef.current = mewcatRuntime
+  mewcatRuntimeRef.current = assistantSet?.runtime ?? mewcatRuntime
   useEffect(() => {
     try { setMewcatRuntime(scopedBrowserStorage().getItem(`mew:assistant-runtime:${auth.email}`)) } catch { setMewcatRuntime(null) }
-  }, [auth.email, api])
+    resetAssistantSet()
+  }, [auth.email, api, resetAssistantSet])
   const selectMewcatRuntime = useCallback((runtime: string) => {
+    overrideAssistantSet()
     setMewcatRuntime(runtime)
     try { scopedBrowserStorage().setItem(`mew:assistant-runtime:${auth.email}`, runtime) } catch { /* Memory-only setting. */ }
-  }, [auth.email])
+  }, [auth.email, overrideAssistantSet])
   const adoptMewcatRuntime = useCallback((runtime: string) => {
     if (!mewcatRuntimeRef.current) selectMewcatRuntime(runtime)
     window.dispatchEvent(new CustomEvent('mew:mewcat-agent-ready', { detail: runtime }))
@@ -422,6 +427,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const [debuggerSettingsRequested, setDebuggerSettingsRequested] = useState(false)
   const [adminOpen, setAdminOpen] = useState(false)
   const [remoteAccessOpen, setRemoteAccessOpen] = useState(false)
+  const [agentSetupOpen, setAgentSetupOpen] = useState(false)
   const [dbListOpen, setDbListOpen] = useState(false)
   const [sysStatsOpen, setSysStatsOpen] = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
@@ -1976,6 +1982,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     ...(caps.serverFiles ? [{ id: 'file-explorer', group: 'tools' as const, label: t('header.fileExplorer'), hint: 'Alt+E', icon: <Folder width={16} height={16} />, onSelect: () => setServerFileExplorerOpen(true) }] : []),
     ...(caps.schedules ? [{ id: 'schedule', group: 'tools' as const, label: t('header.scheduledTasks'), hint: 'Alt+S', icon: <Clock width={16} height={16} />, onSelect: () => setScheduleOpen(true) }] : []),
     ...(caps.system ? [{ id: 'mew-update', group: 'mew' as const, label: uiText('업데이트'), hint: 'Ctrl+U', icon: <Download width={16} height={16} />, onSelect: () => setUpdatesOpen(true) }] : []),
+    ...(isOwner ? [{ id: 'agent-setup', group: 'mew' as const, label: 'Agent Set', icon: <Settings width={16} height={16} />, onSelect: () => setAgentSetupOpen(true) }] : []),
     ...(isOwner ? [{ id: 'mewlink', group: 'mew' as const, label: 'Mewlink', icon: <Link width={16} height={16} />, onSelect: () => setRemoteAccessOpen(true) }] : []),
     { id: 'settings', group: 'mew', label: t('settings.title'), hint: 'Ctrl+,', icon: <Settings width={16} height={16} />, onSelect: () => setSettingsOpen(true) },
   ]
@@ -2293,7 +2300,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       </div>
       </div>}
 
-      {active && <WorkspaceMewcat onOpenSettings={() => { setMewcatSettingsRequest(request => request + 1); setSettingsOpen(true) }} portalTarget={settingsOpen && !desktopMode ? settingsMewcatHost : null} hidden={projectView !== 'workspace'} skin={mewcatSkin} assistant={{ account: auth.email ?? 'guest', enabled: caps.agent, runtime: mewcatRuntime, projectRoot: rootProjectPath, onAction: handleMewcatAction, onRuntimeChange: selectMewcatRuntime, onConnect: () => { setMewcatPicker(true); openWorkspacePanel('agent'); showToast(t('mewcat.assistant.guide')) } }} />}
+      {active && <WorkspaceMewcat onOpenSettings={() => { setMewcatSettingsRequest(request => request + 1); setSettingsOpen(true) }} portalTarget={settingsOpen && !desktopMode ? settingsMewcatHost : null} hidden={projectView !== 'workspace'} skin={mewcatSkin} assistant={{ account: auth.email ?? 'guest', enabled: caps.agent && assistantSetLoaded, runtime: assistantSet?.runtime ?? mewcatRuntime, preset: assistantSet, projectRoot: rootProjectPath, onAction: handleMewcatAction, onRuntimeChange: selectMewcatRuntime, onConnect: () => { setMewcatPicker(true); openWorkspacePanel('agent'); showToast(t('mewcat.assistant.guide')) } }} />}
 
       {projectView === 'workspace' && <MobileDock active={desktopMode ? focusedDockPanel ?? '' : mobileForegroundPanel ?? 'editor'} openPanels={desktopMode ? mobileDockPanels.filter(panel => panel === 'editor' ? editorOpen : panel === 'memo' ? memoOpen : workspacePanelOpen[panel]) : undefined} available={mobileDockPanels} hidden={mobileKeyboardOpen} portalTarget={sidebarDockHost}
         position={dockPosition} onSelect={selectDockPanel} onNavigate={navigateMobileDock} />}
@@ -2328,6 +2335,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       )}
 
       {remoteAccessOpen && isOwner && <RemoteAccessModal onClose={() => setRemoteAccessOpen(false)} />}
+      {agentSetupOpen && isOwner && <AgentSetupModal onClose={() => setAgentSetupOpen(false)} />}
 
       {adminOpen && isOwner && <AdminSettingsModal currentEmail={authEmail} onClose={() => setAdminOpen(false)} />}
 

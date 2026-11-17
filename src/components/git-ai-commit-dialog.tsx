@@ -14,7 +14,7 @@ export function GitAiCommitDialog({ project, files, onFinished, onClose }: {
   onFinished: () => void
   onClose: () => void
 }) {
-  const { fetchWorkspace, fetchGitAiCommit, startGitAiCommit, stopGitAiCommit, approveGitAiCommit } = useWorkspaceApi()
+  const { fetchWorkspace, fetchGitAiCommit, startGitAiCommit, stopGitAiCommit, approveGitAiCommit, fetchAgentTaskBindings, fetchAgentSets } = useWorkspaceApi()
   useUiLocale()
   const [workspace, setWorkspace] = useState<string | null>(null)
   const [job, setJob] = useState<GitAiCommitJob | null>(null)
@@ -27,6 +27,7 @@ export function GitAiCommitDialog({ project, files, onFinished, onClose }: {
   const [reload, setReload] = useState(0)
   const [selection, setSelection] = useState<{ jobId: string; groups: number[] }>({ jobId: '', groups: [] })
   const alive = useRef(true)
+  const selectionTouched = useRef(false)
   const retryId = useRef<string | null>(null)
   const notified = useRef('')
   const onFinishedRef = useRef(onFinished)
@@ -44,13 +45,21 @@ export function GitAiCommitDialog({ project, files, onFinished, onClose }: {
   }, [])
   useEffect(() => {
     let disposed = false
+    void Promise.all([fetchAgentTaskBindings(), fetchAgentSets()]).then(([{ bindings }, { sets }]) => {
+      const set = sets.find(item => item.id === bindings.gitCommit)
+      if (!disposed && set && !selectionTouched.current) { setSelected(set); setChoosing(false) }
+    }).catch(() => {})
+    return () => { disposed = true }
+  }, [fetchAgentTaskBindings, fetchAgentSets])
+  useEffect(() => {
+    let disposed = false
     setLoading(true)
     setError(null)
     void fetchWorkspace().then(async info => {
       const result = await fetchGitAiCommit(project, info.path)
       if (disposed) return
       setWorkspace(info.path); setJob(result.job)
-      setChoosing(!result.job)
+      if (result.job) setChoosing(false)
     }).catch(err => { if (!disposed) setError(err instanceof Error ? err.message : String(err)) })
       .finally(() => { if (!disposed) setLoading(false) })
     return () => { disposed = true }
@@ -69,7 +78,7 @@ export function GitAiCommitDialog({ project, files, onFinished, onClose }: {
     timer = setTimeout(poll, 500)
     return () => { disposed = true; clearTimeout(timer) }
   }, [active, project, workspace, fetchGitAiCommit])
-  const choose = (set: AgentSet) => { setSelected(set); setChoosing(false); retryId.current = null }
+  const choose = (set: AgentSet) => { selectionTouched.current = true; setSelected(set); setChoosing(false); retryId.current = null }
   const generate = async () => {
     if (!workspace || !selected || busy || active) return
     setBusy(true); setStopping(false); setError(null)
@@ -131,7 +140,7 @@ export function GitAiCommitDialog({ project, files, onFinished, onClose }: {
               {job.output && <details className="text-xs text-ink-secondary"><summary className="cursor-pointer py-2">{uiText("진행 로그")}</summary><pre className="max-h-48 select-text overflow-auto whitespace-pre-wrap break-words rounded bg-surface p-3 font-mono text-xs">{job.output}</pre></details>}
               {active && <p className="text-xs text-ink-secondary">{uiText("창을 닫아도 커밋 작업은 계속됩니다. AI 자동 커밋을 다시 열면 확인할 수 있습니다.")}</p>}
             </section>}
-            {!active && !busy && job?.state !== 'review' && (choosing ? <section aria-label={uiText("에이전트셋 선택")}><h3 className="mb-3 text-xs font-medium text-ink-secondary">{uiText("에이전트셋 선택")}</h3><AgentSetPicker onSelect={choose} onCreated={choose} /></section> : <div className="flex items-center justify-between gap-3 text-xs"><span className="min-w-0 truncate text-ink-secondary">{selected?.name ?? uiText("다음 작업의 에이전트셋을 선택하세요")}</span><button type="button" onClick={() => setChoosing(true)} className="shrink-0 rounded border border-edge-strong px-3 py-2 hover:bg-surface-hover">{uiText("에이전트셋 선택")}</button></div>)}
+            {!active && !busy && job?.state !== 'review' && (choosing ? <section aria-label={uiText("에이전트셋 선택")}><h3 className="mb-3 text-xs font-medium text-ink-secondary">{uiText("에이전트셋 선택")}</h3><AgentSetPicker onSelect={choose} onCreated={choose} /></section> : <div className="flex items-center justify-between gap-3 text-xs"><span className="min-w-0 truncate text-ink-secondary">{selected?.name ?? uiText("다음 작업의 에이전트셋을 선택하세요")}</span><button type="button" onClick={() => { selectionTouched.current = true; setChoosing(true) }} className="shrink-0 rounded border border-edge-strong px-3 py-2 hover:bg-surface-hover">{uiText("에이전트셋 선택")}</button></div>)}
           </>}
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-edge p-3">

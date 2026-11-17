@@ -116,6 +116,7 @@ import { createAgentDrawingsRouter } from './agent-drawings.ts'
 import { readCrontab } from './crontab.ts'
 import { agentCommand, jobCwd, jobSessionName, jobViews, otherLines, readJobs, saveSchedules, ScheduleError } from './schedules.ts'
 import { AgentSetError, readSets, writeSets } from './agentSets.ts'
+import { readTaskBindings, writeTaskBindings } from './agent-task-bindings.ts'
 import { GitAiCommitStore } from './git-ai-commit.ts'
 import { createGitAiCommitRouter } from './git-ai-commit-routes.ts'
 import { acpRuntimeList, agentSetRuntimeList, isRuntime, probeModels, thinkingByRuntime } from './agentAcp.ts'
@@ -2749,6 +2750,13 @@ export function createApiApp() {
     } catch (err) {
       handleError(res, err)
     }
+  })
+
+  app.get('/agent-task-bindings', requireFeature('agent'), (_req, res) => {
+    try { res.json({ bindings: readTaskBindings() }) } catch (err) { handleError(res, err) }
+  })
+  app.put('/agent-task-bindings', requireRole('owner'), requireFeature('agent'), (req, res) => {
+    try { res.json({ bindings: writeTaskBindings(req.body?.bindings) }) } catch (err) { handleError(res, err) }
   })
 
   // "지금 실행" — 크론이 도는 것과 똑같이 잡 전용 세션에 에이전트 명령을 타이핑한다(같은 문자열).

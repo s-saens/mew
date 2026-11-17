@@ -97,7 +97,7 @@ Source setup installs dependencies, asks for configuration, then builds and star
 
 [Mewlink](https://link.mew.run) helps another browser connect to your running mew instance. It handles device registration and connection setup; workspace data travels directly between the host and the connecting browser. You do not need your own domain or router port forwarding.
 
-After creating the first administrator, Mew opens one popup with **Mewlink**, **Tailscale**, and **Cloudflare Tunnel**. Open **Menu → Mewlink** to return to the same choices later. Local installation requires no remote-service account; follow the selected provider's sign-in and setup steps when you want remote access.
+After creating the first administrator, Mew opens **Agent Set** to configure agent runtimes and sets, followed by a popup with **Mewlink**, **Tailscale**, and **Cloudflare Tunnel**. Reopen agent setup from **Menu → Agent Set**. Open **Menu → Mewlink** to return to the same choices later. Local installation requires no remote-service account; follow the selected provider's sign-in and setup steps when you want remote access.
 
 1. On the host, sign in as owner and open **Menu → Mewlink → Register device**.
 2. Follow the registration link, sign in to Mewlink, and choose your username and device name.

@@ -1,6 +1,6 @@
 ---
 title: "Mewlink device registration and locally authenticated P2P access contract"
-description: "Defines the link.mew.run entry, Mewlink registration, authentication, browser trust, UI resources, signaling, and transport limits. Covers the shared Mewlink, Tailscale, and Cloudflare Tunnel popup shown after first-owner creation and from the owner menu, with separate host/central verification boundaries."
+description: "Defines the link.mew.run entry, Mewlink registration, authentication, browser trust, UI resources, signaling, and transport limits. Covers the shared Mewlink, Tailscale, and Cloudflare Tunnel popup shown after first-owner agent setup and from the owner menu, with separate host/central verification boundaries."
 created: 2026-10-07
 updated: "2026-11-17"
 ---
@@ -94,7 +94,7 @@ A atomically stores version 1, server key, pinned central key, and account mappi
 
 ## Opening device connection settings
 
-Owners open **Menu → Mewlink** to choose among three methods in one `RemoteAccessModal`. The same popup appears after [successful first-owner creation](first-owner-setup.md#browser-entry). All three choices remain visible, with Mewlink selected initially:
+Owners open **Menu → Mewlink** to choose among three methods in one `RemoteAccessModal`. After [successful first-owner creation](first-owner-setup.md#browser-entry), the agent setup popup appears first; closing it opens the same remote-access popup. All three choices remain visible, with Mewlink selected initially:
 
 | Method | Setup shown in the popup |
 | --- | --- |

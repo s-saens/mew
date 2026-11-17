@@ -1,6 +1,6 @@
 ---
 title: "First administrator setup"
-description: "Defines locally armed, one-time browser creation of the first owner, fresh-install detection, durable closure, account locking, and installer IPC. Covers token privacy, recovery, existing-account preservation, and the remote-access welcome popup after successful creation."
+description: "Defines locally armed, one-time browser creation of the first owner, fresh-install detection, durable closure, account locking, and installer IPC. Covers token privacy, recovery, existing-account preservation, and the agent setup and remote-access welcome popups after successful creation."
 updated: "2026-11-17"
 ---
 
@@ -39,7 +39,7 @@ The trusted launcher opens `<local-base-url>#setup=<token>`. The fragment is con
 
 While setup is pending, the workspace is not imported. The compact setup form asks for email, password, and confirmation and uses the existing login theme and localized UI. A successful claim enters the workspace without a temporary-password step. Missing, rejected, or expired links show local reopen guidance. An already completed setup refreshes status and uses the ordinary login screen when a session is absent. Existing local guest behavior is unchanged outside pending setup.
 
-After a successful first-owner claim, `AppBootstrap` opens the shared remote-access popup once the authenticated workspace is ready. It offers **Mewlink**, **Tailscale**, and **Cloudflare Tunnel**. This page-memory welcome state is set only by successful account creation; existing installations, ordinary login, a competing claim, authentication refresh, and later reloads do not trigger it. Dismissing it preserves the new account and workspace. Owners can open the same popup again from **Menu → Mewlink**. Provider setup follows the [remote-access contract](remote-access.md#opening-device-connection-settings); no provider is registered merely by showing the welcome popup.
+After a successful first-owner claim, `AppBootstrap` opens agent setup once the authenticated workspace is ready. Closing agent setup opens the shared remote-access popup, which offers **Mewlink**, **Tailscale**, and **Cloudflare Tunnel**. Owners can reopen agent setup from **Menu → Agent Set**. This page-memory welcome state is set only by successful account creation; existing installations, ordinary login, a competing claim, authentication refresh, and later reloads do not trigger it. Dismissing it preserves the new account and workspace. Owners can open the same popup again from **Menu → Mewlink**. Provider setup follows the [remote-access contract](remote-access.md#opening-device-connection-settings); no provider is registered merely by showing the welcome popup.
 
 ## CLI and installer transport
 
