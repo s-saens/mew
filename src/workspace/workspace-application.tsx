@@ -20,6 +20,7 @@ import { BrowserContext, useWorkspaceAccount, useWorkspaceBrowser } from './work
 import { deferredComponent } from '../components/deferred-component'
 import type { MewcatAction } from '../../shared/mewcat-assistant'
 import { WORKSPACE_SCOPE_VERSION } from '../../shared/workspace-scope'
+import { ProjectErrorScreen } from './project-error-screen'
 
 
 const BoardBrowser = deferredComponent(async () => ({ default: (await import('../components/BrowserDesktopPanel')).BrowserDesktopPanel }))
@@ -74,10 +75,7 @@ function ProjectHost({ panel, compact, active, legacy, busy, onRecover, restoreF
   const view = useMemo(() => ({ id: panel.id, compact, active: active && !busy, root, restoreFocus }), [panel.id, compact, active, busy, restoreFocus])
   return <WorkspaceApiProvider client={client}><WorkspaceViewProvider value={view}>
     <div ref={root} inert={busy || undefined} aria-busy={busy || undefined} data-workspace-view={panel.id} data-workspace-presentation={compact ? 'compact' : 'docked'} className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      <AppErrorBoundary key={JSON.stringify([panel.workingRoot, panel.projectPath])} fallback={<div role="alert" className="flex flex-col gap-2 p-3 text-sm text-ink-secondary">
-        <p>{uiText('프로젝트를 불러오지 못했습니다. 다른 프로젝트를 선택하거나 패널을 닫아 주세요.')}</p>
-        <button type="button" className="self-start rounded border border-edge px-2 py-1" onClick={onRecover}>{uiText('프로젝트 선택')}</button>
-      </div>}>{children}</AppErrorBoundary>
+      <AppErrorBoundary key={JSON.stringify([panel.workingRoot, panel.projectPath])} fallback={<ProjectErrorScreen onRecover={onRecover} />}>{children}</AppErrorBoundary>
     </div>
   </WorkspaceViewProvider></WorkspaceApiProvider>
 }

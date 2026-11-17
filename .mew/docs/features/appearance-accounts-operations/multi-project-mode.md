@@ -1,9 +1,9 @@
 ---
 title: "Multi-project mode"
-description: "Optional desktop multi-project mode with independent compact workspaces, dedicated movement handles and live animated rearrangement, a shared header/background, independent remote tool panels, and separate mode restoration. Defines compact header controls, panel-scoped project selection and new-panel creation, lifecycle, geometry, recovery, and the current Postgres limitation; links implementation evidence."
+description: "Optional desktop multi-project mode with independent compact workspaces, movement and resizing, shared controls, project selection, lifecycle, centered project error recovery, and the current Postgres limitation."
 status: implemented
 created: "2026-11-06"
-updated: "2026-11-09"
+updated: "2026-11-17"
 ---
 
 # Multi-project mode
@@ -60,7 +60,7 @@ Project panels support column and row arrangement, boundary resizing, and keyboa
 - A delayed save or mutation retains the project and working root captured when it began. Pending drafts and save failures remain recoverable. A project switch, panel close, or mode change cannot silently discard them.
 - Closing a project panel removes its view and releases view subscriptions after the save boundary. Running agents and terminals follow their existing lifecycle; closing the panel does not issue a stop command or delete their shared tabs.
 - Switching from multi to single displays the active project's session. Returning restores the board and each panel's tool selection. Mode changes preserve editor state and agent input; they must not restart running sessions.
-- An unavailable or deleted project, lost permission, or failed lazy module affects the relevant panel. Retain a local recovery surface and the ability to choose another project or close the panel. Never silently substitute another root for a failed explicit scope.
+- An unavailable or deleted project, lost permission, or failed lazy module affects the relevant panel. Retain a local recovery surface and the ability to choose another project or close the panel. Project view errors display a centered, scrollable recovery card with project selection and manual page refresh; refresh reloads the whole browser workspace. Never silently substitute another root for a failed explicit scope.
 - Account changes dispose the prior account's mounted views, subscriptions, and identity-sensitive caches. Preserve its saved board under its account key, following the storage contract. Existing file, feature, and role permissions remain authoritative.
 
 ## Layout choices

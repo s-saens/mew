@@ -1,8 +1,8 @@
 ---
 title: "Drawing and workspace runtime error recovery"
-description: "Records the 2026-11-02 fix for blank screens after drawing-module failures, local drawing error isolation, shared workspace recovery, and regression verification. Distinguishes simulated import/render failures from version-mismatch detection and user-owned runtime application."
+description: "Records drawing and workspace error recovery, including the November 17 project error screen redesign, local verification, and runtime application limits."
 created: "2026-11-02"
-updated: "2026-11-02"
+updated: "2026-11-17"
 ---
 
 ## Purpose and behavior
@@ -26,3 +26,9 @@ Current contracts: [drawing board](../features/terminals-agents-automation/agent
 The reported running installation was not modified or reproduced directly. The fix handles the observed failure class; it does not compare build and server versions or prove that version skew caused the original incident. A failed drawing render may discard its in-memory drawing. Browser and React import caching can retain a rejected module until refresh. General asynchronous event-handler failures remain outside React error boundaries.
 
 The required build updates served assets, but no deployment, launcher, or application server start, stop, or restart was performed. Applying server-side changes remains a user operation. Browser checks use isolated fixtures rather than physical-device input or the running instance.
+
+## Project error screen redesign
+
+On November 17 a project view exception showed a small message in the top-left corner. The [project recovery contract](../features/appearance-accounts-operations/multi-project-mode.md#closing-switching-and-recovery) now presents the existing project selection action and a manual page refresh in a centered card, with scrolling for compact panels. This changes the recovery surface; the exception that prompted the report was not reproduced or identified.
+
+The isolated Chromium fixture passed for a full workspace and a 280×240 panel, covering the error boundary, layout, project selection callback, and page refresh. `npm run build` passed with a large-chunk warning; targeted lint passed with four existing workspace effect/ref warnings. `npm run check:docs` validated 860 descriptions but reported 39 existing link errors, including the missing decisions README. The build updates served UI assets; no deployment or server lifecycle operation was performed. The actual reported exception and physical-device appearance remain unverified.
