@@ -1,8 +1,8 @@
 ---
 title: "WSL GPU monitoring and desktop stalls"
-description: "Records the 2026-11-02 NVIDIA kernel-pool and DPC observations, Windows-only GPU queries under WSL, shared lightweight collection, passing regression/build checks, and an unrelated full-repository document-link failure. Distinguishes local verification from pending server application and long-term driver validation."
+description: "Records NVIDIA kernel-pool and DPC observations, Windows-only GPU queries under WSL, asynchronous executable discovery, local verification, and pending server application and long-term driver validation."
 created: "2026-11-02"
-updated: "2026-11-02"
+updated: "2026-11-17"
 ---
 
 ## Purpose and observed behavior
@@ -32,6 +32,12 @@ Completed local checks:
 - `npm run check:docs`: description validation passed; the full link check failed on an unrelated pending task document's absolute `/api/asset` link. The modified documents' links were checked separately with the existing checker.
 
 These results verify the implementation and bounded collector behavior. They do not establish runtime application, driver repair, or leak-free operation over several days.
+
+## Asynchronous executable discovery
+
+Windows filesystem probes can delay the server event loop. The collector now discovers the Windows executable asynchronously, reuses a working path, and retries discovery after a failed query. The [system resources contract](../features/appearance-accounts-operations/system-resources-and-processes.md#gpu-queries-under-wsl) defines the behavior.
+
+On 2026-11-17, `node --test server/gpu-stats.test.ts` passed all 18 tests and `npm run build` passed with a large-chunk warning. `npm run check:docs` validated 842 descriptions but reported 39 link errors across the working tree. These checks do not establish live server behavior; no server restart or deployment was performed.
 
 ## Application boundary and limitations
 

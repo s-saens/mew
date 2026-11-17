@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "System resources and process view"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-04"
+updated: "2026-11-16"
 status_hash: "20544b07271a698d27b55dfdbbdbc97abb3472a36115cbbbcdffed7759ae2d9f"
 files: ["src/App.tsx", "src/components/header-resources.tsx", "src/components/SystemStatsModal.tsx", "server/sysStats.ts", "server/gpu-stats.ts", "server/resource-sample-cache.ts", "src/components/network-usage-panel.tsx"]
 commits: []
-description: "Defines server resource snapshots, platform memory estimates, shared collection intervals, and Windows-only NVIDIA queries under WSL. Covers header gauges, the resource popup, overload notifications, unsupported measurements, and the current tab's network totals and speeds."
+description: "Defines server resource snapshots, platform memory estimates, shared collection intervals, and asynchronous cached Windows-only NVIDIA discovery under WSL. Covers header gauges, the resource popup, overload notifications, unsupported measurements, and the current tab's network totals and speeds."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -69,6 +69,8 @@ Share collection work across requests and browser tabs in the server process. Co
 
 Treat a Linux server as WSL when WSL environment variables are present or the kernel release identifies Microsoft. Resolve the Windows `nvidia-smi.exe` through PATH and mounted Windows drive roots, including paths with spaces and custom mount locations. Run the executable directly with bounded execution time. If discovery or execution fails, return an empty GPU list and retry according to the unavailable-query interval. Never fall back to Linux `nvidia-smi` under WSL.
 
+Read executable presence and the mount table asynchronously. Windows filesystem discovery must not block authentication or asset requests on the Node event loop. Reuse a successfully discovered executable across sample refreshes; after execution fails, discard that path and rediscover at the next permitted retry. In-flight sample sharing also covers pending discovery. A working path remains selected until its execution fails.
+
 Skip the compute-process GPU query under WSL. Windows compute PIDs belong to a different namespace from Linux `/proc`; the Linux process list retains `gpuMemMb: 0` as an unsupported measurement. Native Linux and Windows retain per-process GPU memory collection. Missing or unsupported aggregate values remain unavailable rather than becoming a claimed zero utilization.
 
 <!-- mew:implementation:end -->
@@ -79,7 +81,7 @@ Skip the compute-process GPU query under WSL. Windows compute PIDs belong to a d
 - The following items are user verification criteria, not a record of completed checks:
   - Verify measurements and unsupported indicators for each supported environment, and that trends reset after the popup is closed.
   - Verify that the upper-right X button is visible on desktop and mobile and can close the popup by click, touch, and keyboard.
-- Regression checks must cover WSL detection, executable discovery with custom mounts and spaces, absence of Linux fallback, PID namespace separation, summary requests skipping process work, concurrent collection sharing, cache expiry, and failure retry delays.
+- Regression checks must cover WSL detection, executable discovery with custom mounts and spaces, absence of synchronous executable probes, event-loop progress during held discovery, successful path reuse and rediscovery after failure, absence of Linux fallback, PID namespace separation, summary requests skipping process work, concurrent collection sharing, cache expiry, and failure retry delays.
 - Header reconciliation regression checks must cover distinct sibling keys, repeated account changes, layout visibility changes, resource permission removal, and cleanup without orphan resource buttons.
 - Local measurements, completed checks, and runtime application status belong to the [WSL GPU monitoring work record](../../work/wsl-gpu-monitoring.md).
 

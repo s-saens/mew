@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
 import { createGpuCollector } from './gpu-stats.ts'
 
 const gpuOutput = 'Fixture GPU, 12, 512, 16384, 50'
@@ -168,8 +169,10 @@ test('missing WSL executable discovery recovers after unavailable sample expires
 test('slow GPU collection remains shared beyond five seconds and caches from fulfillment', async () => {
   let now = 0, calls = 0
   const work = deferred<string>()
-  const { collector } = wslFixture({ now: () => now, run: async () => { calls++; return work.promise } })
+  const started = deferred<void>()
+  const { collector } = wslFixture({ now: () => now, run: async () => { calls++; started.resolve(); return work.promise } })
   const first = collector.gpus()
+  await started.promise
   now = 20_000
   assert.equal(collector.gpus(), first)
   assert.equal(calls, 1)
@@ -181,4 +184,54 @@ test('slow GPU collection remains shared beyond five seconds and caches from ful
   now = 25_000
   await collector.gpus()
   assert.equal(calls, 2)
+})
+
+test('default WSL executable discovery uses asynchronous filesystem work and reuses a working path', async t => {
+  const held = deferred<void>(), probing = deferred<void>()
+  let now = 0, probes = 0, queries = 0
+  const syncAccess = t.mock.method(fs, 'accessSync', () => { throw new Error('synchronous Windows filesystem access is forbidden') })
+  t.mock.method(fs.promises, 'access', async (file: fs.PathLike) => {
+    assert.equal(file, '/fixture Windows tools/nvidia-smi.exe')
+    probes++
+    probing.resolve()
+    await held.promise
+  })
+  const collector = createGpuCollector({
+    platform: 'linux', env: { WSL_DISTRO_NAME: 'fixture', PATH: '/fixture Windows tools' }, now: () => now,
+    run: async () => { queries++; return gpuOutput },
+  })
+  try {
+    const first = collector.gpus()
+    await probing.promise
+    await new Promise<void>(resolve => setImmediate(resolve))
+    assert.equal(collector.gpus(), first, 'slow executable discovery stays shared')
+    assert.equal(queries, 0, 'query waits for executable validation without blocking event-loop work')
+    held.resolve()
+    assert.equal((await first).length, 1)
+    now = 5000
+    assert.equal((await collector.gpus()).length, 1)
+    assert.equal(queries, 2)
+    assert.equal(probes, 1, 'successful samples reuse the discovered executable')
+    assert.equal(syncAccess.mock.callCount(), 0)
+  } finally { held.resolve() }
+})
+
+test('a failed cached Windows command is rediscovered after the unavailable-query interval', async () => {
+  let now = 0, probes = 0, available = '/tools/first/nvidia-smi.exe', fail = false
+  const collector = createGpuCollector({
+    platform: 'linux', env: { WSL_DISTRO_NAME: 'fixture', PATH: '/tools/first:/tools/second' }, now: () => now,
+    executable: async file => { probes++; return file === available },
+    run: async file => { assert.equal(file, available); if (fail) throw new Error('removed fixture executable'); return gpuOutput },
+  })
+  assert.equal((await collector.gpus()).length, 1)
+  assert.equal(probes, 1)
+  now = 5000; fail = true
+  assert.deepEqual(await collector.gpus(), [])
+  assert.equal(probes, 1)
+  now = 34_999; available = '/tools/second/nvidia-smi.exe'; fail = false
+  assert.deepEqual(await collector.gpus(), [])
+  assert.equal(probes, 1, 'failure backoff avoids repeated path probes')
+  now = 35_000
+  assert.equal((await collector.gpus()).length, 1)
+  assert.equal(probes, 3, 'a failed executable is resolved again before retry')
 })
