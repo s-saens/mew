@@ -24,7 +24,7 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
   const { t, locale } = useI18n()
   const [projects, setProjects] = useState<RegisteredProject[] | null>(null)
   const [search, setSearch] = useState('')
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [otherOrder, setOtherOrder] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [reload, setReload] = useState(0)
@@ -90,10 +90,25 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
   const allPaths = projects?.map(project => project.path) ?? []
   const favoriteSet = new Set(paths)
   const otherPaths = [...otherOrder.filter(path => allPaths.includes(path) && !favoriteSet.has(path)), ...allPaths.filter(path => !favoriteSet.has(path) && !otherOrder.includes(path))]
-  const rows = selection ? [...projectHierarchy(paths.filter(path => allPaths.includes(path))), ...projectHierarchy(otherPaths)] : projectHierarchy(allPaths)
+  const rows = projectHierarchy(selection ? [...paths.filter(path => allPaths.includes(path)), ...otherPaths] : allPaths)
+  const parents = new Map(rows.map(row => [row.path, row.parentPath]))
+  for (const match of matches) {
+    let parent = parents.get(match.path)
+    while (parent) { visible.add(parent); parent = parents.get(parent) }
+  }
+  const renderedRows = rows.filter(row => {
+    if (!visible.has(row.path)) return false
+    if (!selection || search) return true
+    let parent = parents.get(row.path)
+    while (parent) {
+      if (!expanded.has(parent)) return false
+      parent = parents.get(parent)
+    }
+    return true
+  })
   function reorder(from: number, to: number) {
-    if (!selection || search || collapsed.size || from === to || to < 0 || to >= rows.length) return
-    const source = rows[from], target = rows[to]
+    if (!selection || search || from === to || to < 0 || to >= renderedRows.length) return
+    const source = renderedRows[from], target = renderedRows[to]
     if (favoriteSet.has(source.path) !== favoriteSet.has(target.path) || source.parentPath !== target.parentPath) return
     const list = favoriteSet.has(source.path) ? rows.filter(row => favoriteSet.has(row.path)).map(row => row.path) : rows.filter(row => !favoriteSet.has(row.path)).map(row => row.path)
     const sourceIndex = list.indexOf(source.path), targetIndex = list.indexOf(target.path)
@@ -102,11 +117,6 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
     else setOtherOrder(list)
   }
   const drag = useDragReorder({ axis: 'y', handleOnly: true, onReorder: reorder })
-  const parents = new Map(rows.map(row => [row.path, row.parentPath]))
-  for (const match of matches) {
-    let parent = parents.get(match.path)
-    while (parent) { visible.add(parent); parent = parents.get(parent) }
-  }
   const duplicates = new Set(projects?.filter((project, index, all) => all.some((other, otherIndex) => index !== otherIndex && other.name === project.name)).map(project => project.name))
 
   return <HoverTipLayer className="mew-project-catalog">
@@ -116,15 +126,14 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
       </label>
       <div className="mew-project-catalog-list" aria-busy={busy || loading || undefined}>
         {!projects && !error && <div role="status" aria-label={t('common.loading')} className="flex justify-center p-2"><LoadingIndicator /></div>}
-        {rows.filter(row => visible.has(row.path) && (search || !(() => { let parent = parents.get(row.path); while (parent) { if (collapsed.has(parent)) return true; parent = parents.get(parent) } return false })())).map(row => {
-          const visualIndex = rows.indexOf(row)
+        {renderedRows.map((row, visualIndex) => {
           const { ref, ...handleProps } = drag.getItemProps(visualIndex)
           const hasChildren = rows.some(child => child.parentPath === row.path)
           const project = byPath.get(row.path)!
           const mine = paths.includes(row.path) || imported.has(row.path)
           return <div key={row.path} ref={selection ? ref : undefined} data-catalog-project={row.path} data-project-depth={row.depth} data-active={row.path === activePath || undefined} className="mew-project-catalog-row" style={{ paddingLeft: Math.min(row.depth, 5) * 12 }}>
             {selection && <MenuReorderHandle {...handleProps} aria-label={`${project.name} · ${t('project.reorder')}`} onMove={direction => reorder(visualIndex, visualIndex + direction)} />}
-            {selection && hasChildren && <button type="button" className="mew-project-catalog-pin" aria-label={`${project.name} · ${collapsed.has(row.path) ? '+' : '−'}`} aria-expanded={!collapsed.has(row.path)} onClick={() => setCollapsed(previous => { const next = new Set(previous); if (next.has(row.path)) next.delete(row.path); else next.add(row.path); return next })}>{collapsed.has(row.path) ? <NavArrowRight width={14} /> : <NavArrowDown width={14} />}</button>}
+            {selection && hasChildren && <button type="button" className="mew-project-catalog-pin" aria-label={`${project.name} · ${search || expanded.has(row.path) ? '−' : '+'}`} aria-expanded={!!search || expanded.has(row.path)} disabled={!!search} onClick={() => setExpanded(previous => { const next = new Set(previous); if (next.has(row.path)) next.delete(row.path); else next.add(row.path); return next })}>{search || expanded.has(row.path) ? <NavArrowDown width={14} /> : <NavArrowRight width={14} />}</button>}
             <button type="button" disabled={busy} title={project.path} onClick={() => { discoveryRequest.current?.abort(); setLoading(false); if (selection) void onOpen(project.path); else void importProject(project) }} onContextMenu={event => onContextMenu?.(project.path, event)} className="mew-project-catalog-open"
               aria-label={`${project.name}${duplicates.has(project.name) ? ` (${project.path})` : ''} · ${t(mine ? 'project.inMine' : 'project.addToMine')}`}>
               <ProjectIcon icon={project.icon ?? 'i:folder'} size={16} />

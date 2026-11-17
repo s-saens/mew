@@ -1,6 +1,6 @@
 ---
 title: "Projects and file navigation"
-description: "Explains project selection, single- and multi-project modes, files, preserved task documents, Git operations, and per-account GitHub connections. Covers setup, personal shortcuts, project deletion, and the multi-project database limitation."
+description: "Explains project selection with collapsed nested projects, single- and multi-project modes, files, preserved task documents, Git operations, and per-account GitHub connections. Covers setup, personal shortcuts, project deletion, and the multi-project database limitation."
 updated: "2026-11-17"
 상위파일:
   - "MOC.md"
@@ -70,7 +70,7 @@ Use Left/Right on the scope buttons to switch and move focus, Home to select My,
 
 - Select a row to switch projects without refreshing. Document tabs, layout, and scroll positions are restored per project. Your other connected screens follow the switch; other users' active projects stay as they are. Running agents keep their original working directories.
 - Use **+** below either list to open the project setup popup. The workspace catalog is available in **All** and under **Workspace** in the popup. In a project's context menu, choose **Delete → Remove from My Projects** to remove only your shortcut, preserving the project, other users' shortcuts, and all files. If other shortcuts remain, removing the current one first opens another project. Removing your last shortcut returns to the centered project panel. My projects only contains registered catalog entries.
-- Nested Git/Mew projects are discovered in the shared catalog. Pinned descendants appear beneath their nearest pinned parent in My projects. Select a project when you want to change the active root.
+- Nested Git/Mew projects are discovered in the shared catalog. In project selection, nested projects start collapsed beneath their nearest registered parent; expand a parent to see its children. Search reveals matching nested projects and their parent paths. Select a project when you want to change the active root.
 - In My, drag the left handle to reorder shortcuts. **↑/↓** on the handle or **Shift+↑/↓** on the row also reorders them. The **Alt+1…9** numbers on the right follow your order.
 - `Alt+P` opens Projects and focuses its first available item; `Alt+1…9` switches in personal list order. Within My, Up/Down and Home/End navigate, and Enter/Space selects. Existing modal, IME, repeated-key, and remote-screen input boundaries apply. `Ctrl/Cmd+number` selects tabs in the current panel.
 - The desktop sidebar stays open after selection and can be resized from its right border. Its width and open state are remembered in this browser. The mobile panel closes on selection, Close, Esc, or Back and restores focus to the project button.
