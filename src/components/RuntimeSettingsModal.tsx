@@ -1,6 +1,6 @@
 import { useWorkspaceApi } from '../api/workspace-api-context'
 import { RuntimeInstallProgress } from './RuntimeInstallProgress'
-import { subscribeAgentRuntimes } from '../utils/agentPickerCache'
+import { subscribeAgentRuntimes, updateAgentRuntimesCache } from '../utils/agentPickerCache'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 // 에이전트 런타임 설정 팝업 — 실행 파일·추가 인자·공급자 env(API 키·엔드포인트)를 런타임별로 저장한다.
@@ -161,6 +161,7 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
   const refreshRuntime = async () => {
     const { runtimes } = await fetchAgentRuntimes()
     setRuntime(runtimes.find((item) => item.id === runtimeId) ?? null)
+    updateAgentRuntimesCache(runtimes)
   }
 
   const install = async () => {

@@ -31,7 +31,12 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentSetupModa
       const pathname = new URL(route.request().url()).pathname
       if (pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript; charset=utf-8', body: chunk.code })
       if (pathname === '/api/agent-runtimes') return route.fulfill({ json: { runtimes: [runtime()] } })
-      if (pathname === '/api/agent-runtimes/claude/install') { installed = true; return route.fulfill({ json: { status: runtime(), output: '' } }) }
+      if (pathname === '/api/agent-runtimes/claude/install') {
+        installed = route.request().method() !== 'DELETE'
+        return route.fulfill({ json: { status: runtime(), output: '' } })
+      }
+      if (pathname === '/api/agent-runtimes/claude/settings') return route.fulfill({ json: { settings: null } })
+      if (pathname === '/api/agent-runtimes/claude/account') return route.fulfill({ status: 500, json: {} })
       if (pathname === '/api/agent-task-bindings') return route.fulfill({ json: { bindings: {} } })
       if (pathname === '/api/agent-sets') { if (route.request().method() === 'PUT') sets = route.request().postDataJSON().sets; return route.fulfill({ json: { sets } }) }
       if (pathname.endsWith('/models')) return route.fulfill({ json: { models: [] } })
@@ -48,6 +53,12 @@ createRoot(document.getElementById('root')).render(<I18nProvider><AgentSetupModa
     await editor.getByRole('button', { name: '저장', exact: true }).click()
     await editor.waitFor({ state: 'hidden' })
     assert.equal(sets[0].runtime, 'claude')
+    await page.getByRole('button', { name: 'Claude Agent 설정' }).click()
+    await page.getByRole('button', { name: '런타임 삭제' }).click()
+    await page.getByRole('button', { name: '삭제', exact: true }).click()
+    await page.getByText('연결 프로그램 설치되지 않음').waitFor()
+    await page.getByRole('button', { name: '취소', exact: true }).click()
+    await page.getByRole('button', { name: '설치', exact: true }).waitFor({ timeout: 3000 })
     assert.deepEqual(errors, [])
   } finally { await browser.close() }
 })

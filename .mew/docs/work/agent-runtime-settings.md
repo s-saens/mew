@@ -1,6 +1,6 @@
 ---
 title: "Agent runtime settings improvements"
-description: "Records the runtime settings dialog clarification, explicit override and environment variable removal, local verification, management actions, and remaining host CLI readiness limits."
+description: "Records the runtime settings dialog clarification, explicit override and environment variable removal, local verification, management actions, runtime status synchronization, and remaining host CLI readiness limits."
 created: "2026-11-17"
 ---
 
@@ -15,3 +15,7 @@ Local verification covered settings merge, clearing and removal, asynchronous ru
 The management section exposes execution-settings reset and runtime removal with separate confirmation and explicit scope. Automatic removal remains disabled where no fixed safe uninstall command is registered, including the Claude and Codex connectors bundled as Mew dependencies. No provider runtime was actually removed.
 
 Local checks: the settings browser test exercised reset cancellation and confirmation, unavailable removal, and a supported removal using mocked APIs; settings storage regressions also passed. Lint completed with warnings. The documentation checker reported 39 pre-existing link errors. The project build was run locally. No running server was restarted and no deployment was performed.
+
+## Runtime list refresh after removal
+
+Runtime settings now publish the refreshed runtime list after installation or removal so open selectors and agent setup update their actions. A mocked browser regression reproduced the missing Install button after removal and passed after the fix; it also checks the existing settings dialog. The two targeted browser tests and the project build passed; lint passed with warnings. The documentation check still reports 39 existing link errors. No provider runtime was removed, no server was restarted, and no deployment was performed.
