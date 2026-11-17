@@ -157,6 +157,62 @@ test('catalog discovers nested Git and Mew roots, registers them and returns nea
   assert.deepEqual(parse(fs.readFileSync(store.file, 'utf8')).projects.map((project: { path: string }) => project.path), [root, child, grandchild])
 })
 
+test('HTTP catalog discovery yields to other work, shares concurrent scans, and preserves live account updates', async t => {
+  const store = fixture(), root = path.join(temporary, `async-hierarchy-${sequence}`)
+  const child = path.join(root, 'apps', 'child'), outside = path.join(temporary, `async-outside-${sequence}`)
+  fs.mkdirSync(path.join(child, '.mew'), { recursive: true })
+  fs.mkdirSync(outside)
+  for (const ignored of ['node_modules/dependency', '.hidden/secret']) fs.mkdirSync(path.join(root, ignored, '.mew'), { recursive: true })
+  fs.symlinkSync(outside, path.join(root, 'alias'), 'dir')
+  store.link('a@example.test', root)
+  const readdir = fs.promises.readdir.bind(fs.promises)
+  let release!: () => void, scanning!: () => void, rootReads = 0
+  const held = new Promise<void>(resolve => { release = resolve })
+  const started = new Promise<void>(resolve => { scanning = resolve })
+  t.mock.method(fs.promises, 'readdir', async (directory: fs.PathLike, options: { withFileTypes: true }) => {
+    if (directory === root) { rootReads++; scanning(); await held }
+    return readdir(directory, options)
+  })
+  try {
+    const first = store.listAsync('a@example.test'), second = store.listAsync('b@example.test')
+    await started
+    await new Promise<void>(resolve => setImmediate(resolve))
+    store.setMine('a@example.test', root, false)
+    store.link('b@example.test', outside)
+    release()
+    const [a, b] = await Promise.all([first, second])
+    assert.equal(rootReads, 1, 'simultaneous HTTP callers share disk discovery')
+    assert.deepEqual(a.map(project => project.path), [root, outside, child])
+    assert.equal(a.find(project => project.path === root)?.mine, false, 'late discovery preserves shortcut removal')
+    assert.equal(b.find(project => project.path === outside)?.mine, true, 'each caller receives its current account shortcuts')
+    assert.equal(a.find(project => project.path === child)?.parentPath, root)
+    assert.equal(a.find(project => project.path === child)?.discovered, true)
+  } finally { release() }
+})
+
+test('HTTP discovery cannot restore a project deleted while a captured descendant is being scanned', async t => {
+  const store = fixture(), root = path.join(temporary, `async-deleted-${sequence}`), child = path.join(root, 'child')
+  fs.mkdirSync(path.join(child, '.mew'), { recursive: true })
+  store.link('a@example.test', root)
+  const readdir = fs.promises.readdir.bind(fs.promises)
+  let release!: () => void, scanning!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  const started = new Promise<void>(resolve => { scanning = resolve })
+  t.mock.method(fs.promises, 'readdir', async (directory: fs.PathLike, options: { withFileTypes: true }) => {
+    if (directory === child) { scanning(); await held }
+    return readdir(directory, options)
+  })
+  try {
+    const listing = store.listAsync('a@example.test')
+    await started
+    store.delete(root)
+    release()
+    assert.deepEqual(await listing, [])
+    assert.equal(store.has(child), false)
+    assert.deepEqual(store.readMine('a@example.test')?.paths, [])
+  } finally { release() }
+})
+
 test('My Projects drops orphan shortcuts after global catalog removal without re-registering them', async () => {
   const store = fixture(), first = await store.create('a@example.test', 'first'), second = await store.create('a@example.test', 'second')
   const ledger = parse(fs.readFileSync(store.file, 'utf8'))

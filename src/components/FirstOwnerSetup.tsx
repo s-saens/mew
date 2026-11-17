@@ -1,4 +1,4 @@
-import { canAutoFocusInput } from '@mew/ui'
+import { canAutoFocusInput } from '@mew/ui/input-focus'
 import { useState, type FormEvent } from 'react'
 import { createFirstOwner, fetchAuthStatus, type AuthStatus } from '../api/auth'
 import { ApiResponseError } from '../api/response'

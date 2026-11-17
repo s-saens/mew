@@ -6,7 +6,7 @@ import { terminalBackend } from '../packages/tmux-term/src/server/backends/index
 import { MEW_APP_ROOT, isReleaseDistribution, RELEASE_UPDATE_MESSAGE } from './mewUpdate.ts'
 import { findExecutable, RUNTIMES, resolvedSpec, claudeCliSpec, type SpawnSpec } from './agentRuntimes.ts'
 import { ANTIGRAVITY_ACP_VERSION, antigravityCommand } from './antigravityAcp.ts'
-import { runtimeStatuses } from './agentRuntimeInstall.ts'
+import { runtimeStatusesAsync } from './agentRuntimeInstall.ts'
 import { agentProcessRunning, primeReleaseUrl, primeReleaseVersion } from './update-policy.ts'
 import type { UpdateItem, UpdateJob, UpdatesStatus } from '../shared/updates.ts'
 import { createTmuxManager, type TmuxManager } from '@mew/tmux-term/server'
@@ -99,7 +99,7 @@ async function agents(): Promise<UpdateCandidate[]> {
     } catch { return false }
   }
   const rows: UpdateCandidate[] = []
-  for (const status of runtimeStatuses().filter(row => row.installed && row.id !== 'tmux')) {
+  for (const status of (await runtimeStatusesAsync()).filter(row => row.installed && row.id !== 'tmux')) {
     if (status.id === 'claude' || status.id === 'codex') continue // Bundled ACP adapters are updated with Mew, not independently.
     if (status.id === 'antigravity') {
       const row = item('agent:antigravity', status.label, 'agent', resolvedSpec('antigravity')?.cmd === antigravityCommand() ? ANTIGRAVITY_ACP_VERSION : null)
@@ -254,7 +254,7 @@ export async function startUpdates(ids: unknown, manager: TmuxManager = updateTm
   if (updatesRunning()) throw new Error('이미 업데이트 중입니다')
   starting = true
   try {
-    if (runtimeStatuses().some(row => row.installing)) throw new Error('에이전트 설치 작업이 끝난 뒤 업데이트해 주세요')
+    if ((await runtimeStatusesAsync()).some(row => row.installing)) throw new Error('에이전트 설치 작업이 끝난 뒤 업데이트해 주세요')
     if (!Array.isArray(ids) || !ids.length || ids.some(id => typeof id !== 'string')) throw new Error('업데이트 항목이 필요합니다')
     await updatesStatus(true)
     if (queueRunning()) throw new Error('이미 업데이트 중입니다')

@@ -6,6 +6,16 @@ import { generateManifest } from 'material-icon-theme'
 import { fileIconId, folderIconId } from './file-icons.ts'
 import manifest from './file-icon-manifest.json' with { type: 'json' }
 import defaultArtwork from './file-icon-default-artwork.json' with { type: 'json' }
+import { defaultIcons } from './file-icon-chunks/defaults.ts'
+
+test('generated lightweight icon defaults preserve every synchronous pack and palette ID', () => {
+  for (const pack of ['material', 'catppuccin'] as const) for (const light of [false, true]) {
+    const defaults = light ? defaultIcons[pack].light : defaultIcons[pack]
+    assert.equal(defaults.file, fileIconId('', light, pack))
+    assert.equal(defaults.folder, folderIconId(false, light, pack))
+    assert.equal(defaults.folderExpanded, folderIconId(true, light, pack))
+  }
+})
 
 test('file icons distinguish languages, documents, media, archives and special filenames', () => {
   for (const [name, icon] of Object.entries({

@@ -3,13 +3,14 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { pdfAssetsPlugin } from './server/pdf-assets-plugin.ts'
 import { startupCodeSplitting } from './server/startup-chunks.ts'
+import { uiCompressionPlugin } from './server/ui-compression-plugin.ts'
 
 // https://vite.dev/config/
 export default defineConfig({
   // Preloads, imports and workers must share the iframe's per-connection resource URL.
   base: './',
   build: { rolldownOptions: { output: { codeSplitting: startupCodeSplitting } } },
-  plugins: [react(), tailwindcss(), pdfAssetsPlugin(), {
+  plugins: [react(), tailwindcss(), pdfAssetsPlugin(), uiCompressionPlugin(), {
     name: 'docs-api',
     async configureServer(server) {
       // A URL import keeps native server dependencies out of Vite's config bundle.

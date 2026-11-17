@@ -1,6 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { useUiLocale } from '@mew/ui/i18n'
-import { uiText } from '@mew/ui/i18n-core'
+import { startupUiText as uiText } from '@mew/ui/i18n-startup'
 
 export class AppErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, { failed: boolean }> {
   state = { failed: false }

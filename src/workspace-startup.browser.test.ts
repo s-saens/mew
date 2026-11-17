@@ -62,7 +62,8 @@ test('workspace chrome remains usable while editor and unopened tools download o
   for (const width of [1100, 390]) await t.test(`${width === 1100 ? 'desktop' : 'mobile'} shell survives pending tool imports`, async () => {
     const page = await browser.newPage({ viewport: { width, height: 800 }, locale: 'ko-KR' })
     page.setDefaultTimeout(5000)
-    const errors: string[] = [], requested = new Set<string>()
+    const errors: string[] = [], requested = new Set<string>(), workspaceReads: string[] = [], editorTabReads: { search: string; afterWrite: boolean }[] = []
+    let editorTabs = initialUi.tabs, editorRevision = 1, editorTabsWritten = false
     page.on('pageerror', error => errors.push(error.message))
     let releaseEditor!: () => void, releaseSettings!: () => void
     const editorPending = new Promise<void>(resolve => { releaseEditor = resolve })
@@ -92,7 +93,12 @@ test('workspace chrome remains usable while editor and unopened tools download o
       }
       const json = (value: unknown) => route.fulfill({ json: value })
       if (url.pathname === '/api/auth/me') return json({ authenticated: true, email: 'startup@example.test', role: 'owner', mustChangePassword: false, displayName: 'Startup', avatarDataUrl: null, capabilities: { filesRead: true, filesWrite: true, agent: true, terminal: false, serverFiles: false, collaboration: false, git: true, desktop: true } })
-      if (url.pathname === '/api/workspace') return json({ path: '/alpha', workspaceScopeVersion: 1, projects: [], docs: 'docs', docsPath: '/alpha/docs', workspaceUi: { workspacePath: '/alpha', state: initialUi } })
+      if (url.pathname === '/api/workspace') { workspaceReads.push(url.search); return json({ path: '/alpha', workspaceScopeVersion: 1, projects: [], docs: 'docs', docsPath: '/alpha/docs', workspaceUi: { workspacePath: '/alpha', state: initialUi }, editorTabs: { workspacePath: '/alpha', state: initialUi.tabs, revision: 1 } }) }
+      if (url.pathname === '/api/user-ui/editor-tabs') {
+        if (method === 'PUT') { const payload = route.request().postDataJSON(); editorTabs = { ...editorTabs, [payload.project]: payload.state }; editorRevision++; editorTabsWritten = true }
+        else editorTabReads.push({ search: url.search, afterWrite: editorTabsWritten })
+        return json({ state: editorTabs, revision: editorRevision })
+      }
       if (url.pathname === '/api/user-ui/root-projects') return json({ state: { paths: ['/alpha'], icons: {}, groups: [] } })
       if (url.pathname === '/api/user-ui/theme') return json({ state: method === 'PUT' ? route.request().postDataJSON().state : { palette: DEFAULT_THEME_PALETTE, custom: [] } })
       if (url.pathname === '/api/user-ui/workspace') return json({ state: method === 'PUT' ? route.request().postDataJSON().state : initialUi })
@@ -118,13 +124,15 @@ test('workspace chrome remains usable while editor and unopened tools download o
       assert.ok(preparation.indexOf('engine:plain') >= 0 && preparation.indexOf('engine:plain') < preparation.indexOf('editor'), 'the accepted initial UI prepares the selected engine before pane registration: ' + JSON.stringify(preparation))
       assert.ok(preparation.indexOf('editor') >= 0 && preparation.indexOf('editor') < preparation.indexOf('agent'), 'editor preparation starts before background agent module fanout: ' + JSON.stringify(preparation))
       assert.equal(requested.has(agentScript), true, 'background agent preparation continues while the editor is held')
+      assert.deepEqual(workspaceReads, ['?include=workspace-ui'], 'the application hands its accepted initial snapshot to the editor without a second workspace RTT')
+      assert.ok(editorTabReads.every(read => read.afterWrite), 'the accepted initial response removes the initial ledger RTT; post-save reconciliation stays fresh')
       // Establish presence after the initial HTTP snapshot, then exercise its permission refresh.
       await page.evaluate(() => { for (const socket of (window as any).startupSockets) { socket.readyState = 1; socket.onopen?.() } })
       if (width === 390) await page.locator('.mobile-dock').getByRole('button', { name: '파일 탐색기', exact: true }).click()
       const sidebar = page.locator('[data-sidebar]')
       await sidebar.waitFor()
       const scopes = sidebar.locator('[data-explorer-toggle]')
-      const scope = scopes.getByRole('button', { name: '문서', exact: true })
+      const scope = scopes.getByRole('button', { name: '위키', exact: true })
       assert.equal(await scopes.getByRole('combobox').count(), 0, 'scope uses the existing document/file toggle')
       await scope.click()
       assert.equal(await scope.getAttribute('aria-pressed'), 'true')
@@ -163,6 +171,9 @@ test('workspace chrome remains usable while editor and unopened tools download o
       releaseEditor()
       await page.locator('[data-dock-tab-bar]').waitFor({ state: 'attached' })
       assert.equal(await menu.isVisible(), true)
+      await page.evaluate(() => window.dispatchEvent(new Event('mew:remote-reconnected')))
+      await page.waitForFunction(() => performance.getEntriesByType('resource').filter(entry => new URL(entry.name).pathname === '/api/workspace').length >= 2)
+      assert.equal(workspaceReads.length, 2, 'recovery performs a fresh workspace read instead of reusing the startup snapshot')
       assert.deepEqual(errors, [])
     } finally {
       releaseEditor(); releaseSettings()

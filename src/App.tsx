@@ -29,12 +29,15 @@ import { defaultCapabilities } from '../shared/access-policy'
 import { writeBrowserStorage } from '@mew/ui/browser-storage'
 import { WorkspaceSnapshotCache } from './utils/workspace-snapshot-cache'
 import { seedWorkspaceUiSnapshot } from './utils/workspace-ui-startup'
+import { readWorkspaceEditorTabsSnapshot } from '../shared/workspace-ui-snapshot'
+import type { AccountEditorTabs } from './utils/account-editor-tabs'
 import { workspaceEditorPreparations } from './utils/workspace-editor-preparation'
 import { createDeferredModulePreparation } from './utils/deferred-module-preparation'
 import { prepareEditorView } from './components/deferred-editor-views'
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { workspaceClient, type RegisteredProject, type AuthStatus, type MewUpdateStatus, type TreeNode, type WorkspaceUiState, type WorkspaceInfo } from './api/client'
 import { ProjectSwitcher } from './components/ProjectSwitcher'
+import { DeferredProjectCatalogPanel } from './components/deferred-project-catalog'
 import { ProjectLoadingOverlay } from './components/project-loading-overlay'
 import { projectDeleteCopy } from './components/project-delete-copy'
 import { useTaskList } from './hooks/use-task-list'
@@ -216,9 +219,13 @@ export interface EditorAppProps {
   onProfileChanged: (profile: { displayName: string; avatarDataUrl: string | null }) => void
   host?: ProjectWorkspaceHost
   onWorkspaceReady?: (info: WorkspaceInfo) => void
+  takeInitialWorkspace?: () => WorkspaceInfo | undefined
 }
 
-function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileChanged, host, onWorkspaceReady }: EditorAppProps) {
+function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileChanged, host, onWorkspaceReady, takeInitialWorkspace }: EditorAppProps) {
+  // The authenticated outer host has already resolved this exact initial scope.
+  // Consume its response once; broadcasts and later activations always read again.
+  const initialWorkspaceRef = useRef(takeInitialWorkspace ?? host?.takeInitialWorkspace)
   const hostRef = useRef(host)
   hostRef.current = host
   const globalOwner = host?.globalOwner ?? true
@@ -568,6 +575,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const accountEditorTabs = useAccountEditorTabs(isGuest ? null : authEmail, projectUiPath,
     error => showToast(error instanceof Error ? error.message : String(error)))
   const prepareEditorTabs = accountEditorTabs.prepare
+  const prepareInitialEditorTabs = accountEditorTabs.prepareInitialSnapshot
 
   const refreshMewUpdate = useCallback(async (announce = false) => {
     try {
@@ -838,21 +846,28 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     if (!sameProject) setRequestedAgentTab(null)
   }, [deviceLayout, workspacePanelSetters, setProject, onWorkspaceReady, api, isDesktop, loadMobileForegroundPanel])
 
-  const handleWorkspaceBroadcast = useCallback(() => {
+  const readWorkspace = useCallback((bootstrap = false) => {
     // Resolve notifications after our POST so an older GET cannot undo its result.
     // Read once afterward to retain a concurrent switch from another client.
     if (projectOpeningRef.current) { workspaceBroadcastPending.current = true; return }
     const sequence = ++workspaceReadSequence.current
     const epoch = workspaceEpochRef.current
     const initial = workspaceInfoRef.current === null
-    const reading = fetchWorkspace({ includeUi: initial }).then(info => {
+    const prepared = initialWorkspaceRef.current?.()
+    initialWorkspaceRef.current = undefined
+    const snapshot = bootstrap && initial && epoch === 0 ? prepared : undefined
+    const reading = (snapshot ? Promise.resolve(snapshot) : fetchWorkspace({ includeUi: initial })).then(info => {
       if (sequence !== workspaceReadSequence.current || !workspaceUiOwnerAlive.current) return
       if (initial && workspaceInfoRef.current === null) {
         seedWorkspaceUiSnapshot(info, workspaceUiCache.current, { sequence, epoch },
           { sequence: workspaceReadSequence.current, epoch: workspaceEpochRef.current }, (_path, state) => state)
-        if (info.hasProject !== false && epoch === workspaceEpochRef.current && initialEditorPreparationAllowed.current) {
-          const state = workspaceUiCache.current.get(info.projectPath ?? info.path)
-          for (const view of workspaceEditorPreparations(state)) void prepareEditorView(view.mode, view.path).catch(() => {})
+        if (info.hasProject !== false && epoch === workspaceEpochRef.current) {
+          const tabs = readWorkspaceEditorTabsSnapshot(info)
+          if (tabs) prepareInitialEditorTabs(tabs.workspacePath, { state: tabs.state as AccountEditorTabs | null, revision: tabs.revision })
+          if (initialEditorPreparationAllowed.current) {
+            const state = workspaceUiCache.current.get(info.projectPath ?? info.path)
+            for (const view of workspaceEditorPreparations(tabs ? { tabs: tabs.state } : state)) void prepareEditorView(view.mode, view.path).catch(() => {})
+          }
         }
       }
       setWorkspaceError('')
@@ -863,7 +878,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       if (initial) setWorkspaceError(error instanceof Error ? error.message : String(error))
       else showToast(error instanceof Error ? error.message : String(error))
     })
-  }, [applyWorkspace, trackRefresh, fetchWorkspace, showToast])
+  }, [applyWorkspace, trackRefresh, fetchWorkspace, showToast, prepareInitialEditorTabs])
+  const handleWorkspaceBroadcast = useCallback(() => readWorkspace(), [readWorkspace])
 
   const openRootProject = useCallback(async (projectPath: string) => {
     if (hostRef.current) {
@@ -1509,8 +1525,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
 
   useEffect(() => {
     if (isGuest) return
-    handleWorkspaceBroadcast()
-  }, [isGuest, handleWorkspaceBroadcast, api])
+    readWorkspace(true)
+  }, [isGuest, readWorkspace, api])
 
   // Only issue root-relative requests after the server handoff. Recent first-level
   // listings paint immediately; refresh them without blanking the cached tree.
@@ -2054,14 +2070,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
             onPreview={previewRootProject}
             onIconChange={changeRootProjectIcon}
             onReorder={setOpenProjectPaths}
-            onRemove={async path => {
-              if (!canOpenProjects || projectOpeningRef.current) return
-              if (path === projectUiPath) {
-                const next = projectPaths.find(candidate => candidate !== path)
-                if (next && !(await openRootProject(next))) return
-              }
-              setOpenProjectPaths(previous => previous.filter(candidate => candidate !== path))
-            }}
+            onRemove={path => setOpenProjectPaths(previous => previous.filter(candidate => candidate !== path))}
             onDelete={async path => {
               if (!isOwner || projectOpeningRef.current) throw new Error(projectDeleteCopy(locale).unavailable)
               await rootProjectSaveQueue.current
@@ -2119,7 +2128,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
 
       {workspaceError && <div role="alert" className="p-3 text-sm text-danger-ink">{workspaceError}</div>}
 
-      {projectView === 'setup' && <main data-project-empty data-workspace-panel="projects" className="mew-project-empty mew-panel-surface bg-surface-deep">{projectAdd}</main>}
+      {projectView === 'setup' && <main data-project-empty data-workspace-panel="projects" className="mew-panel-surface bg-surface-deep"><DeferredProjectCatalogPanel selection paths={projectPaths} onFavoritesChange={setOpenProjectPaths} onOpen={openRootProject} />{projectAdd}</main>}
       {projectView === 'workspace' && <div className="workspace-dock-layout" data-dock-position={dockPosition}>
         <div ref={setProjectSidebarHost} className="mew-project-sidebar-host" data-project-sidebar-host />
         <div ref={setSidebarDockHost} className="desktop-dock-rail" data-sidebar-dock />
@@ -2432,7 +2441,7 @@ function App(props: EditorAppProps) {
   return <>
     {props.auth.authenticated && <GitLoginDialog key={`git-login:${props.auth.email ?? 'guest'}`} />}
     <WorkspaceAccountProvider key={`workspace:${props.auth.email ?? 'guest'}`} auth={props.auth}><WorkspacePresenceProvider>
-      <WorkspaceApplication account={props.auth.email} guest={props.auth.role === 'guest'} renderWorkspace={(host, onWorkspaceReady) => <EditorApp {...props} host={host} onWorkspaceReady={onWorkspaceReady} />} />
+      <WorkspaceApplication account={props.auth.email} guest={props.auth.role === 'guest'} renderWorkspace={(host, onWorkspaceReady, takeInitialWorkspace) => <EditorApp {...props} host={host} onWorkspaceReady={onWorkspaceReady} takeInitialWorkspace={takeInitialWorkspace} />} />
     </WorkspacePresenceProvider></WorkspaceAccountProvider>
   </>
 }

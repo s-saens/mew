@@ -73,6 +73,8 @@ export interface AgentRuntime {
   spec?: () => SpawnSpec
   /** terminal 표면이 탭별 tmux에서 실행할 공식 CLI. */
   terminal?: () => SpawnSpec
+  /** Installation checks need only this command, without resolving launch-only host CLI/environment. */
+  installationCommand?: () => string
   /** 명령을 입력하지 않고 tmux의 기본 셸 자체를 탭 표면으로 쓴다. */
   terminalLaunch?: 'shell'
   /** UI 설치 버튼이 실행하는 고정 명령. 요청 값을 인자에 섞지 않는다. */
@@ -235,6 +237,7 @@ const login = (
 export const RUNTIMES: Record<string, AgentRuntime> = {
   claude: {
     id: 'claude', label: 'Claude Agent', surface: 'acp', spec: claudeSpawnSpec,
+    installationCommand: () => process.env.MEW_AGENT_CMD || process.env.MEW_AGENT_CLAUDE_CMD || DEFAULT_CLAUDE_ACP_CMD,
     install: () => ({ cmd: 'npm', args: ['install', '--no-save', '@agentclientprotocol/claude-agent-acp@0.65.0'] }),
     logout: () => claudeCliSpec(['auth', 'logout']),
     auth: {
@@ -254,6 +257,7 @@ export const RUNTIMES: Record<string, AgentRuntime> = {
   },
   codex: {
     id: 'codex', label: 'Codex', surface: 'acp', spec: codexSpawnSpec,
+    installationCommand: () => process.env.MEW_AGENT_CODEX_CMD || DEFAULT_CODEX_ACP_CMD,
     install: () => ({ cmd: 'npm', args: ['install', '--no-save', '@agentclientprotocol/codex-acp@1.6.0'] }),
     logout: () => ({ cmd: hostCodexCliCommand(), args: ['logout'] }),
     auth: {
@@ -317,6 +321,7 @@ export const RUNTIMES: Record<string, AgentRuntime> = {
   },
   tmux: {
     id: 'tmux', label: 'tmux 터미널', surface: 'terminal', terminal: tmuxShellSpec, terminalLaunch: 'shell',
+    installationCommand: () => terminalBackend.binary,
     auth: { methods: () => [] },
   },
   openclaw: {
@@ -355,6 +360,7 @@ export const RUNTIMES: Record<string, AgentRuntime> = {
   },
   prime: {
     id: 'prime', label: 'Prime Agent', surface: 'acp', spec: primeSpawnSpec,
+    installationCommand: () => process.env.MEW_PRIME_AGENT_EXECUTABLE || 'prime-agent',
     // 공식 인스톨러 — Linux·macOS 공통. 버전 있는 릴리스를 내려받아 검증 후 prime-agent 명령을 심는다.
     install: process.platform === 'win32' ? undefined : () => ({ cmd: 'sh', args: ['-lc', 'curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh'] }),
     auth: {
@@ -423,6 +429,15 @@ export function resolvedTerminalSpec(id: string): SpawnSpec | null {
   const entry = RUNTIMES[id]
   if (entry?.surface !== 'terminal' || !entry.terminal) return null
   return applySetting(entry.terminal(), id)
+}
+
+/** Resolve only the executable whose presence defines installation, retaining saved command rules. */
+export function runtimeInstallationCommand(id: string): string {
+  const entry = RUNTIMES[id]
+  if (!entry) return ''
+  const command = entry.installationCommand?.()
+  if (command === undefined) return (entry.surface === 'terminal' ? resolvedTerminalSpec(id) : resolvedSpec(id))?.cmd ?? ''
+  return applySetting({ cmd: command, args: [] }, id).cmd
 }
 
 /** 요청값으로 명령을 만들지 않는다. 등록표에 박힌 로그인 spec만 돌려준다. */

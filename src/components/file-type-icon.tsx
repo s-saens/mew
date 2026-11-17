@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Folder, Page } from 'iconoir-react'
-import { fileIconId, folderIconId } from '../utils/file-icons'
+import { defaultIcons } from '../utils/file-icon-chunks/defaults'
 import defaultArtwork from '../utils/file-icon-default-artwork.json'
 import catppuccinDefaults from '../utils/catppuccin-icon-default-artwork.json'
 import { createIconArtwork } from './file-icon-artwork'
@@ -15,20 +15,20 @@ const defaults = { material: createIconArtwork(defaultArtwork), catppuccin: crea
 export function FolderTypeIcon({ open = false, size = 16 }: { open?: boolean; size?: number }) {
   const pack = useIconPack()
   const DefaultArtwork = pack === 'none' ? null : defaults[pack]
+  const ids = pack === 'none' ? null : defaultIcons[pack]
+  const state = open ? 'folderExpanded' : 'folder'
   return <span aria-hidden="true" data-icon-pack={pack} className="pointer-events-none inline-flex shrink-0 items-center justify-center" style={{ width: size, height: size }}>
-    {DefaultArtwork ? <DefaultArtwork icon={folderIconId(open, false, pack)} lightIcon={folderIconId(open, true, pack)} size={size} /> : <Folder width={size} height={size} />}
+    {DefaultArtwork && ids ? <DefaultArtwork icon={ids[state]} lightIcon={ids.light[state]} size={size} /> : <Folder width={size} height={size} />}
   </span>
 }
 
 export function FileTypeIcon({ name, size = 16 }: { name: string; size?: number }) {
   const pack = useIconPack()
   if (pack === 'none') return <span aria-hidden="true" data-icon-pack={pack} className="pointer-events-none inline-flex shrink-0 items-center justify-center" style={{ width: size, height: size }}><Page width={size} height={size} /></span>
-  const icon = fileIconId(name, false, pack), lightIcon = fileIconId(name, true, pack)
+  const ids = defaultIcons[pack]
   const DefaultArtwork = defaults[pack], Artwork = artwork[pack]
-  const fallback = <DefaultArtwork icon={fileIconId('', false, pack)} lightIcon={fileIconId('', true, pack)} size={size} />
+  const fallback = <DefaultArtwork icon={ids.file} lightIcon={ids.light.file} size={size} />
   return <span aria-hidden="true" data-icon-pack={pack} className="pointer-events-none inline-flex shrink-0 items-center justify-center" style={{ width: size, height: size }}>
-    {icon === fileIconId('', false, pack) && lightIcon === fileIconId('', true, pack) ? fallback : <Suspense fallback={fallback}>
-      <Artwork icon={icon} lightIcon={lightIcon} size={size} />
-    </Suspense>}
+    <Suspense fallback={fallback}><Artwork name={name} size={size} /></Suspense>
   </span>
 }

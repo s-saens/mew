@@ -12,7 +12,6 @@ import { projectPanelCopy } from './project-panel-copy'
 import { projectDeleteCopy } from './project-delete-copy'
 import { ProjectDeleteDialog } from './project-delete-dialog'
 import { ProjectSelectionFrame } from './project-selection-frame'
-import { ScopeToggle } from './scope-toggle'
 import { WORKSPACE_PROJECT } from '../utils/active-project'
 import { projectHierarchy, type ProjectHierarchyRow } from '../utils/project-hierarchy'
 import { useWorkspaceDesktop, useWorkspaceView } from '../workspace/workspace-view-context'
@@ -63,7 +62,6 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   const { t, locale } = useI18n()
   const copy = projectPanelCopy(locale)
   const deleteCopy = projectDeleteCopy(locale)
-  const [scope, setScope] = useState<'my' | 'all'>('my')
   const [catalogBusy, setCatalogBusy] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
   const menuElement = useRef<HTMLDivElement>(null)
@@ -216,13 +214,10 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
     <span className="max-w-[min(18rem,50vw)] truncate">{label}</span>
   </>
 
-  const scopeToggle = <div className="flex shrink-0 items-center gap-1 border-b border-edge p-1" data-project-scope>
-    <ScopeToggle<'my' | 'all'> label={t('project.choose')} value={scope} disabled={catalogBusy}
-      options={[{ value: 'my', label: copy.mine }, { value: 'all', label: copy.all }]} onChange={setScope} />
-  </div>
-
   function catalog() {
-    return <ProjectCatalogPanel paths={paths} beforeMutation={beforeProjectMutation} onBusyChange={setCatalogBusy}
+    return <ProjectCatalogPanel selection paths={paths} activePath={activePath} onFavoritesChange={onReorder}
+      onContextMenu={(path, event) => { if (canChangeIcon) { event.preventDefault(); openContextMenu(path, event.clientX, event.clientY, event.currentTarget) } }}
+      renderActions={path => showingSidebar && canUseCommands ? <CommandButtonMenu project={WORKSPACE_PROJECT} workspacePath={path === activePath ? activeWorkingPath ?? path : path} shortcutEnabled={path === activePath} title={`${labelOf(path)} · ${t('project.commands')}`} className="mew-project-command" /> : null} beforeMutation={beforeProjectMutation} onBusyChange={setCatalogBusy}
       onOpen={async path => {
         try {
           const result = await (onOpenCatalogProject ? onOpenCatalogProject(path) : onActivate(path))
@@ -238,7 +233,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
       }} />
   }
 
-  function projectItems(inSidebar: boolean) {
+  function _projectItems(inSidebar: boolean) {
     return <ProjectOrder rows={rows} activePath={activePath} onReorder={onReorder} renderItem={(path, move, index) => <>
       <ActionMenuItem style={{ flex: 1, minWidth: 0, width: 'auto' }} data-project-option={path} title={path} aria-keyshortcuts={index < 9 ? `Alt+${index + 1}` : undefined} role="menuitemradio" checked={path === activePath} closeOnSelect={!inSidebar}
         data-dialog-autofocus={!inSidebar && index === 0 || undefined}
@@ -258,17 +253,17 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
     </>} />
   }
 
+  void _projectItems
   const mobileContents = <div id={panelId} data-mobile-project-panel className="mew-project-sidebar-body min-h-0">
         <div className="mew-project-sidebar-heading">
           <Folder width={14} height={14} aria-hidden="true" />
           <h2 id={mobileTitleId} className="min-w-0 flex-1 truncate">{copy.title}</h2>
           <PanelCloseButton disabled={catalogBusy} aria-label={`${copy.title} · ${t('common.close')}`} onClick={closeMenu} />
         </div>
-        {scopeToggle}
         <div className={projectAdd ? 'mew-project-sidebar-content' : 'contents'}>
-        <div ref={menuElement} role={scope === 'my' ? 'menu' : undefined} data-inline-menu={scope === 'my' || undefined} data-project-list-scope={scope} aria-label={t('project.choose')} className="mew-project-sidebar-list"
+        <div ref={menuElement} data-project-list-scope="all" aria-label={t('project.choose')} className="mew-project-sidebar-list"
           onKeyDown={event => {
-            if (scope !== 'my' || event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+            if (event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
             const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-action-menu-item]:not(:disabled)'))
             const index = items.indexOf(document.activeElement as HTMLButtonElement)
             const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
@@ -276,7 +271,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
               : event.key === 'ArrowUp' ? (index - 1 + items.length) % items.length : null
             if (next !== null) { event.preventDefault(); items[next]?.focus({ preventScroll: true }) }
           }}>
-          {scope === 'my' ? projectItems(false) : catalog()}
+          {catalog()}
           {!projectAdd && <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={() => { closeMenu(); onOpen() }}>{t('project.add')}</ActionMenuItem></div>}
         </div>
         {projectAdd && <div className="mew-project-inline-add" inert={catalogBusy || undefined}>{projectAdd}</div>}
@@ -323,11 +318,10 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
           <span className="min-w-0 flex-1 truncate">{copy.title}</span>
           <PanelCloseButton disabled={catalogBusy} aria-label={`${copy.title} · ${t('common.close')}`} onClick={() => { onSidebarOpenChange?.(false); trigger.current?.focus({ preventScroll: true }) }} />
         </div>
-        {scopeToggle}
         <div className={projectAdd ? 'mew-project-sidebar-content' : 'contents'}>
-        <div ref={sidebarList} role={scope === 'my' ? 'menu' : undefined} data-inline-menu={scope === 'my' || undefined} data-project-list-scope={scope} aria-label={t('project.choose')} className="mew-project-sidebar-list"
+        <div ref={sidebarList} data-project-list-scope="all" aria-label={t('project.choose')} className="mew-project-sidebar-list"
           onKeyDown={event => {
-            if (scope !== 'my' || event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
+            if (event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
               || !event.currentTarget.contains(event.target as Node)) return
             const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-project-option]'))
             const row = (event.target as Element).closest('[data-project-row]')
@@ -342,7 +336,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
               : event.key === 'ArrowUp' ? (index - 1 + items.length) % items.length : null
             if (next !== null) { event.preventDefault(); items[next]?.focus({ preventScroll: true }) }
           }}>
-          {scope === 'my' ? projectItems(true) : catalog()}
+          {catalog()}
         </div>
         {projectAdd && <div className="mew-project-inline-add" inert={catalogBusy || undefined}>{projectAdd}</div>}
         </div>
@@ -362,14 +356,14 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
       : <DialogFrame labelledBy={mobileTitleId} onClose={closeMenu} busy={catalogBusy} size="settings" className="mew-mobile-project-panel">{mobileContents}</DialogFrame> : <ActionMenu ref={menuElement} variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current}
       outsideIgnore={() => deletingPath ? document.body : contextMenuElement.current ?? (menuElement.current?.querySelector('[data-project-add-inline] [aria-expanded="true"]') ? document.body : null)}
       onClose={() => { setContextMenu(null); setMenu(null) }}>
-      {projectItems(false)}
+      {catalog()}
       {paths.length > 0 && <ActionMenuSeparator />}
       {projectAdd ?? <ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem>}
     </ActionMenu>)}
     {contextMenu && canChangeIcon && <ActionMenu key="project-actions" x={contextMenu.x} y={contextMenu.y} label={labelOf(contextMenu.path)} ref={contextMenuElement} trigger={contextMenu.trigger}
       portalContainer={contextMenu.container} onClose={() => setContextMenu(null)}>
       {deleteChoices ? <>
-        {canOpen && onRemove && <ActionMenuItem icon={<Xmark />} onClick={() => onRemove(contextMenu.path)}>{deleteCopy.removeFromMine}</ActionMenuItem>}
+        {canOpen && onRemove && paths.includes(contextMenu.path) && <ActionMenuItem icon={<Xmark />} onClick={() => onRemove(contextMenu.path)}>{deleteCopy.removeFromMine}</ActionMenuItem>}
         {canDelete && onDelete && <ActionMenuItem icon={<Trash />} danger onClick={() => setDeletingPath(contextMenu.path)}>{deleteCopy.permanently}</ActionMenuItem>}
       </> : <>
         <ActionMenuItem icon={<EditPencil />} onClick={() => editIcon(contextMenu.path)}>{t('project.edit')}</ActionMenuItem>

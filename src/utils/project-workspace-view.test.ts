@@ -10,8 +10,8 @@ test('waits for both active-project metadata and the personal shortcut list', ()
   assert.equal(projectWorkspaceView({ ...account, shortcutsLoaded: false, paths: [], hasProject: false }), 'loading')
 })
 
-test('an empty personal list uses setup even when an authorized active project was saved', () => {
-  assert.equal(projectWorkspaceView({ ...account, paths: [] }), 'setup')
+test('an empty favorite list keeps an authorized active project open', () => {
+  assert.equal(projectWorkspaceView({ ...account, paths: [] }), 'workspace')
   assert.equal(projectWorkspaceView({ ...account, paths: [], hasProject: false }), 'setup')
 })
 
@@ -21,7 +21,7 @@ test('the setup surface recovers an account with shortcuts but no active root', 
 
 test('removing the last shortcut and adding a project change the workspace presentation', () => {
   assert.equal(projectWorkspaceView(account), 'workspace')
-  assert.equal(projectWorkspaceView({ ...account, paths: [] }), 'setup')
+  assert.equal(projectWorkspaceView({ ...account, paths: [] }), 'workspace')
   assert.equal(projectWorkspaceView({ ...account, paths: ['/new-project'] }), 'workspace')
 })
 

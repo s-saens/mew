@@ -2,8 +2,26 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { getUiLocale, setUiLocale, subscribeUiLocale, translateUi, uiText, uiWeekdays } from './i18n-core.ts'
 import { uiMessages, type UiMessage } from './ui-messages.ts'
+import { getUiLocale as getStartupLocale, setUiLocale as setStartupLocale } from './i18n-locale.ts'
+import { startupUiMessages, startupUiText, type StartupUiMessage } from './i18n-startup.ts'
 
 const placeholders = (text: string) => [...new Set(text.match(/\{\w+\}/g) ?? [])].sort()
+
+test('startup copy is canonical and shares locale state with the full UI in every language', () => {
+  const initial = getUiLocale()
+  try {
+    for (const locale of ['ko', 'en', 'zh-CN', 'ja'] as const) {
+      setStartupLocale(locale)
+      assert.equal(getUiLocale(), locale)
+      for (const message of Object.keys(startupUiMessages) as StartupUiMessage[]) {
+        assert.equal(uiMessages[message], startupUiMessages[message], 'both catalogs retain the same canonical entry')
+        assert.equal(startupUiText(message), translateUi(locale, message))
+      }
+      setUiLocale(locale === 'ko' ? 'en' : 'ko')
+      assert.equal(getStartupLocale(), getUiLocale())
+    }
+  } finally { setUiLocale(initial) }
+})
 
 test('every shared UI message has three translations with matching placeholders', () => {
   for (const [source, translations] of Object.entries(uiMessages)) {

@@ -1,8 +1,8 @@
 ---
 title: "UI foundations, themes, and copy"
-description: "Shared visual foundations for compact layouts, icons, scrollbars with batched geometry reads and deduplicated style writes, theme colors, UI copy, and translations. Defines reusable presentation rules while feature documents retain their requirements."
+description: "Shared visual foundations for compact layouts, icons, scrollbars with batched geometry reads and deduplicated style writes, theme colors, UI copy, and translations with a canonical lightweight startup subset. Defines reusable presentation rules while feature documents retain their requirements."
 created: "2026-11-03"
-updated: "2026-11-07"
+updated: "2026-11-16"
 상위파일: "ui-contracts.md"
 ---
 
@@ -143,7 +143,7 @@ When removing explanations, also clean up empty boxes, dividers, and spacing. Fo
 ## UI translation
 
 - The existing `I18nProvider` manages the app's language selection and immediately passes both the initially saved language and changes to `setUiLocale` in `@mew/ui/i18n-core`. The app's `t()` keys and the shared package's `uiText()` follow the same Korean, English, Simplified Chinese, and Japanese settings.
-- `packages/ui/src/ui-messages.ts` is the canonical source for shared copy. Use the Korean source text as the key and register English, Chinese, and Japanese translations for every entry. Include loading, empty states, error fallbacks, buttons, help, and accessible names. Register new source text under an existing app key or in the shared dictionary instead of inserting it directly into the UI. Pass counts, paths, and names as placeholders, and translate complete sentences.
+- `packages/ui/src/ui-messages.ts` is the canonical source for shared copy. Its five startup/recovery entries come from `i18n-startup.ts`, allowing the initial screen to use that small subset without downloading the full catalog. Keep each translation in one canonical entry. Both paths share locale state and subscriptions through `i18n-locale.ts`; the existing full translation API remains synchronous. Use the Korean source text as the key and register English, Chinese, and Japanese translations for every entry. Include loading, empty states, error fallbacks, buttons, help, and accessible names. Register new source text under an existing app key or in the shared dictionary instead of inserting it directly into the UI. Pass counts, paths, and names as placeholders, and translate complete sentences.
 - React surfaces subscribe to changes through `useUiLocale()` from `@mew/ui/i18n`. Do not freeze translated results at module initialization. Utilities outside React read the language at call time, and DOM node views subscribe through `subscribeUiLocale()` and unsubscribe on destruction. CodeMirror search reconfigures only the language compartment, and the Markdown render cache includes the language in its key. Do not remount editors or terminals or clear drafts, search terms, or documents to switch languages.
 - Weekdays, calendars, and times use the selected language's `Intl` formatting. Do not replace original text in user documents, filenames, project names, conversations, command output, or external systems in an attempt to translate it. Preserve Korean slash-search aliases, compatibility values for existing tab names, and Markdown heading parsing aliases as data contracts.
 - Verification: `packages/ui/src/i18n.test.ts` checks all four languages, placeholders, and subscription cleanup; `src/ui-localization.test.ts` checks for untranslated Korean literals in UI sources, language-specific Markdown caches, and time display. `server/i18n-ui.test.ts` checks switching among all four languages, refreshing agent history and the current conversation, CodeMirror find, code copying, shared confirmation dialogs, and preservation of drafts, search terms, and content on desktop and mobile in isolated Chromium.

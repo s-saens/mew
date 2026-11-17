@@ -1,15 +1,20 @@
 import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useRef, useState } from 'react'
-import { Check, Plus, RefreshDouble, Search } from 'iconoir-react'
-import { HoverTipLayer, LoadingIndicator } from '@mew/ui'
+import { Check, Plus, RefreshDouble, Search, Star, NavArrowDown, NavArrowRight } from 'iconoir-react'
+import { HoverTipLayer, LoadingIndicator, MenuReorderHandle, useDragReorder } from '@mew/ui'
 import { type RegisteredProject } from '../api/client'
 import { useI18n } from '../i18n'
 import { projectHierarchy } from '../utils/project-hierarchy'
 import { ProjectIcon } from './ProjectIcon'
 import { projectAddCopy } from './project-add-copy'
 
-export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMutation, onBusyChange }: {
+export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMutation, onBusyChange, selection = false, onFavoritesChange, activePath, onContextMenu, renderActions }: {
   paths: string[]
+  selection?: boolean
+  activePath?: string | null
+  onContextMenu?: (path: string, event: React.MouseEvent<HTMLButtonElement>) => void
+  renderActions?: (path: string) => React.ReactNode
+  onFavoritesChange?: (paths: string[]) => void
   onOpen: (path: string) => Promise<boolean | void> | boolean | void
   onProjectsChanged?: () => Promise<void> | void
   beforeMutation?: () => Promise<unknown>
@@ -19,11 +24,14 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
   const { t, locale } = useI18n()
   const [projects, setProjects] = useState<RegisteredProject[] | null>(null)
   const [search, setSearch] = useState('')
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [otherOrder, setOtherOrder] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [reload, setReload] = useState(0)
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(false)
   const pending = useRef(false)
+  const discoveryRequest = useRef<AbortController | null>(null)
   const [imported, setImported] = useState(() => new Set<string>())
   const content = useRef<HTMLDivElement>(null)
   const alive = useRef(true)
@@ -31,12 +39,19 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   useEffect(() => {
     const controller = new AbortController()
+    discoveryRequest.current = controller
     setLoading(true)
     setError(null)
-    fetchProjectRegistry(controller.signal).then(result => { if (!controller.signal.aborted) setProjects(result.projects) }).catch((err: unknown) => {
+    let complete = false
+    // Show the registered catalog while the full discovery runs. A late snapshot
+    // must never replace a completed discovery response.
+    void fetchProjectRegistry(controller.signal, true).then(result => {
+      if (!controller.signal.aborted && !complete) setProjects(result.projects)
+    }).catch(() => {})
+    fetchProjectRegistry(controller.signal).then(result => { complete = true; if (!controller.signal.aborted) setProjects(result.projects) }).catch((err: unknown) => {
       if (!controller.signal.aborted) setError(err instanceof Error ? err.message : String(err))
     }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
-    return () => controller.abort()
+    return () => { controller.abort(); if (discoveryRequest.current === controller) discoveryRequest.current = null }
   }, [reload, pathsKey, fetchProjectRegistry])
 
   async function importProject(project: RegisteredProject) {
@@ -72,7 +87,21 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
   const query = search.toLocaleLowerCase()
   const matches = projects?.filter(project => project.name.toLocaleLowerCase().includes(query) || project.path.toLocaleLowerCase().includes(query)) ?? []
   const visible = new Set(matches.map(project => project.path))
-  const rows = projectHierarchy(projects?.map(project => project.path) ?? [])
+  const allPaths = projects?.map(project => project.path) ?? []
+  const favoriteSet = new Set(paths)
+  const otherPaths = [...otherOrder.filter(path => allPaths.includes(path) && !favoriteSet.has(path)), ...allPaths.filter(path => !favoriteSet.has(path) && !otherOrder.includes(path))]
+  const rows = selection ? [...projectHierarchy(paths.filter(path => allPaths.includes(path))), ...projectHierarchy(otherPaths)] : projectHierarchy(allPaths)
+  function reorder(from: number, to: number) {
+    if (!selection || search || collapsed.size || from === to || to < 0 || to >= rows.length) return
+    const source = rows[from], target = rows[to]
+    if (favoriteSet.has(source.path) !== favoriteSet.has(target.path) || source.parentPath !== target.parentPath) return
+    const list = favoriteSet.has(source.path) ? rows.filter(row => favoriteSet.has(row.path)).map(row => row.path) : rows.filter(row => !favoriteSet.has(row.path)).map(row => row.path)
+    const sourceIndex = list.indexOf(source.path), targetIndex = list.indexOf(target.path)
+    list.splice(targetIndex, 0, list.splice(sourceIndex, 1)[0])
+    if (favoriteSet.has(source.path)) onFavoritesChange?.(list)
+    else setOtherOrder(list)
+  }
+  const drag = useDragReorder({ axis: 'y', handleOnly: true, onReorder: reorder })
   const parents = new Map(rows.map(row => [row.path, row.parentPath]))
   for (const match of matches) {
     let parent = parents.get(match.path)
@@ -87,16 +116,23 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
       </label>
       <div className="mew-project-catalog-list" aria-busy={busy || loading || undefined}>
         {!projects && !error && <div role="status" aria-label={t('common.loading')} className="flex justify-center p-2"><LoadingIndicator /></div>}
-        {rows.filter(row => visible.has(row.path)).map(row => {
+        {rows.filter(row => visible.has(row.path) && (search || !(() => { let parent = parents.get(row.path); while (parent) { if (collapsed.has(parent)) return true; parent = parents.get(parent) } return false })())).map(row => {
+          const visualIndex = rows.indexOf(row)
+          const { ref, ...handleProps } = drag.getItemProps(visualIndex)
+          const hasChildren = rows.some(child => child.parentPath === row.path)
           const project = byPath.get(row.path)!
           const mine = paths.includes(row.path) || imported.has(row.path)
-          return <div key={row.path} data-catalog-project={row.path} data-project-depth={row.depth} className="mew-project-catalog-row" style={{ paddingLeft: Math.min(row.depth, 5) * 12 }}>
-            <button type="button" disabled={busy} title={project.path} onClick={() => void importProject(project)} className="mew-project-catalog-open"
+          return <div key={row.path} ref={selection ? ref : undefined} data-catalog-project={row.path} data-project-depth={row.depth} data-active={row.path === activePath || undefined} className="mew-project-catalog-row" style={{ paddingLeft: Math.min(row.depth, 5) * 12 }}>
+            {selection && <MenuReorderHandle {...handleProps} aria-label={`${project.name} · ${t('project.reorder')}`} onMove={direction => reorder(visualIndex, visualIndex + direction)} />}
+            {selection && hasChildren && <button type="button" className="mew-project-catalog-pin" aria-label={`${project.name} · ${collapsed.has(row.path) ? '+' : '−'}`} aria-expanded={!collapsed.has(row.path)} onClick={() => setCollapsed(previous => { const next = new Set(previous); if (next.has(row.path)) next.delete(row.path); else next.add(row.path); return next })}>{collapsed.has(row.path) ? <NavArrowRight width={14} /> : <NavArrowDown width={14} />}</button>}
+            <button type="button" disabled={busy} title={project.path} onClick={() => { discoveryRequest.current?.abort(); setLoading(false); if (selection) void onOpen(project.path); else void importProject(project) }} onContextMenu={event => onContextMenu?.(project.path, event)} className="mew-project-catalog-open"
               aria-label={`${project.name}${duplicates.has(project.name) ? ` (${project.path})` : ''} · ${t(mine ? 'project.inMine' : 'project.addToMine')}`}>
               <ProjectIcon icon={project.icon ?? 'i:folder'} size={16} />
               <span className="min-w-0 flex-1"><span className="block truncate">{project.name}</span>{duplicates.has(project.name) && <span className="block truncate text-xs text-ink-secondary">{project.path}</span>}</span>
-              {mine ? <Check width={16} height={16} className="shrink-0 text-ink-secondary" aria-hidden="true" /> : <Plus width={16} height={16} className="shrink-0 text-ink-secondary" aria-hidden="true" />}
+              {!selection && (mine ? <Check width={16} height={16} className="shrink-0 text-ink-secondary" aria-hidden="true" /> : <Plus width={16} height={16} className="shrink-0 text-ink-secondary" aria-hidden="true" />)}
             </button>
+            {selection && renderActions?.(row.path)}
+            {selection && <button type="button" className="mew-project-catalog-pin" aria-pressed={mine} aria-label={mine ? t('favorites.remove', { name: project.name }) : `${project.name} · ${t('favorites.add')}`} onClick={() => onFavoritesChange?.(mine ? paths.filter(path => path !== row.path) : [...paths, row.path])}><Star width={16} height={16} fill={mine ? 'currentColor' : 'none'} /></button>}
           </div>
         })}
         {projects && !matches.length && <p className="px-2 py-3 text-xs text-ink-secondary">{t(projects.length ? 'project.noProjectMatches' : 'project.noProjects')}</p>}

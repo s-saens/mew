@@ -30,6 +30,7 @@ export class ProjectRegistry {
   readonly file: string
   readonly managedRoot: string
   private pendingDirectories = new Set<string>()
+  private discovery: { promise: Promise<void>; controller: AbortController; waiters: number } | null = null
   constructor(directory = DATA_DIR, managedRoot = path.join(os.homedir(), '.mew', 'projects')) {
     this.file = path.join(directory, 'projects.yaml')
     this.managedRoot = managedRoot
@@ -127,10 +128,111 @@ export class ProjectRegistry {
       }
     }
     if (changed) this.write(state)
+    return this.rows(state, account)
+  }
+
+  /** Return the persisted catalog without filesystem discovery or icon reads. */
+  snapshot(account: string): RegistryProject[] {
+    return this.rows(this.read(), account, false)
+  }
+
+  /** Concurrent callers share discovery until all interested requests disconnect. */
+  async listAsync(account: string, signal?: AbortSignal): Promise<RegistryProject[]> {
+    if (signal?.aborted) throw new DOMException('Discovery canceled', 'AbortError')
+    let discovery = this.discovery
+    if (!discovery) {
+      const controller = new AbortController()
+      discovery = { controller, waiters: 0, promise: this.discoverAsync(controller.signal) }
+      this.discovery = discovery
+    }
+    discovery.waiters++
+    let canceled: (() => void) | undefined
+    try {
+      const aborted = new Promise<never>((_, reject) => {
+        canceled = () => reject(new DOMException('Discovery canceled', 'AbortError'))
+        signal?.addEventListener('abort', canceled, { once: true })
+        if (signal?.aborted) canceled()
+      })
+      await Promise.race([discovery.promise, aborted])
+      return this.rows(this.read(), account)
+    } finally {
+      if (canceled) signal?.removeEventListener('abort', canceled)
+      discovery.waiters--
+      if (discovery.waiters === 0) {
+        if (this.discovery === discovery) this.discovery = null
+        discovery.controller.abort()
+      }
+    }
+  }
+
+  private async discoverAsync(signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted()
+    const initial = this.read()
+    let entries: fs.Dirent[] = []
+    try { entries = await fs.promises.readdir(this.managedRoot, { withFileTypes: true }) } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
+    const managed: string[] = []
+    for (const entry of entries) {
+      signal.throwIfAborted()
+      if (!entry.isDirectory() || entry.name.startsWith('.')) continue
+      const directory = path.join(this.managedRoot, entry.name)
+      if (this.pendingDirectories.has(directory)) continue
+      try { assertNotServerDataPath(directory) } catch { continue }
+      try {
+        managed.push(await fs.promises.realpath(directory))
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT' || (error as NodeJS.ErrnoException).code === 'ENOTDIR') continue
+        throw error
+      }
+    }
+    const roots = new Set([...initial.projects.filter(project => !project.discovered).map(project => project.path), ...managed])
+    const nested = new Map<string, string[]>()
+    for (const root of roots) {
+      signal.throwIfAborted()
+      nested.set(root, await discoverNestedProjectsAsync(root, this.pendingDirectories, signal))
+    }
+    signal.throwIfAborted()
+
+    // Discovery yielded to other requests. Merge into the latest ledger so concurrent
+    // shortcuts, registrations and permanent deletions cannot be overwritten.
+    const state = this.read()
+    let changed = false
+    const available = (directory: string): boolean => {
+      if (this.pendingDirectories.has(directory)) return false
+      try { return fs.lstatSync(directory).isDirectory() && fs.realpathSync(directory) === directory } catch { return false }
+    }
+    for (const directory of managed) {
+      if (available(directory) && !state.projects.some(project => project.path === directory)) {
+        this.include(state, directory, true)
+        changed = true
+      }
+    }
+    for (const [root, directories] of nested) {
+      if (!state.projects.some(project => project.path === root) || !available(root)) continue
+      for (const directory of directories) {
+        if (available(directory) && !state.projects.some(project => project.path === directory)) {
+          this.include(state, directory).discovered = true
+          changed = true
+        }
+      }
+    }
+    if (changed) this.write(state)
+  }
+
+  private rows(state: Registry, account: string, withIcons = true): RegistryProject[] {
     const mine = new Set(state.myProjects[accountKey(account)]?.paths ?? [])
+    const registered = new Set(state.projects.map(project => project.path))
     return state.projects.map(project => {
-      const parent = state.projects.filter(candidate => candidate.path !== project.path && project.path.startsWith(candidate.path.endsWith(path.sep) ? candidate.path : candidate.path + path.sep)).sort((a, b) => b.path.length - a.path.length)[0]
-      return { ...project, mine: mine.has(project.path), icon: fs.existsSync(project.path) ? readProjectIcon(project.path) : null, ...(parent ? { parentPath: parent.path } : {}) }
+      let ancestor = path.dirname(project.path)
+      let parentPath: string | undefined
+      while (ancestor !== project.path) {
+        if (registered.has(ancestor)) { parentPath = ancestor; break }
+        const parent = path.dirname(ancestor)
+        if (parent === ancestor) break
+        ancestor = parent
+      }
+      return { ...project, mine: mine.has(project.path), icon: withIcons && fs.existsSync(project.path) ? readProjectIcon(project.path) : null, ...(parentPath ? { parentPath } : {}) }
     })
   }
 
@@ -247,6 +349,13 @@ export class ProjectRegistry {
 }
 
 const ignoredDirectories = new Set(['.git', '.mew', '.worktrees', 'node_modules', 'vendor', 'dist', 'build', '.cache'])
+const unityGeneratedDirectories = new Set(['Library', 'Temp'])
+
+function discoveryChildren(entries: fs.Dirent[]): fs.Dirent[] {
+  const isUnityProject = ['Assets', 'ProjectSettings'].every(name => entries.some(entry => entry.name === name && entry.isDirectory()))
+  return entries.filter(entry => entry.isDirectory() && !entry.name.startsWith('.') && !ignoredDirectories.has(entry.name)
+    && !(isUnityProject && unityGeneratedDirectories.has(entry.name)))
+}
 
 /** Bounded, link-free discovery keeps dependency trees and server metadata outside the catalog. */
 export function discoverNestedProjects(root: string, excluded: ReadonlySet<string> = new Set()): string[] {
@@ -257,8 +366,7 @@ export function discoverNestedProjects(root: string, excluded: ReadonlySet<strin
     if (current.depth >= 20) continue
     let entries: fs.Dirent[]
     try { entries = fs.readdirSync(current.directory, { withFileTypes: true }) } catch { continue }
-    for (const entry of entries) {
-      if (!entry.isDirectory() || ignoredDirectories.has(entry.name) || entry.name.startsWith('.')) continue
+    for (const entry of discoveryChildren(entries)) {
       if (++visited > 10_000) break
       const directory = path.join(current.directory, entry.name)
       if (excluded.has(directory)) continue
@@ -269,6 +377,38 @@ export function discoverNestedProjects(root: string, excluded: ReadonlySet<strin
       if (marker) result.push(directory)
       pending.push({ directory, depth: current.depth + 1 })
     }
+  }
+  return result.sort()
+}
+
+/** Match synchronous catalog discovery while allowing authentication and file requests to proceed. */
+export async function discoverNestedProjectsAsync(root: string, excluded: ReadonlySet<string> = new Set(), signal?: AbortSignal): Promise<string[]> {
+  const result: string[] = [], pending = [{ directory: root, depth: 0 }]
+  let visited = 0
+  while (pending.length && visited < 10_000) {
+    signal?.throwIfAborted()
+    // Bound directory and marker reads instead of queuing the whole workspace at once.
+    await Promise.all(pending.splice(-4).map(async ({ directory, depth }) => {
+      let entries: fs.Dirent[]
+      try { entries = await fs.promises.readdir(directory, { withFileTypes: true }) } catch { return }
+      const children = discoveryChildren(entries)
+      for (let offset = 0; offset < children.length && visited < 10_000; offset += 16) {
+        signal?.throwIfAborted()
+        await Promise.all(children.slice(offset, offset + 16).map(async entry => {
+          if (visited++ >= 10_000) return
+          const child = path.join(directory, entry.name)
+          if (excluded.has(child)) return
+          try { assertNotServerDataPath(child) } catch { return }
+          let marker = false
+          for (const name of ['.mew', '.git']) {
+            try { const stat = await fs.promises.lstat(path.join(child, name)); marker = stat.isDirectory() || name === '.git' && stat.isFile() } catch { /* no marker */ }
+            if (marker) break
+          }
+          if (marker) result.push(child)
+          if (depth < 19) pending.push({ directory: child, depth: depth + 1 })
+        }))
+      }
+    }))
   }
   return result.sort()
 }

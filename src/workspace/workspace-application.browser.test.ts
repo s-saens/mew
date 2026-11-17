@@ -14,10 +14,11 @@ async function fixtureBundle() {
   const source = `
     import React from'react';import{createRoot}from'react-dom/client';import{createPortal}from'react-dom';
     import{WorkspaceApplication}from${JSON.stringify(application)};import{useWorkspaceApi}from${JSON.stringify(apiContext)};
-    window.fixture={activeRoot:new URLSearchParams(location.search).has('no-project')?null:'/a',calls:[],hosts:{},mounts:{},unmounts:{},prepared:{},released:{},waiters:{},blocked:[],prepareBlocked:[],prepareWaiters:{},fail:[],unavailable:[],actions:[],notReady:[],globalMounts:0,globalUnmounts:0};
+    window.fixture={activeRoot:new URLSearchParams(location.search).has('no-project')?null:'/a',calls:[],hosts:{},mounts:{},unmounts:{},prepared:{},released:{},waiters:{},blocked:[],prepareBlocked:[],prepareWaiters:{},fail:[],unavailable:[],actions:[],notReady:[],snapshots:[],globalMounts:0,globalUnmounts:0};
     function Header({host}){React.useEffect(()=>{window.fixture.globalMounts++;return()=>{window.fixture.globalUnmounts++}},[]);return <nav data-global-toolbar data-project={host.panel.projectPath}><button data-mode="multi" onClick={()=>host.onModeChange('multi')}>Multi</button><button data-mode="single" onClick={()=>host.onModeChange('single')}>Single</button></nav>}
     function Workspace({host,onWorkspaceReady}){const api=useWorkspaceApi(),[tool,setTool]=React.useState('editor'),[selecting,setSelecting]=React.useState(false);if(!host)return window.fixture.activeRoot?<div data-legacy-workspace data-api-root={api.scope?.workspacePath??'legacy'}><textarea aria-label="Legacy draft"/></div>:<div data-fallback><button data-first-project onClick={()=>{window.fixture.activeRoot='/a';onWorkspaceReady?.({path:'/a',projectPath:'/a',hasProject:true,workspaceScopeVersion:1})}}>Open first project</button></div>;
       React.useEffect(()=>{window.fixture.mounts[host.id]=(window.fixture.mounts[host.id]??0)+1;return()=>{window.fixture.unmounts[host.id]=(window.fixture.unmounts[host.id]??0)+1}},[host.id]);
+      React.useEffect(()=>{const snapshot=host.takeInitialWorkspace?.();window.fixture.snapshots.push({id:host.id,root:host.panel.workingRoot,path:snapshot?.path??null})},[]);
       React.useEffect(()=>{window.fixture.hosts[host.id]=host;host.register({workspacePath:host.panel.workingRoot,isReady:()=>!window.fixture.notReady.includes(host.panel.workingRoot),performAction:async action=>{window.fixture.actions.push({id:host.id,project:host.panel.projectPath,root:host.panel.workingRoot,action});if(action.kind==='start_project_session')setTool('agent')},prepareClose:async()=>{window.fixture.prepared[host.id]=(window.fixture.prepared[host.id]??0)+1;if(window.fixture.prepareBlocked.includes(host.panel.projectPath))await new Promise(resolve=>{window.fixture.prepareWaiters[host.id]=resolve});return()=>{window.fixture.released[host.id]=(window.fixture.released[host.id]??0)+1}}});return()=>{host.register(null);if(window.fixture.hosts[host.id]===host)delete window.fixture.hosts[host.id]}},[host]);
       React.useEffect(()=>{if(host.selectionSignal)setSelecting(true)},[host.selectionSignal]);
       return <div data-fixture-workspace={host.id} data-path={host.panel.projectPath} data-root={host.panel.workingRoot} data-active={String(host.active)} data-api-root={api.scope?.workspacePath??'legacy'}>
@@ -41,7 +42,7 @@ async function fixtureBundle() {
       if (id.endsWith('.css')) return { code: '', moduleType: 'js' }
       if (id === client) return clientSource
       if (id === sourcePath('../i18n.tsx')) return `export function useI18n(){return{locale:'en',t:key=>key}}`
-      if (id === sourcePath('./workspace-account.tsx')) return 'const services={capabilities:{terminal:false},projects:{paths:["/a","/b","/c"],setPaths(){},icons:{},saveQueue:{current:Promise.resolve()}}};export function useWorkspaceAccount(){return services}'
+      if (id === sourcePath('./workspace-account.tsx')) return 'const services={capabilities:{terminal:false},projects:{paths:["/a","/b","/c"],setPaths(){},icons:{},saveQueue:{current:Promise.resolve()}}};export function useWorkspaceAccount(){return services};export {BrowserContext,useWorkspaceBrowser} from "./workspace-browser-context"'
       if (id === sourcePath('../components/ProjectIcon.tsx')) return 'export function ProjectIcon(){return null}'
       if (id === sourcePath('../components/CommandButtonMenu.tsx')) return `import React from'react';export function CommandButtonMenu({workspacePath}){return <button data-project-command={workspacePath}>Command</button>}`
       if (id === sourcePath('../components/project-add-inline.tsx')) return `export function ProjectAddInline(){return null}`
@@ -121,6 +122,33 @@ test('workspace application preserves independent project tools and drafts throu
   await workspace(page, '/c').waitFor({ state: 'visible' })
   assert.deepEqual(await paths(page), ['/a', '/b', '/c'])
   assert.equal(await page.locator('[data-global-toolbar]').count(), 1)
+  assert.deepEqual(errors, [])
+})
+
+test('the initial workspace snapshot is consumed once and cannot return after panel replacement or reopening', { timeout: 30_000 }, async t => {
+  const fixture = await fixtureBundle(), browser = await connectTestBrowser()
+  t.after(() => browser.close())
+  const page = await browser.newPage({ viewport: { width: 1800, height: 1000 } }), errors = await install(page, fixture)
+  await page.waitForFunction('window.fixture.snapshots.length === 1')
+  assert.deepEqual(await page.evaluate('window.fixture.snapshots.map(({root,path})=>({root,path}))'), [{ root: '/a', path: '/a' }])
+  await page.locator('[data-mode="multi"]').click()
+  // Closing the original panel removes its local ref, but must not replenish the
+  // outer host's already consumed authenticated response.
+  await page.locator('[data-project-panel]:visible .mew-project-board-header button:last-child').click()
+  await page.locator('[data-project-panel]:visible').waitFor({ state: 'detached' })
+  await add(page, '/a')
+  await page.waitForFunction('window.fixture.snapshots.length === 2')
+  assert.deepEqual(await page.evaluate('window.fixture.snapshots.map(({root,path})=>({root,path}))'), [{ root: '/a', path: '/a' }, { root: '/a', path: null }])
+  // This newly opened panel is independent of the single-project selection, so
+  // replacing its scope and returning remounts its child without a retained copy.
+  await page.evaluate(`window.fixture.replaced=Object.values(window.fixture.hosts).find(host=>host.panel.workingRoot==='/a').onProjectChange('/b')`)
+  assert.equal(await page.evaluate('window.fixture.replaced'), true)
+  await workspace(page, '/b').waitFor({ state: 'visible' })
+  await page.evaluate(`window.fixture.replaced=Object.values(window.fixture.hosts).find(host=>host.panel.workingRoot==='/b').onProjectChange('/a')`)
+  assert.equal(await page.evaluate('window.fixture.replaced'), true)
+  await workspace(page, '/a').waitFor({ state: 'visible' })
+  await page.waitForFunction('window.fixture.snapshots.length === 4')
+  assert.deepEqual(await page.evaluate('window.fixture.snapshots.map(({root,path})=>({root,path}))'), [{ root: '/a', path: '/a' }, { root: '/a', path: null }, { root: '/b', path: null }, { root: '/a', path: null }])
   assert.deepEqual(errors, [])
 })
 
@@ -300,6 +328,7 @@ test('a single workspace worktree change is the actual scope used when opening m
     window.fixture.pendingOpenProject=host.onAction({kind:'open_project',path:'/a'});
   })()`)
   await page.evaluate('window.fixture.pendingOpenProject')
+  await workspace(page, '/a').waitFor({ state: 'visible' })
   assert.deepEqual(await paths(page), ['/a'])
   assert.equal(await workspace(page, '/a').getAttribute('data-root'), '/a/.worktrees/task')
   assert.equal(await page.evaluate('window.fixture.activeRoot'), '/a/.worktrees/task', 'opening an existing logical project preserves its selected worktree')

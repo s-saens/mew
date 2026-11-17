@@ -59,6 +59,7 @@
 .mew-project-catalog-search input { width: 100%; min-width: 0; background: transparent; font-size: 12px; color: var(--color-ink); }
 .mew-project-catalog-list { min-height: 0; max-height: min(24rem, 50dvh); overflow: auto; padding: 0 6px 4px; }
 .mew-project-catalog-row { display: flex; min-width: 0; align-items: center; gap: 2px; }
+.mew-project-catalog-row[data-active="true"] { background: color-mix(in srgb, var(--color-accent) 14%, transparent); }
 .mew-project-catalog-open { display: flex; min-width: 0; min-height: 36px; flex: 1; align-items: center; gap: 6px; border-radius: 4px; padding: 6px; text-align: left; font-size: 13px; }
 .mew-project-catalog-pin { display: inline-flex; width: 30px; height: 32px; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 4px; color: var(--color-ink-secondary); }
 .mew-project-catalog-open:hover, .mew-project-catalog-pin:hover { background: var(--color-surface-hover); }

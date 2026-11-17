@@ -1,8 +1,8 @@
 ---
 title: "Browser startup and deferred loading"
-description: "Browser routes and startup contracts for parallel local authentication, storage scope, initial workspace snapshots, deferred modules, failure handling, and chunk boundaries. Separates verification contracts from historical isolated measurements."
+description: "Browser routes and startup contracts for parallel local authentication, storage scope, single-use initial workspace handoff, compressed direct assets, deferred modules, failure handling, and chunk boundaries. Separates verification contracts from historical isolated measurements."
 created: "2026-11-03"
-updated: "2026-11-06"
+updated: "2026-11-16"
 ---
 
 ## Application routes and missing pages
@@ -19,7 +19,7 @@ The missing-page screen inherits the saved theme and local fonts. Its 404 graphi
 
 Separately from regular and remote access, `demo.html` prepares an in-memory runtime environment, then loads the same `main`·`AppBootstrap`·`App`. `src/runtime/app-runtime.ts` injects transport, collaboration, initial authentication, and the base path, distinguishing them from actual P2P state. [Browser Demo](demo.md) owns the state, deployment, and verification contract for the demo, which does not duplicate the UI.
 
-`src/main.tsx` applies the saved font/theme and shows the lightweight `StartupScreen`. Start the P2P parent MessagePort, authentication query, and current-path entry download in parallel. For an ordinary workspace entry without runtime-provided authentication, start `/api/auth/me` alongside the bootstrap import and reuse its result; a failed request retains the guest fallback. Share and missing-page routes do not start this lookup.
+`src/main.tsx` applies the saved font/theme and shows the lightweight `StartupScreen`. Start the P2P parent MessagePort, authentication query, current-path entry, and `I18nProvider` downloads in parallel. Use the tiny canonical startup/recovery catalog and shared locale state before full catalogs arrive. Keep keyed workspace translations out of the initial entry; wait for the provider before rendering localized application screens. For an ordinary workspace entry without runtime-provided authentication, start `/api/auth/me` alongside the bootstrap import and reuse its result; a failed request retains the guest fallback. Share and missing-page routes do not start this lookup.
 
 - Load `AppBootstrap`, but render it only after confirming storage scope.
 - Use `initialAuth` only when the P2P launcher verified it on the current connection. It sets the local-user/instance storage scope; missing or malformed state requires `/api/auth/me` verification. Do not reuse passed state during reconnection.
@@ -51,6 +51,12 @@ The first authenticated read opts into `GET /api/workspace?include=workspace-ui`
 | No selected project, lookup failure, or envelope exceeding 64 KiB in UTF-8 | Omit the optional envelope |
 | Ordinary GET or POST | Preserve the existing response |
 | Guest | Keep access forbidden |
+
+`WorkspaceApplication` requests this envelope in its first capability-negotiating workspace read. Pass that accepted response to the first matching editor workspace, including both actual and logical roots. The editor consumes it once instead of waiting for a duplicate workspace GET. A projectless or legacy-server fallback can consume the same initial response. Other restored panels issue their own scoped reads. Do not retain this handoff as an authoritative cache: permission invalidation, recovery, broadcasts, later activations, and explicit project changes use fresh requests. File bodies, account tabs, and collaboration still follow their independent validation gates.
+
+The same opt-in may include `editorTabs: { workspacePath, state, revision }` from the account's authoritative tab ledger, using the logical project root. The combined optional envelopes stay within 64 KiB in UTF-8. A missing, oversized, malformed, or unreadable ledger envelope retains the separate tab GET; a known-empty `null` state is valid authority. The server retains the ledger's existing lazy legacy migration. [Account tabs](account-tabs.md#editor-tabs) owns synchronization and migration semantics.
+
+The mode shell requests these envelopes in its first authenticated workspace read and hands the accepted response to a matching actual/logical editor through an atomic callback. Consumption belongs to the outer shell, so remounting after replacing, closing, or returning to the initial project cannot reuse old metadata. The editor consumes initial tab authority only before a logical root activates; later signals, recovery, permissions, and project returns use fresh reads. Engine preparation prefers accepted authoritative tabs over legacy UI tabs. [ADR 0178](../decisions/0178-responsive-startup-and-host-discovery.md) records these refinements.
 
 Seed the client cache only from an accepted initial response with a current request sequence/permission epoch and no newer UI snapshot. Validate the logical root and object/null shape; retain [device-local layout precedence](../features/appearance-accounts-operations/panel-layout-mobile-and-state-restoration.md#device-specific-layouts-and-memotasks-popups-2026-10-06). A `null` state is a successful empty server snapshot; absent/invalid envelopes use the existing UI-state GET. Later workspace changes and broadcasts keep their reconciliation path. The optional field grants no file or editing permissions.
 
@@ -145,6 +151,10 @@ Provide manual **Refresh**; if the error followed an update, advise restarting t
 
 The [drawing board](../features/terminals-agents-automation/agent-drawing-editor.md) has a local error boundary around its lazy import, so drawing failures preserve the surrounding document or agent draft. Its loading and error dialogs can be closed without refreshing. The [runtime failure record](../work/runtime-error-recovery.md) separates isolated regression checks from application to a running instance.
 
+### Direct static UI assets
+
+Production builds prepare Brotli and gzip sidecars for compressible hashed JavaScript, CSS, JSON, and SVG assets of at least 1 KiB. Direct HTTP `/assets` negotiates these representations with `Vary: Accept-Encoding` and existing immutable caching. Validators and HEAD describe the chosen representation; byte-range requests retain the original identity body. Builds without sidecars retain the original files. Compression runs during the build, outside the API request path. Applying the middleware requires a separately authorized server restart; a build alone prepares sidecars and updates UI assets. Remote resource compression retains its [separate transport contract](remote-access.md#host-ui-compression-and-revalidation).
+
 ### Chunk and dependency boundaries
 
 `src/api/auth.ts` is an authentication-only API that does not import terminal packages. The regular workspace API, `api/client.ts`, re-exports the same functions and types for compatibility with existing callers. `api/response.ts` shares error and session expiration notifications.
@@ -155,6 +165,7 @@ The [drawing board](../features/terminals-agents-automation/agent-drawing-editor
 | --- | --- |
 | `startup` | main's static dependencies |
 | `authentication` | `AppBootstrap`'s static dependencies |
+| `runtime-primitives` | Independent UUID and recovery helpers, preventing native initialization from acquiring workspace code before authentication |
 | `workspace` | Lower-priority recursive grouping of `App`'s static dependencies |
 
 Keep shared initial/authentication code in its original chunks without duplication or moving it to the workspace. Retain dynamic editor/tool imports. Grouping all editor shared dependencies was rejected because holding its response also blocked settings.
@@ -163,20 +174,20 @@ Run startup asynchronously without blocking module evaluation, allowing `main.ts
 
 The workspace group uses `entriesAware: true` and `entriesAwareMergeThreshold: 14 * 1024`. Partition modules by their actual importing entries before merging small compatible groups. This keeps shared public-share code from pulling in the workspace while reducing small critical-path requests.
 
-The final full-source graph preserves 170 deferred edges and reduces critical chunks from 33 to 19. A 16 KiB threshold was rejected after moving 933 bytes of `lib0/eventloop` into eager workspace evaluation. A 14 KiB threshold preserves the boundary at the same critical request count. Keep checks for initial/authentication modules, public-share isolation, every dynamic edge, and caller-ready dependencies. The [initial-offer and rendering decision](../decisions/0122-mewlink-initial-offer.md) and [measurement record](../work/mewlink-subsecond-startup.md) cover the 2026-11-02 changes.
+The 2026-11-02 full-source graph preserved 170 deferred edges and reduced critical chunks from 33 to 19. The November 16 graph retains 177 deferred edges and reduces the current ungrouped 44 critical chunks to 24; the [performance work record](../work/startup-performance-2026-11.md) tracks the current artifact and timings. A 16 KiB threshold was rejected after moving 933 bytes of `lib0/eventloop` into eager workspace evaluation. A 14 KiB threshold preserves the boundary at the same critical request count. Keep checks for initial/authentication modules, public-share isolation, every dynamic edge, and caller-ready dependencies. The [initial-offer and rendering decision](../decisions/0122-mewlink-initial-offer.md) and [measurement record](../work/mewlink-subsecond-startup.md) cover the 2026-11-02 changes.
 
 ### Verification
 
 | Regression | Contract checked |
 | --- | --- |
 | `src/app-bootstrap.browser.test.ts` | Actual main, authentication, P2P bridge, and login in an isolated browser: pending-auth startup screen, 0 workspace requests before remote login, 1 initial authentication query, required password changes, identity/permission switches, local guests, and query failures |
-| `src/workspace-startup.browser.test.ts` | Actual desktop/mobile header and explorer remain usable with editor/settings responses held; closed tools stay deferred |
+| `src/workspace-startup.browser.test.ts` | Actual desktop/mobile header and explorer remain usable with editor/settings responses held; one initial workspace read is handed to the editor, bounded authoritative tab metadata removes its first ledger wait, recovery reads fresh state, and closed tools stay deferred |
 | `src/api/client-bundle.test.ts` | API, explorer, and workspace dependency boundaries |
 | `src/components/session-terminal-startup.browser.test.ts` | Command-popup renderer waits |
 | `src/components/project-icons-startup.browser.test.ts` | Icon size and selection |
 | `src/components/shared-memo-startup.browser.test.ts` | Notes focus on first open and reopen |
 
-The user builds and applies `dist/` for the actual installation.
+Follow the [execution rules](getting-started.md#execution-and-verification) for building and application. A required build replaces served UI assets; server source changes require a separately authorized server restart.
 
 `server/deferred-dialog-ui.test.ts` holds imports while checking immediate shells, settings/mobile bounds and layering, current props, first-commit warm reuse, close/Esc/Back, canceled loads, local failures/retry, and production rendering with retry timers held. `src/workspace-startup.browser.test.ts` holds actual Settings and editor chunks to check that the Settings frame opens before its module and remains closable while the workspace/editor continue loading. `server/menu-dialog-data-ui.test.ts` holds actual account, administration, permission, Mewlink, and ignore-list APIs to check early frames, editable drafts, incremental body updates, local errors, and late-response cancellation at desktop/mobile widths.
 

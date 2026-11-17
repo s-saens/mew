@@ -16,6 +16,7 @@ test('installation exposes live stdout/stderr, rejects duplicates, retains failu
   let succeed = false
   RUNTIMES[id] = {
     ...RUNTIMES.codex, id,
+    installationCommand: () => executable,
     spec: () => ({ cmd: executable, args: [] }),
     install: () => ({ cmd: process.execPath, args: ['-e', succeed
       ? `require('fs').writeFileSync(${JSON.stringify(executable)}, 'fixture', {mode:0o755}); console.log('x'.repeat(13000)+'installed')`

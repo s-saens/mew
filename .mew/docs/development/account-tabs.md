@@ -1,8 +1,8 @@
 ---
 title: "Real-time account tabs"
-description: "Defines authoritative account-and-project editor, agent, and terminal tabs across devices, single-use fresh editor-tab preparation during project switching, live presence signals, migration, concurrent saves, draft protection, and recovery. Separates shared tab metadata from single-project desktop slots and optional scoped multi-project views, preserving logical project identity across worktrees."
+description: "Defines authoritative account-and-project editor, agent, and terminal tabs across devices, single-use authoritative startup snapshots and fresh editor-tab preparation during project switching, live presence signals, migration, concurrent saves, draft protection, and recovery. Separates shared tab metadata from single-project desktop slots and optional scoped multi-project views, preserving logical project identity across worktrees."
 created: "2026-11-04"
-updated: "2026-11-12"
+updated: "2026-11-16"
 ---
 
 Open editor, agent, and terminal tabs and active selection belong to the authenticated account and logical project on one Mew instance. Changes propagate through the existing presence connection. Different accounts and projects keep independent lists. Dock positions, panel sizes, visibility, mobile foreground, and popup geometry retain their [device-local ownership](ui-workspace-layout.md#workspace-panel-layout). See [ADR 0133](../decisions/0133-realtime-account-tabs.md).
@@ -14,6 +14,8 @@ Concurrent project views retain the same account/logical-project ledgers. Each v
 ## Editor tabs
 
 `GET /api/user-ui/editor-tabs?workspace=<logical project path>` returns `{state, revision}`. `state` is a map from editor API scope to its `StoredTabs`, or `null` before initialization. Stored metadata contains paths, preview and view modes, pane membership, pane layout, active paths, and focused pane. It contains no document bodies, drafts, or permission grants. External filesystem and transient Git tabs remain local.
+
+The initial `include=workspace-ui` workspace response may carry the same ledger's state and revision in a bounded `editorTabs` envelope. Only the accepted current account/logical-root response prepares `useAccountEditorTabs.prepareInitialSnapshot`, before root activation. Consume it once through the existing synchronization read path. Explicit `null` or empty authority remains empty. Matching metadata signals, permissions, recovery, account/root changes, and disposal invalidate unused preparation; returning to a project never reuses it. Missing or invalid envelopes retain the ordinary ledger GET. The [startup contract](browser-startup.md#initial-workspace-ui-snapshot) owns size and response validation.
 
 During explicit project selection, `useAccountEditorTabs.prepare(path, signal)` starts the authoritative GET alongside the workspace POST. Only the matching account and logical project consume that preparation, once. Preparation does not activate the project or fetch file bodies; root-relative file and tree requests still wait for server confirmation. A return to a project starts a fresh query rather than restoring an older authoritative tab snapshot. Subsequent synchronization reads and post-save reconciliation remain fresh.
 

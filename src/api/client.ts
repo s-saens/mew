@@ -29,7 +29,7 @@ import { isHiddenTmuxSession } from '@mew/tmux-term/command-session'
 import { createDbSubscriptions } from './dbSocket'
 import { compressImage } from '../utils/compressImage'
 import { detectInitialProject } from '../utils/active-project'
-import type { WorkspaceUiSnapshot } from '../../shared/workspace-ui-snapshot.ts'
+import type { WorkspaceUiSnapshot, WorkspaceEditorTabsSnapshot } from '../../shared/workspace-ui-snapshot.ts'
 import type { CommandButtonResult } from '../../shared/command-button-result.ts'
 
 export type { TreeNode } from '@mew/editor'
@@ -201,6 +201,7 @@ export interface WorkspaceInfo {
   /** 같은 폴더의 절대 경로 */
   docsPath: string
   workspaceUi?: WorkspaceUiSnapshot
+  editorTabs?: WorkspaceEditorTabsSnapshot
 }
 
 export type LoginDesktopSession = { id: string; job: string; url: string; streamUrl: string }
@@ -935,7 +936,6 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
   function stopGitAiCommit(project: string, workspace: string, id: string): Promise<{ ok: true }> {
     return mewFetch(gitAiCommitUrl(project, workspace, `/${encodeURIComponent(id)}/stop`), { method: 'POST' }).then(json<{ ok: true }>)
   }
-
   function approveGitAiCommit(project: string, workspace: string, id: string, groups: number[]): Promise<{ job: GitAiCommitJob }> {
     return gitFetch(gitAiCommitUrl(project, workspace, `/${encodeURIComponent(id)}/approve`), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ groups }) }, project).then(json<{ job: GitAiCommitJob }>)
   }
@@ -1061,8 +1061,8 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     }).then(json<WorkspaceInfo & { project: string }>)
   }
 
-  function fetchProjectRegistry(signal?: AbortSignal): Promise<{ projects: RegisteredProject[] }> {
-    return mewFetch('/api/project-registry', { signal }).then(json<{ projects: RegisteredProject[] }>)
+  function fetchProjectRegistry(signal?: AbortSignal, snapshot = false): Promise<{ projects: RegisteredProject[] }> {
+    return mewFetch(snapshot ? '/api/project-registry?snapshot=1' : '/api/project-registry', { signal }).then(json<{ projects: RegisteredProject[] }>)
   }
 
   function registerProject(input: { name: string; git: boolean } | { path: string }): Promise<{ project: RegisteredProject }> {

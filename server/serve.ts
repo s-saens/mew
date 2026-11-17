@@ -36,6 +36,7 @@ import { workspaceSearchPolicy } from './search-indexing.ts'
 import { sendDirectUiHtml } from './direct-ui.ts'
 import { appRoute } from '../shared/app-route.ts'
 import { securityHeaders } from './security-headers.ts'
+import { uiStaticAssets } from './ui-static-assets.ts'
 
 // 프로덕션 서버 — `npm run build` 후 `npm run serve`.
 // 단일 서버(5000) — 로그인 없이 접속하면 게스트(뷰어), 로그인하면 owner/manager/member.
@@ -78,7 +79,7 @@ const PORT = Number(process.env.MEW_TEAM_PORT ?? 5000)
 
 function addStaticAndSpaFallback(app: express.Express) {
   // vite가 해시를 붙이는 /assets는 영구 캐시, 그 외(index.html 등)는 항상 재검증
-  app.use('/assets', express.static(path.join(DIST, 'assets'), { immutable: true, maxAge: '30d' }))
+  app.use('/assets', uiStaticAssets(path.join(DIST, 'assets')))
   app.use(express.static(DIST, { index: false }))
   app.use(async (req, res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {

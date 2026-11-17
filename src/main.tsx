@@ -5,7 +5,6 @@ import { startInputFocusTracking } from '@mew/ui/input-focus'
 import { StrictMode, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import { I18nProvider } from './i18n.tsx'
 import { applyFontPreferences, loadFontPreferences } from './utils/fontPreferences.ts'
 import { applyThemePalette, loadThemeSettings } from './utils/theme-color.ts'
 import { startNetworkTracking } from './utils/network-tracking.ts'
@@ -66,9 +65,10 @@ async function startApp() {
     const localAuth = !remoteApp && initialRoute === 'workspace' && !nativeAuth && !getAppRuntime().initialAuth
       ? fetchAuthStatus().catch(error => { console.error(error); return GUEST_AUTH })
       : undefined
-    const [bootstrap, initialAuth] = await Promise.all([
+    const [bootstrap, initialAuth, { I18nProvider }] = await Promise.all([
       bootstrapModule,
       remoteApp ? initializeRemoteApp() : nativeAuth ?? getAppRuntime().initialAuth ?? localAuth,
+      import('./i18n.tsx'),
     ])
     const sharePath = remoteApp ? new URLSearchParams(location.search).get('sharePath') : location.pathname
     const share = sharePath ? parsePublicSharePath(sharePath) : null

@@ -11,7 +11,7 @@ async function fixtureBundle() {
   const source = `import React from ${JSON.stringify(import.meta.resolve('react'))};import{createRoot}from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
 import{FileTypeIcon,FolderTypeIcon}from'${root}src/components/file-type-icon.tsx';import{IconPackProvider}from'${root}src/components/icon-pack-context.tsx';
 function Fixture(){const[pack,setPack]=React.useState('material'),[name,setName]=React.useState('unknown.xyz'),[shown,setShown]=React.useState(true);window.setPack=setPack;window.setName=setName;return <IconPackProvider value={pack}><button onClick={()=>setShown(value=>!value)}>Toggle</button><div data-file>{shown&&<FileTypeIcon name={name}/>}</div><div data-folder><FolderTypeIcon/><FolderTypeIcon open/></div></IconPackProvider>};createRoot(document.getElementById('root')).render(<Fixture/>);`
-  const bundle = await build({ input: 'virtual:bounded-icons.tsx', write: false, platform: 'browser', output: { format: 'esm', codeSplitting: startupCodeSplitting }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('production') } }, plugins: [{ name: 'bounded-icons', resolveId(id) { if (id === 'virtual:bounded-icons.tsx') return id }, load(id) { if (id === 'virtual:bounded-icons.tsx') return source } }] })
+  const bundle = await build({ input: 'virtual:bounded-icons.tsx', write: false, platform: 'browser', output: { format: 'esm', codeSplitting: startupCodeSplitting }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('production') } }, onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) }, plugins: [{ name: 'bounded-icons', resolveId(id) { if (id === 'virtual:bounded-icons.tsx') return id }, load(id) { if (id === 'virtual:bounded-icons.tsx') return source } }] })
   const chunks = bundle.output.filter(item => item.type === 'chunk')
   const modules = chunks.flatMap(chunk => Object.keys(chunk.modules))
   assert.equal(modules.includes(`${root}src/utils/file-icon-artwork.json`), false, 'Material full-pack source cannot enter the product graph')
@@ -22,10 +22,21 @@ function Fixture(){const[pack,setPack]=React.useState('material'),[name,setName]
     assert.ok(Buffer.byteLength(chunk.code) <= 48 * 1024, `${chunk.fileName}: emitted chunk must remain bounded`)
   }
   const owners = new Map(chunks.flatMap(chunk => Object.keys(chunk.modules).map(id => [id, '/' + chunk.fileName] as const)))
+  const entry = chunks.find(chunk => chunk.isEntry)!
+  const initial = new Set<string>()
+  const visit = (filename: string) => {
+    if (initial.has('/' + filename)) return
+    initial.add('/' + filename)
+    for (const dependency of chunks.find(chunk => chunk.fileName === filename)!.imports) visit(dependency)
+  }
+  visit(entry.fileName)
+  const manifests = { material: owners.get(`${root}src/utils/file-icon-manifest.json`)!, catppuccin: owners.get(`${root}src/utils/catppuccin-icon-manifest.json`)! }
+  for (const filename of Object.values(manifests)) assert.equal(initial.has(filename), false, 'no full matching manifest blocks the initial UI')
+  assert.notEqual(manifests.material, manifests.catppuccin, 'each pack keeps an independent matching manifest')
   const registry = async (pack: string) => JSON.parse((await fs.readFile(`${root}src/utils/file-icon-chunks/${pack}.ts`, 'utf8')).match(/^export const iconChunks:.* = (.+)$/m)![1]) as Record<string, number>
   const [material, catppuccin] = await Promise.all([registry('material'), registry('catppuccin')])
   const bucket = (pack: string, number: number) => owners.get(`${root}src/utils/file-icon-chunks/${pack}-${String(number).padStart(2, '0')}.json`)!
-  return { scripts: new Map(chunks.map(chunk => ['/' + chunk.fileName, chunk.code])), entry: '/' + chunks.find(chunk => chunk.isEntry)!.fileName, artwork: new Set(artwork.map(chunk => '/' + chunk.fileName)), material, catppuccin, bucket }
+  return { scripts: new Map(chunks.map(chunk => ['/' + chunk.fileName, chunk.code])), entry: '/' + entry.fileName, artwork: new Set(artwork.map(chunk => '/' + chunk.fileName)), material, catppuccin, bucket, manifests }
 }
 
 test('cold file icons download only selected bounded buckets and ignore cancelled pack loads', { skip: !domBrowserExecutable(), timeout: 25_000 }, async t => {
@@ -36,7 +47,7 @@ test('cold file icons download only selected bounded buckets and ignore cancelle
   page.setDefaultTimeout(5000)
   const materialTypescript = fixture.bucket('material', fixture.material.typescript)
   const catppuccinTypescript = fixture.bucket('catppuccin', fixture.catppuccin['mocha-typescript'])
-  const held = new Set([materialTypescript, catppuccinTypescript]), releases = new Map<string, () => void>()
+  const held = new Set([materialTypescript, catppuccinTypescript, fixture.manifests.material]), releases = new Map<string, () => void>()
   await page.route('http://bounded-icons.test/**', async route => {
     const path = new URL(route.request().url()).pathname
     requested.push(path)
@@ -45,10 +56,15 @@ test('cold file icons download only selected bounded buckets and ignore cancelle
     const script = fixture.scripts.get(path)
     await route.fulfill(script === undefined ? { contentType: 'text/html', body: `<div id="root"></div><script type="module" src="${fixture.entry}"></script>` } : { contentType: 'text/javascript', body: script })
   })
-  await page.goto('http://bounded-icons.test/')
+  const matchingRequest = page.waitForRequest(request => new URL(request.url()).pathname === fixture.manifests.material)
+  await page.goto('http://bounded-icons.test/', { waitUntil: 'domcontentloaded' })
   await page.locator('[data-file] img[data-file-icon="file"]').waitFor()
   await page.locator('[data-folder] img[data-file-icon="folder-open"]').waitFor()
   assert.deepEqual(requested.filter(path => fixture.artwork.has(path)), [], 'generic files and folders never download associated artwork')
+  await matchingRequest
+  assert.equal(requested.includes(fixture.manifests.catppuccin), false, 'the unselected matching manifest is not downloaded')
+  held.delete(fixture.manifests.material)
+  releases.get(fixture.manifests.material)!()
   const materialRequest = page.waitForRequest(request => new URL(request.url()).pathname === materialTypescript)
   await page.evaluate("window.setName('main.ts')")
   await materialRequest

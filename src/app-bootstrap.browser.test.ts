@@ -94,13 +94,19 @@ test('workspace grouping preserves every deferred module gate in the actual sour
     const explorer = new URL('./components/SearchPanel.tsx', import.meta.url).pathname
     assert.ok(owner.has(editor) && owner.has(codePane), 'the real EditorPane and CodePane must be bundled')
     const initial = modules(staticChunks(chunks, entry)), authentication = modules(closure(bootstrap))
+    assert.equal(initial.has(new URL('./i18n.tsx', import.meta.url).pathname), false, 'the full application message catalog must not delay startup or authentication requests')
+    assert.equal(initial.has(new URL('../packages/ui/src/ui-messages.ts', import.meta.url).pathname), false, 'startup and recovery use only their canonical message subset')
     const critical = new Set([...closure(appPath), ...closure(editor)])
     assert.equal(modules(closure(appPath)).has(explorer), false, 'file explorer controls keep their independent download boundary')
+    for (const manifest of ['file-icon-manifest.json', 'catppuccin-icon-manifest.json']) {
+      assert.equal(modules(closure(appPath)).has(new URL(`./utils/${manifest}`, import.meta.url).pathname), false, 'file icon matching manifests stay outside the workspace shell')
+    }
     assert.notEqual(owner.get(appPath)!.fileName, owner.get(editor)!.fileName, 'EditorPane retains its own dynamic boundary')
     for (const eager of [initial, authentication]) {
       assert.equal(eager.has(appPath) || eager.has(editor) || eager.has(codePane), false, 'workspace and editor remain behind authentication')
       assert.equal(eager.has(explorer), false, 'file explorer controls remain behind authentication')
       assert.deepEqual([...eager].filter(id => /\/(?:@codemirror|@lezer|@tiptap|@xterm)\//.test(id) || id.includes('/packages/tmux-term/')), [], 'editor and terminal dependencies remain deferred')
+      assert.deepEqual([...eager].filter(id => /\/packages\/ui\/src\/(?:date-field|date-calendar|color-picker|select-field|useDragReorder)\.tsx?$/.test(id)), [], 'authentication imports only the shared UI primitives it renders')
     }
     return { chunks, owner, closure, modules, initial, authentication, critical, criticalModules: modules(critical) }
   }

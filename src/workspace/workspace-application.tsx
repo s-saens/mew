@@ -40,13 +40,14 @@ export type ProjectWorkspaceHost = {
   headerHost: HTMLElement | null
   selectionSignal: number
   globalOwner: boolean
+  takeInitialWorkspace?: () => WorkspaceInfo | undefined
   onModeChange: (mode: WorkspaceMode) => void
   onProjectChange: (path: string) => Promise<boolean>
   onAction: (action: MewcatAction) => Promise<void>
   onScopeChanged: (info: WorkspaceInfo) => void
   register: (handle: ProjectWorkspaceHandle | null) => void
 }
-type Props = { account: string | null; guest: boolean; renderWorkspace: (host?: ProjectWorkspaceHost, onWorkspaceReady?: (info: WorkspaceInfo) => void) => ReactNode }
+type Props = { account: string | null; guest: boolean; renderWorkspace: (host?: ProjectWorkspaceHost, onWorkspaceReady?: (info: WorkspaceInfo) => void, takeInitialWorkspace?: () => WorkspaceInfo | undefined) => ReactNode }
 const label = (path: string) => path.replace(/[\\/]+$/, '').split(/[\\/]/).at(-1) ?? path
 const panelFor = (info: WorkspaceInfo): ProjectBoardPanel => ({ id: uuid(), projectPath: info.projectPath ?? info.path, workingRoot: info.path })
 const sameScope = (left: Pick<ProjectBoardPanel, 'projectPath' | 'workingRoot'>, right: Pick<ProjectBoardPanel, 'projectPath' | 'workingRoot'>) => left.projectPath === right.projectPath && left.workingRoot === right.workingRoot
@@ -96,6 +97,12 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
   const desktop = useWorkspaceDesktop()
   const [mode, setMode] = useState(() => readMode(account ?? 'guest'))
   const [initial, setInitial] = useState<WorkspaceInfo | null>(null)
+  const bootstrapSnapshot = useRef<WorkspaceInfo | undefined>(undefined)
+  const takeInitialWorkspace = useCallback(() => {
+    const snapshot = bootstrapSnapshot.current
+    bootstrapSnapshot.current = undefined
+    return snapshot
+  }, [])
   const [failed, setFailed] = useState('')
   const [board, setBoard] = useState<ProjectBoardState>(() => createProjectBoard())
   const [retained, setRetained] = useState<ProjectBoardPanel[]>([])
@@ -193,8 +200,9 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
   useEffect(() => {
     if (guest) return
     let alive = true
-    void workspaceClient.fetchWorkspace().then(info => {
+    void workspaceClient.fetchWorkspace({ includeUi: true }).then(info => {
       if (!alive) return
+      bootstrapSnapshot.current = info
       initialize(info)
     }).catch(error => { if (alive) setFailed(error instanceof Error ? error.message : String(error)) })
     return () => { alive = false }
@@ -360,7 +368,7 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
     })
     if (action.kind !== 'open_project') await handle.performAction!(action)
   }
-  if (guest || initial?.hasProject === false || initial && initial.workspaceScopeVersion !== WORKSPACE_SCOPE_VERSION) return <>{renderWorkspace(undefined, acceptBootstrap)}</>
+  if (guest || initial?.hasProject === false || initial && initial.workspaceScopeVersion !== WORKSPACE_SCOPE_VERSION) return <>{renderWorkspace(undefined, acceptBootstrap, takeInitialWorkspace)}</>
   if (!initial) return failed ? <div role="alert" className="p-3 text-sm text-danger">{failed}</div> : <StartupScreen />
   const singlePanel = [...board.panels, ...retained].find(panel => panel.id === singleId && legacyScope && sameScope(panel, legacyScope))
   const activeId = multi ? board.activePanelId : singlePanel?.id ?? null
@@ -386,6 +394,7 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
       beforeMutation={async () => { await services.projects.saveQueue.current }} restoreFocus={restoreActiveFocus}
       onProjectsChanged={async () => { const { state } = await workspaceClient.fetchRootProjectTabs(); services.projects.setPaths(state?.paths ?? []) }} />
     const host: ProjectWorkspaceHost = {
+      takeInitialWorkspace: initial.path === panel.workingRoot && (initial.projectPath ?? initial.path) === panel.projectPath ? takeInitialWorkspace : undefined,
       id: panel.id, panel, active: panel.id === activeId, compact: multi, mode, headerHost,
       selectionSignal: selection[panel.id] ?? 0, globalOwner: panel.id === ownerId,
       onModeChange: changeMode, onProjectChange: path => navigate(panel, path),

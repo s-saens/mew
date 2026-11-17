@@ -6,7 +6,8 @@ export function projectWorkspaceView({ canOpenProjects, shortcutsLoaded, paths, 
   paths: readonly string[]
   hasProject: boolean | null
 }): ProjectWorkspaceView {
+  void paths
   if (hasProject === null || canOpenProjects && !shortcutsLoaded) return 'loading'
-  if (canOpenProjects && (paths.length === 0 || !hasProject)) return 'setup'
+  if (canOpenProjects && !hasProject) return 'setup'
   return 'workspace'
 }

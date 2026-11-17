@@ -117,7 +117,7 @@ test('same-account scoped HTTP, resources, snapshots, navigation, and subscripti
   panel.messages.length = browser.messages.length = 0
   const prepared = await request('/workspace?include=workspace-ui', scopes[0])
   assert.equal(prepared.status, 200)
-  assert.deepEqual(await prepared.json(), { workspaceScopeVersion: WORKSPACE_SCOPE_VERSION, hasProject: true, path: roots[0], projectPath: roots[0], projects: [], docs: 'docs', docsPath: path.join(roots[0], 'docs'), workspaceUi: { workspacePath: roots[0], state: { editor: 'a' } } })
+  assert.deepEqual(await prepared.json(), { workspaceScopeVersion: WORKSPACE_SCOPE_VERSION, hasProject: true, path: roots[0], projectPath: roots[0], projects: [], docs: 'docs', docsPath: path.join(roots[0], 'docs'), workspaceUi: { workspacePath: roots[0], state: { editor: 'a' } }, editorTabs: { workspacePath: roots[0], state: null, revision: 0 } })
   assert.equal((await (await request('/workspace')).json() as { workspaceScopeVersion: number }).workspaceScopeVersion, WORKSPACE_SCOPE_VERSION, 'legacy snapshots advertise support before the client may create explicit views')
   assert.equal(readActiveWorkspace(owner.email), roots[2])
   const localSwitch = await request('/workspace', scopes[0], { path: roots[1] })

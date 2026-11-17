@@ -16,6 +16,7 @@ export function useAccountEditorTabs(account: string | null, workspacePath: stri
   const [state, setState] = useState<State>({ account, workspacePath, tabs: undefined, hydrated: false })
   const controller = useRef<Controller | null>(null), errorHandler = useRef(onError)
   const preparation = useRef<Preparation | null>(null)
+  const initialSnapshotAccepted = useRef(false)
   const currentScope = state.account === account && state.workspacePath === workspacePath
   if (!currentScope) setState({ account, workspacePath, tabs: undefined, hydrated: false })
   useEffect(() => { errorHandler.current = onError }, [onError])
@@ -50,6 +51,18 @@ export function useAccountEditorTabs(account: string | null, workspacePath: stri
       if (preparation.current === pending) discardPreparation()
     })
   }, [account, discardPreparation, fetchAccountEditorTabs])
+
+  // Only an accepted startup response can prepare this authority, before any
+  // logical root is active. Subsequent reads and activations remain fresh.
+  const prepareInitialSnapshot = useCallback((path: string, snapshot: AccountEditorTabsSnapshot) => {
+    if (!account || initialSnapshotAccepted.current || controller.current || preparation.current) return false
+    initialSnapshotAccepted.current = true
+    preparation.current = {
+      account, workspacePath: path, controller: new AbortController(),
+      promise: Promise.resolve(snapshot), detach: () => {},
+    }
+    return true
+  }, [account])
 
   useEffect(() => {
     const refresh = () => { discardPreparation(); controller.current?.sync.refresh() }
@@ -111,5 +124,5 @@ export function useAccountEditorTabs(account: string | null, workspacePath: stri
     const current = controller.current
     if (current?.account === account && current.workspacePath === workspacePath) current.sync.change(project, tabs)
   }, [account, workspacePath])
-  return { tabs: currentScope ? state.tabs : undefined, hydrated: currentScope && state.hydrated, change, prepare }
+  return { tabs: currentScope ? state.tabs : undefined, hydrated: currentScope && state.hydrated, change, prepare, prepareInitialSnapshot }
 }

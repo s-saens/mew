@@ -1,6 +1,9 @@
 // Source-message keys keep shared UI packages independent of the host app.
 // Every entry supplies English, Simplified Chinese and Japanese; the key is Korean.
+import { startupUiMessages } from './i18n-startup.ts'
+
 export const uiMessages = {
+  ...startupUiMessages,
   "선택한 파일 {count}개를 작업 단위로 분석합니다. 내용을 확인하고 커밋할 작업을 선택하세요.": ["Analyze {count} selected files by work unit. Review the results and choose which work to commit.","按工作单元分析所选的 {count} 个文件。查看结果并选择要提交的工作。","選択した {count} ファイルを作業単位で分析します。内容を確認してコミットする作業を選択してください。"],
   "분석 완료 · 커밋할 작업 선택": ["Analysis complete · Choose work to commit","分析完成 · 选择要提交的工作","分析完了 · コミットする作業を選択"],
   "변경사항 분석": ["Analyze changes","分析更改","変更を分析"],
@@ -631,7 +634,6 @@ export const uiMessages = {
   "확인을 위해 프로젝트 이름 {name}을(를) 그대로 입력하세요.": ["To confirm, enter the project name \"{name}\" exactly.", "请输入完整项目名称“{name}”以确认。", "確認のためプロジェクト名「{name}」をそのまま入力してください。"],
   "{name} 여는 중…": ["Opening {name}…", "正在打开 {name}…", "{name} を開いています…"],
   "마지막 실행 {time}": ["Last run {time}", "上次运行 {time}", "最終実行 {time}"],
-  "불러오는 중…": ["Loading…","加载中…","読み込み中…"],
   "적용": ["Apply","应用","適用"],
   "목록을 불러오지 못했습니다": ["Could not load the list","无法加载列表","一覧を読み込めませんでした"],
   "읽기 전용": ["Read-only","只读","読み取り専用"],
@@ -655,7 +657,6 @@ export const uiMessages = {
   "열기": ["Open","打开","開く"],
   "파일 탐색기 열기": ["Open file explorer","打开文件资源管理器","ファイルエクスプローラーを開く"],
   "목차": ["Table of contents","目录","目次"],
-  "새로고침": ["Refresh","刷新","更新"],
   "다시 불러오기": ["Reload","重新加载","再読み込み"],
   "에이전트": ["Agent","代理","エージェント"],
   "추가": ["Add","添加","追加"],
@@ -668,10 +669,7 @@ export const uiMessages = {
   "로그아웃": ["Log out","退出登录","ログアウト"],
   "저장했습니다.": ["Saved.","已保存。","保存しました。"],
   "연결 중…": ["Connecting…","正在连接…","接続中…"],
-  "접속 중…": ["Connecting…","正在连接…","接続中…"],
-  "작업 화면을 불러오지 못했습니다. 페이지를 다시 열어 주세요.": ["Could not load the workspace. Reopen the page.","无法加载工作区，请重新打开页面。","ワークスペースを読み込めませんでした。ページを開き直してください。"],
   "그림판을 불러오지 못했습니다.": ["Could not load the drawing editor.", "无法加载绘图板。", "描画エディターを読み込めませんでした。"],
-  "업데이트 후 발생했다면 서버를 재시작한 뒤 새로고침해 주세요.": ["If this happened after an update, restart the server, then refresh.", "如果在更新后发生此问题，请重启服务器，然后刷新。", "更新後に発生した場合は、サーバーを再起動してから再読み込みしてください。"],
   "처리 중…": ["Working…","处理中…","処理中…"],
   "여는 중…": ["Opening…","正在打开…","開いています…"],
   "로그인 계속하기": ["Continue sign-in","继续登录","ログインを続ける"],
@@ -1464,6 +1462,9 @@ export const uiMessages = {
   "동영상 미리보기": ["Video preview","视频预览","動画プレビュー"],
   "{p0} 동영상 미리보기": ["{p0} video preview","{p0} 视频预览","{p0} の動画プレビュー"],
   "동영상 미리보기 닫기": ["Close video preview","关闭视频预览","動画プレビューを閉じる"],
+  "사진": ["Image","图片","画像"],
+  "사진 확대": ["Enlarge image","放大图片","画像を拡大"],
+  "사진 편집": ["Edit image","编辑图片","画像を編集"],
   "사진 미리보기 닫기": ["Close image preview","关闭图片预览","画像プレビューを閉じる"],
   "에이전트 오류 상세": ["Agent error details","代理错误详情","エージェントのエラー詳細"],
   "오류 상세 복사": ["Copy error details","复制错误详情","エラー詳細をコピー"],

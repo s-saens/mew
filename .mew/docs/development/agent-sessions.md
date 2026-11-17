@@ -1,7 +1,7 @@
 ---
 title: "Agent session and communication contract"
-description: "Runtime sessions, recovery and elapsed-time restoration across changed transcript prefixes, real-time account tabs, agent-assisted project loading, Git AI Commit review and execution, CLI, memory, history previews, and scoped MCP bindings. Guidance storage and delivery belong to the linked agent guidance contract."
-updated: "2026-11-14"
+description: "Runtime sessions, asynchronous runtime presence checks, recovery and elapsed-time restoration across changed transcript prefixes, real-time account tabs, project loading, Git AI Commit review and execution, CLI, memory, history previews, and scoped MCP bindings. Guidance storage and delivery belong to the linked agent guidance contract."
+updated: "2026-11-16"
 상위파일:
   - "../_docs.md"
   - "MOC.md"
@@ -13,6 +13,12 @@ Automatic commits by general agents inherit the author environment of the logged
 ## Passing project context
 
 See [Agent guidance and context delivery](agent-guidance.md#passing-project-context) for account/project instructions, settings, revision APIs, and captured context.
+
+## Runtime installation presence
+
+`GET /api/agent-runtimes` and update discovery use asynchronous executable-presence checks. Concurrent callers with identical runtime commands, PATH, and installation generation share the in-flight checks. Completed results are not retained, so external installation/removal and saved command changes remain visible on the next read. Each response uses current installation progress and flags.
+
+The registry supplies cheap installation commands for Claude, Codex, tmux, and Prime so presence checks do not resolve launch-only host CLIs or construct their environment. Preserve saved command rules: Claude checks its ACP adapter, Codex checks the configured adapter, tmux checks its selected backend command, and Prime checks the real `prime-agent` executable rather than Mew's Node adapter. Actual launches retain their existing host resolution and environment rules. The synchronous status helper remains for compatibility and explicit install/remove operations. `server/agent-runtime-statuses.test.ts` verifies held-probe event-loop progress, shared checks, command-change isolation, and fresh completed reads.
 
 ## Agent-assisted project creation
 

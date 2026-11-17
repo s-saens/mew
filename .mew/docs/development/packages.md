@@ -1,7 +1,7 @@
 ---
 title: "Shared Packages"
-description: "Shared package responsibilities, independent imports, and host APIs. Covers editor metadata, source mapping, voice recording, terminal auxiliary key focus, mobile keys, shared UI, diagrams, and verification boundaries."
-updated: "2026-11-10"
+description: "Shared package responsibilities, independent imports, and host APIs. Covers lightweight startup copy and authentication controls, editor metadata, source mapping, voice recording, terminal auxiliary key focus, mobile keys, shared UI, diagrams, and verification boundaries."
+updated: "2026-11-16"
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -21,6 +21,8 @@ The document pane also imports frontmatter, source annotations, comment anchors,
 ## Shared translations
 
 Shared UI text is translated with `uiText` from `@mew/ui/i18n-core` and `useUiLocale` from `@mew/ui/i18n`. Hosts pass the language through `setUiLocale`, and Mew connects it to the existing `I18nProvider`. The editor, mobile modifier keys, terminal, shortcut errors, and confirmation dialogs use the same language. Utilities used in Node use the `i18n-core` entry point, which does not load React. Dictionaries, subscriptions, and verification criteria follow the [UI translation contract](ui-foundations.md#ui-translation).
+
+Startup and recovery screens use `@mew/ui/i18n-startup` for five canonical messages. The full dictionary includes those entries, and both paths share the same lightweight locale state and subscriptions. Authentication imports focus, tooltips, and dismissal through `@mew/ui/input-focus`, `hover-tip-layer`, and `overlay-dismiss`; importing these controls does not download the package root's date, selection, color, drag, or tab components. Existing root exports remain available. The actual-source startup graph regression checks both boundaries.
 
 ## Editor package
 

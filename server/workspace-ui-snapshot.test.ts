@@ -11,10 +11,10 @@ import { createApiApp } from './api.ts'
 import { createSession, upsertUser } from './auth.ts'
 import { attachAuthContext } from './reqAuth.ts'
 import { WORKSPACE_ROOT, setWorkspaceRoot } from './paths.ts'
-import { writeActiveWorkspace, writeWorkspaceUi } from './userUiState.ts'
+import { readEditorTabs, writeActiveWorkspace, writeEditorTabs, writeWorkspaceUi } from './userUiState.ts'
 import { resetTreeWatchers } from './watcher.ts'
 
-type WorkspaceResponse = { path: string; projectPath?: string; hasProject: boolean; workspaceUi?: { workspacePath: string; state: Record<string, unknown> | null } }
+type WorkspaceResponse = { path: string; projectPath?: string; hasProject: boolean; workspaceUi?: { workspacePath: string; state: Record<string, unknown> | null }; editorTabs?: { workspacePath: string; state: Record<string, Record<string, unknown>> | null; revision: number } }
 
 function account(email: string) {
   upsertUser(email, { hash: '', role: 'owner', mustChangePassword: false, createdAt: Date.now(), passwordChangedAt: 0 })
@@ -59,10 +59,13 @@ test('workspace UI snapshots are opt-in, bounded and tied to the authenticated a
   writeWorkspaceUi(alice, primary, { marker: 'Alice primary', sidebarOpen: false })
   writeWorkspaceUi(bob, primary, { marker: 'Bob primary', sidebarOpen: true })
   writeWorkspaceUi(alice, other, { marker: 'Alice other' })
+  writeEditorTabs(alice, primary, 'docs', { active: 'alice.md' })
+  writeEditorTabs(bob, primary, 'docs', { active: 'bob.md' })
   const api = await apiFixture()
   try {
     const plain = await workspace(await api.request('/workspace', aliceCookie))
     assert.equal(Object.hasOwn(plain, 'workspaceUi'), false, 'ordinary workspace metadata keeps its response contract')
+    assert.equal(Object.hasOwn(plain, 'editorTabs'), false)
     for (const include of ['unknown', 'workspace-ui,tree', 'workspace-ui&include=workspace-ui']) {
       const result = await workspace(await api.request('/workspace?include=' + include, aliceCookie))
       assert.equal(Object.hasOwn(result, 'workspaceUi'), false, 'only the exact single opt-in selects the snapshot')
@@ -74,15 +77,19 @@ test('workspace UI snapshots are opt-in, bounded and tied to the authenticated a
       { workspacePath: primary, state: { marker: 'Alice primary', sidebarOpen: false } },
       { workspacePath: primary, state: { marker: 'Bob primary', sidebarOpen: true } },
     ], 'concurrent requests cannot borrow another account\'s layout')
+    assert.deepEqual(snapshots.map(result => result.editorTabs), ['alice.md', 'bob.md', 'alice.md', 'bob.md'].map(active => ({ workspacePath: primary, state: { docs: { active } }, revision: 1 })), 'tabs use the same authenticated account boundary')
     const forged = await workspace(await api.request('/workspace?include=workspace-ui&email=' + encodeURIComponent(bob) + '&workspace=' + encodeURIComponent(other), aliceCookie))
     assert.deepEqual(forged.workspaceUi, snapshots[0].workspaceUi, 'request account and root query parameters do not select someone else\'s ledger')
+    assert.deepEqual(forged.editorTabs, snapshots[0].editorTabs)
     assert.equal((await api.request('/workspace?include=workspace-ui')).status, 403, 'guests cannot request account workspace state')
 
     const knownEmpty = await workspace(await api.request('/workspace?include=workspace-ui', emptyCookie))
     assert.deepEqual(knownEmpty.workspaceUi, { workspacePath: primary, state: null }, 'known-empty state is explicit so clients can skip a redundant query')
+    assert.deepEqual(knownEmpty.editorTabs, { workspacePath: primary, state: null, revision: 0 })
     const noProject = await workspace(await api.request('/workspace?include=workspace-ui', projectlessCookie))
     assert.equal(noProject.hasProject, false)
     assert.equal(Object.hasOwn(noProject, 'workspaceUi'), false, 'projectless accounts do not receive a snapshot for the default server root')
+    assert.equal(Object.hasOwn(noProject, 'editorTabs'), false)
 
     const switched = await workspace(await api.request('/workspace', aliceCookie, { path: other }))
     assert.equal(switched.path, other)
@@ -100,6 +107,21 @@ test('workspace UI snapshots are opt-in, bounded and tied to the authenticated a
     const fallback = await api.request('/user-ui/workspace?workspace=' + encodeURIComponent(other), aliceCookie)
     assert.equal(fallback.status, 200)
     assert.deepEqual(await fallback.json(), { state: large }, 'the existing route remains available when the startup envelope is omitted')
+
+    writeWorkspaceUi(alice, other, { layout: 'a'.repeat(40_000) })
+    writeEditorTabs(alice, other, 'docs', { active: 'b'.repeat(30_000) })
+    const combined = await workspace(await api.request('/workspace?include=workspace-ui', aliceCookie))
+    assert.deepEqual(combined.workspaceUi, { workspacePath: other, state: { layout: 'a'.repeat(40_000) } }, 'tabs cannot displace the existing bounded UI snapshot')
+    assert.equal(Object.hasOwn(combined, 'editorTabs'), false, 'individually small envelopes still share the 64 KiB budget')
+    writeEditorTabs(alice, other, 'docs', { active: '한'.repeat(24_000) })
+    const unicode = await workspace(await api.request('/workspace?include=workspace-ui', aliceCookie))
+    assert.equal(Object.hasOwn(unicode, 'editorTabs'), false, 'tab size is measured in UTF-8 bytes')
+
+    writeWorkspaceUi(empty, primary, { tabs: { docs: { active: 'legacy.md' } } })
+    const migrated = await workspace(await api.request('/workspace?include=workspace-ui', emptyCookie))
+    assert.deepEqual(migrated.editorTabs, { workspacePath: primary, state: { docs: { active: 'legacy.md' } }, revision: 0 })
+    writeWorkspaceUi(empty, primary, { tabs: { docs: { active: 'device-layout.md' } } })
+    assert.deepEqual(readEditorTabs(empty, primary), { state: { docs: { active: 'legacy.md' } }, revision: 0 }, 'initial envelope freezes legacy migration with existing authoritative semantics')
   } finally {
     await api.close()
     resetTreeWatchers()
@@ -127,6 +149,8 @@ test('worktree workspace snapshots use the logical project key while metadata re
   writeActiveWorkspace(email, primary)
   writeWorkspaceUi(email, primary, { marker: 'Logical project layout' })
   writeWorkspaceUi(email, linked, { marker: 'Different worktree-only layout' })
+  writeEditorTabs(email, primary, 'docs', { active: 'logical.md' })
+  writeEditorTabs(email, linked, 'docs', { active: 'physical.md' })
   const api = await apiFixture()
   try {
     const switched = await workspace(await api.request('/workspace', cookie, { path: linked, worktree: true, workspace: primary }))
@@ -136,6 +160,7 @@ test('worktree workspace snapshots use the logical project key while metadata re
     assert.equal(selected.path, linked)
     assert.equal(selected.projectPath, primary)
     assert.deepEqual(selected.workspaceUi, { workspacePath: primary, state: { marker: 'Logical project layout' } }, 'a worktree must not replace project-scoped layouts with its physical path ledger')
+    assert.deepEqual(selected.editorTabs, { workspacePath: primary, state: { docs: { active: 'logical.md' } }, revision: 1 })
   } finally {
     await api.close()
     resetTreeWatchers()

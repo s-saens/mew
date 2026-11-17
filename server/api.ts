@@ -123,7 +123,7 @@ import { isRuntimeLoginMethod, runtimeLoginSpec } from './agentRuntimes.ts'
 import { terminalAuthFromHost } from './agentHost.ts'
 import { authFailureMessageFromOutput, browserLoginDetailsFromOutput, prepareAgentAuthTerminal, readAgentAuthTerminalStatus } from './agentAuthTerminal.ts'
 import { resolveWorkspaceLink } from './workspaceLinks.ts'
-import { installRuntime, logoutRuntime, runtimeStatuses, RuntimeInstallError, uninstallRuntime } from './agentRuntimeInstall.ts'
+import { installRuntime, logoutRuntime, runtimeStatusesAsync, RuntimeInstallError, uninstallRuntime } from './agentRuntimeInstall.ts'
 import { readRuntimeAccount } from './agentAccount.ts'
 import { AgentDefaultError, readAgentDefault, writeAgentDefault } from './agentDefaults.ts'
 import { AgentCwdError, resolveAgentCwd, suggestAgentCwds } from './agentCwd.ts'
@@ -510,9 +510,15 @@ export function createApiApp() {
     )
   })
 
-  app.get('/project-registry', requireAuthenticated, (req, res) => {
-    try { res.json({ projects: projectRegistry.list(authOf(req).email!) }) }
-    catch (err) { handleError(res, err) }
+  app.get('/project-registry', requireAuthenticated, async (req, res) => {
+    const controller = new AbortController()
+    const disconnect = () => { if (!res.writableEnded) controller.abort() }
+    res.on('close', disconnect)
+    try {
+      const projects = req.query.snapshot === '1' ? projectRegistry.snapshot(authOf(req).email!) : await projectRegistry.listAsync(authOf(req).email!, controller.signal)
+      if (!controller.signal.aborted) res.json({ projects })
+    } catch (err) { if (!controller.signal.aborted) handleError(res, err) }
+    finally { res.off('close', disconnect) }
   })
 
   app.get('/project-registry/repositories', requireAuthenticated, async (req, res) => {
@@ -2399,8 +2405,9 @@ export function createApiApp() {
   })
 
   // 에이전트 런타임 설치는 서버 머신에 실행 파일을 쓰는 작업 — 터미널과 같은 역할만.
-  app.get('/agent-runtimes', requireAnyFeature('agent', 'terminal'), (_req, res) => {
-    res.json({ runtimes: runtimeStatuses() })
+  app.get('/agent-runtimes', requireAnyFeature('agent', 'terminal'), async (_req, res) => {
+    try { res.json({ runtimes: await runtimeStatusesAsync() }) }
+    catch (err) { handleError(res, err) }
   })
 
   app.get('/terminal-backends', requireFeature('terminal'), (_req, res) => {

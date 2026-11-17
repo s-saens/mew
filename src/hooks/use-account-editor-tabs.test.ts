@@ -38,20 +38,20 @@ type Request = {
   resolve: (value: AccountEditorTabsSnapshot) => void; reject: (error: Error) => void
 }
 type Fixture = {
-  account: string; path: string; tabs: AccountEditorTabs | undefined; hydrated: boolean; errors: unknown[]
-  prepare: (path: string, signal: AbortSignal) => void; render: () => void; close: () => void
+  account: string; path: string | null; tabs: AccountEditorTabs | undefined; hydrated: boolean; errors: unknown[]
+  prepare: (path: string, signal: AbortSignal) => void; prepareInitialSnapshot: (path: string, snapshot: AccountEditorTabsSnapshot) => boolean; render: () => void; close: () => void
 }
 const snapshot = (path: string): AccountEditorTabsSnapshot => ({ revision: 1, state: {
   '.workspace': { panes: [{ id: 'main', activePath: path, tabs: [{ path, preview: false, viewMode: 'plain' }] }], layout: { kind: 'leaf', pane: 'main' }, focusedPaneId: 'main' },
 } })
 
-function mount() {
+function mount(initialPath: string | null = '/alpha') {
   const win = new Window({ url: 'https://account-tabs.test', console: { ...console, error() {} }, settings: {
     enableJavaScriptEvaluation: true, suppressInsecureJavaScriptEnvironmentWarning: true,
   } })
   win.document.body.innerHTML = '<div id="root"></div>'
   const requests: Request[] = []
-  const data = { account: 'first@example.test', path: '/alpha', errors: [], read(path: string, signal: AbortSignal) {
+  const data = { account: 'first@example.test', path: initialPath, errors: [], read(path: string, signal: AbortSignal) {
     // Keep mock responses controllable even after cancellation to check stale replies.
     return new Promise<AccountEditorTabsSnapshot>((resolve, reject) => requests.push({ path, signal, resolve, reject }))
   } }
@@ -217,5 +217,65 @@ test('preparation respects aborted selections and unmount cleanup, and consumed 
     view.fixture.prepare('/gamma', new AbortController().signal)
     view.fixture.close()
     assert.equal(view.requests[3].signal.aborted, true, 'unmount aborts unconsumed preparations')
+  } finally { await view.close() }
+})
+
+
+test('accepted initial tab authority removes only the first ledger read and preserves fresh recovery and returns', async () => {
+  const view = mount(null)
+  try {
+    assert.equal(view.requests.length, 0)
+    assert.equal(view.fixture.prepareInitialSnapshot('/alpha', snapshot('initial.md')), true)
+    view.switchTo('/alpha')
+    await view.waitFor(() => view.fixture.hydrated)
+    assert.equal(view.activePath(), 'initial.md')
+    assert.equal(view.requests.length, 0, 'the startup response supplies fresh ledger authority')
+    assert.equal(view.fixture.prepareInitialSnapshot('/alpha', snapshot('obsolete.md')), false, 'an active root cannot be reseeded')
+    view.event('mew:editor-tabs-changed', '/alpha')
+    assert.equal(view.requests.length, 1, 'a later signal uses the API')
+    view.requests[0].resolve({ ...snapshot('updated.md'), revision: 2 })
+    await view.waitFor(() => view.activePath() === 'updated.md')
+    view.switchTo('/beta'); view.switchTo('/alpha')
+    assert.equal(view.requests.length, 3, 'returning to the startup project reads fresh authority')
+    view.requests[2].resolve({ ...snapshot('returned.md'), revision: 3 })
+    await view.waitFor(() => view.activePath() === 'returned.md')
+  } finally { await view.close() }
+})
+
+test('unused initial tab snapshots cannot survive permission changes, changed roots or account switches', async () => {
+  for (const reason of ['permission', 'root', 'account'] as const) {
+    const view = mount(null)
+    try {
+      assert.equal(view.fixture.prepareInitialSnapshot('/alpha', snapshot('obsolete.md')), true)
+      if (reason === 'permission') view.event('mew:permissions-changed')
+      view.switchTo(reason === 'root' ? '/beta' : '/alpha', reason === 'account' ? 'other@example.test' : view.fixture.account)
+      assert.equal(view.requests.length, 1, reason + ' requires an authoritative GET')
+      view.requests[0].resolve(snapshot('fresh.md'))
+      await view.waitFor(() => view.fixture.hydrated)
+      assert.equal(view.activePath(), 'fresh.md')
+    } finally { await view.close() }
+  }
+})
+
+test('initial metadata preserves explicit empty authority and cannot replace a newer selection preparation', async () => {
+  for (const state of [null, {}]) {
+    const view = mount(null)
+    try {
+      assert.equal(view.fixture.prepareInitialSnapshot('/alpha', { state, revision: 0 }), true)
+      view.switchTo('/alpha')
+      await view.waitFor(() => view.fixture.hydrated)
+      assert.equal(Object.keys(view.fixture.tabs ?? {}).length, 0)
+      assert.equal(view.requests.length, 0)
+    } finally { await view.close() }
+  }
+  const view = mount(null)
+  try {
+    view.fixture.prepare('/beta', new AbortController().signal)
+    assert.equal(view.fixture.prepareInitialSnapshot('/alpha', snapshot('old.md')), false)
+    view.requests[0].resolve(snapshot('selected.md'))
+    view.switchTo('/beta')
+    await view.waitFor(() => view.fixture.hydrated)
+    assert.equal(view.activePath(), 'selected.md')
+    assert.equal(view.requests.length, 1)
   } finally { await view.close() }
 })
