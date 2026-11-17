@@ -92,7 +92,8 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
     if (catalogBusy) return
     setContextMenu(null)
     setMenu(null)
-    trigger.current?.focus({ preventScroll: true })
+    if (view?.compact) requestAnimationFrame(() => view.restoreFocus?.()?.focus({ preventScroll: true }))
+    else trigger.current?.focus({ preventScroll: true })
   }
 
   function cancelHold() {
@@ -257,6 +258,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
         <div className="mew-project-sidebar-heading">
           <Folder width={14} height={14} aria-hidden="true" />
           <h2 id={mobileTitleId} className="min-w-0 flex-1 truncate">{copy.title}</h2>
+          <div className="mew-project-heading-add" inert={catalogBusy || undefined}>{projectAdd ?? <button type="button" aria-label={t('project.add')} data-tip={t('project.add')} onClick={() => { closeMenu(); onOpen() }}><Plus width={18} height={18} /></button>}</div>
           <PanelCloseButton disabled={catalogBusy} aria-label={`${copy.title} · ${t('common.close')}`} onClick={closeMenu} />
         </div>
         <div className={projectAdd ? 'mew-project-sidebar-content' : 'contents'}>
@@ -271,9 +273,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
             if (next !== null) { event.preventDefault(); items[next]?.focus({ preventScroll: true }) }
           }}>
           {catalog()}
-          {!projectAdd && <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={() => { closeMenu(); onOpen() }}>{t('project.add')}</ActionMenuItem></div>}
         </div>
-        {projectAdd && <div className="mew-project-inline-add" inert={catalogBusy || undefined}>{projectAdd}</div>}
         </div>
       </div>
   const compactHost = view?.compact ? view.root.current?.closest<HTMLElement>('[data-project-panel]') : null
@@ -315,6 +315,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
         <div className="mew-project-sidebar-heading">
           <Folder width={14} height={14} aria-hidden="true" />
           <span className="min-w-0 flex-1 truncate">{copy.title}</span>
+          <div className="mew-project-heading-add" inert={catalogBusy || undefined}>{projectAdd ?? <button type="button" aria-label={t('project.add')} data-tip={t('project.add')} onClick={onOpen}><Plus width={18} height={18} /></button>}</div>
           <PanelCloseButton disabled={catalogBusy} aria-label={`${copy.title} · ${t('common.close')}`} onClick={() => { onSidebarOpenChange?.(false); trigger.current?.focus({ preventScroll: true }) }} />
         </div>
         <div className={projectAdd ? 'mew-project-sidebar-content' : 'contents'}>
@@ -337,9 +338,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
           }}>
           {catalog()}
         </div>
-        {projectAdd && <div className="mew-project-inline-add" inert={catalogBusy || undefined}>{projectAdd}</div>}
         </div>
-        {!projectAdd && <div className="mew-project-sidebar-footer"><ActionMenuItem icon={<Plus />} onClick={onOpen}>{t('project.add')}</ActionMenuItem></div>}
       </div>
       <div role="separator" tabIndex={0} aria-label={t('project.resizeSidebar')} aria-orientation="vertical" aria-valuenow={sidebarWidth} aria-valuemin={200} aria-valuemax={360}
         className="mew-project-sidebar-resize" onPointerDown={onSidebarResize}
@@ -352,7 +351,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
     </aside>, sidebarHost)}
     {canOpen && !sidebarEnabled && menu && (mobile ? compactHost
       ? <ProjectSelectionFrame host={compactHost} labelledBy={mobileTitleId} onClose={closeMenu} restoreFocus={view?.restoreFocus} busy={catalogBusy}>{mobileContents}</ProjectSelectionFrame>
-      : <DialogFrame labelledBy={mobileTitleId} onClose={closeMenu} busy={catalogBusy} size="settings" className="mew-mobile-project-panel">{mobileContents}</DialogFrame> : <ActionMenu ref={menuElement} variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current}
+      : <DialogFrame labelledBy={mobileTitleId} onClose={closeMenu} busy={catalogBusy} size="settings" overlayClassName="mew-project-selection-overlay" className="mew-mobile-project-panel">{mobileContents}</DialogFrame> : <ActionMenu ref={menuElement} variant="header" x={menu.x} y={menu.y} label={t('project.choose')} trigger={trigger.current}
       outsideIgnore={() => deletingPath ? document.body : contextMenuElement.current ?? (menuElement.current?.querySelector('[data-project-add-inline] [aria-expanded="true"]') ? document.body : null)}
       onClose={() => { setContextMenu(null); setMenu(null) }}>
       {catalog()}

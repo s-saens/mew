@@ -184,6 +184,7 @@ export interface RegisteredProject {
   path: string
   name: string
   managed: boolean
+  inManagedRoot: boolean
   mine: boolean
   icon: string | null
 }

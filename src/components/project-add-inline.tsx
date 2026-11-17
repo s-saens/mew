@@ -1,6 +1,6 @@
 import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useEffect, useId, useRef, useState } from 'react'
-import { ArrowLeft, Check, Folder, FolderPlus, GitBranch, Link, Lock, Plus, RefreshDouble, Spark, Xmark } from 'iconoir-react'
+import { ArrowLeft, Check, Folder, FolderPlus, GitBranch, Lock, Plus, RefreshDouble, Spark, Xmark } from 'iconoir-react'
 import { canAutoFocusInput, DialogFrame, HoverTipLayer, LoadingIndicator } from '@mew/ui'
 import { type fetchConnectedGitRepositories, type RegisteredProject } from '../api/client'
 import { GIT_CONNECTION_CHANGED } from '../api/git-auth-request'
@@ -8,10 +8,8 @@ import { useI18n } from '../i18n'
 import { GitHubAccount } from './github-account'
 import { LinkProjectDialog } from './LinkProjectDialog'
 import { projectAddCopy } from './project-add-copy'
-import { DeferredProjectCatalogPanel as ProjectCatalogPanel } from './deferred-project-catalog'
 
-type Mode = 'clone' | 'create' | 'workspace'
-const emptyPaths: string[] = []
+type Mode = 'clone' | 'create'
 type Repository = Awaited<ReturnType<typeof fetchConnectedGitRepositories>>['repositories'][number]
 
 const iconButton = 'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40'
@@ -31,7 +29,7 @@ export interface ProjectAddInlineProps {
   onboarding?: boolean
 }
 
-export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProjectsChanged, onCreateWithAgent, canUseAgent = true, canManageFolders = true, beforeMutation, openRequested = false, onOpenRequestHandled, onboarding = false }: ProjectAddInlineProps) {
+export function ProjectAddInline({ basePath, onOpen, onProjectsChanged, onCreateWithAgent, canUseAgent = true, canManageFolders = true, beforeMutation, openRequested = false, onOpenRequestHandled, onboarding = false }: ProjectAddInlineProps) {
   const { fetchConnectedGitRepositories, registerProject, cloneManagedProject } = useWorkspaceApi()
   const { t, locale } = useI18n()
   const copy = projectAddCopy(locale)
@@ -58,7 +56,6 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
   const [createdMode, setCreatedMode] = useState<Mode | null>(null)
   const busyRef = useRef(false)
   const alive = useRef(true)
-  const workspace = useRef<HTMLDivElement>(null)
   const linked = useRef(new Map<string, RegisteredProject>())
   const [created, setCreated] = useState<RegisteredProject | null>(null)
 
@@ -85,7 +82,7 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
       if (canAutoFocusInput()) input.current?.focus()
       else backTrigger.current?.focus()
     } else if (mode) {
-      (mode === 'workspace' && canAutoFocusInput() ? workspace.current?.querySelector<HTMLInputElement>('input') : backTrigger.current)?.focus()
+      backTrigger.current?.focus()
     }
   }, [expanded, mode, linkOpen])
   useEffect(() => {
@@ -173,8 +170,8 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
     setError(null)
   }
 
-  const choices = ['create', 'clone', 'workspace', 'browse'] as const
-  const title = mode === 'workspace' ? copy.workspace : mode ? copy[mode] : copy.add
+  const choices = ['create', 'clone', 'browse'] as const
+  const title = mode ? copy[mode] : copy.add
 
   return <HoverTipLayer className={`mew-project-add${onboarding ? ' mew-project-add-onboarding' : ''}`}><div className="min-w-0" data-project-add-inline data-project-add-step={!expanded ? 'closed' : mode ?? 'choices'}>
     {onboarding && <h2 className="mew-project-add-heading text-center text-base font-medium text-ink">{copy.heading}</h2>}
@@ -192,28 +189,17 @@ export function ProjectAddInline({ basePath, paths = emptyPaths, onOpen, onProje
         <button type="button" data-project-add-close aria-label={t('common.close')} data-tip={t('common.close')} disabled={busy} onClick={close} className={iconButton}><Xmark width={18} height={18} aria-hidden="true" /></button>
       </header>
       <div id={`${id}-setup`} className="mew-project-add-body min-h-0 overflow-y-auto p-3">
-      {mode === null && <nav aria-label={title} className="mew-project-add-choices grid min-w-0 grid-cols-4 gap-3">
+      {mode === null && <nav aria-label={title} className="mew-project-add-choices grid min-w-0 grid-cols-3 gap-3">
         {choices.map((next, index) => <button key={next} ref={element => { if (next === 'browse') browseTrigger.current = element; else modeTriggers.current[next] = element }} type="button"
           data-project-add-choice={next} data-dialog-autofocus={index === 0 || undefined} aria-label={copy[next]} disabled={busy || !!created && next !== createdMode}
           onClick={() => next === 'browse' ? setLinkOpen(true) : choose(next)}
           className="mew-project-add-choice group flex min-w-0 flex-col items-center gap-2 rounded-lg py-1 text-center text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40">
           <span className="mew-project-add-choice-icon flex aspect-square w-full max-w-24 shrink-0 items-center justify-center rounded-xl border border-edge text-accent group-hover:border-edge-strong group-hover:bg-surface-hover">
-            {next === 'clone' ? <GitBranch width={32} height={32} aria-hidden="true" /> : next === 'create' ? <FolderPlus width={32} height={32} aria-hidden="true" /> : next === 'browse' ? <Folder width={32} height={32} aria-hidden="true" /> : <Link width={32} height={32} aria-hidden="true" />}
+            {next === 'clone' ? <GitBranch width={32} height={32} aria-hidden="true" /> : next === 'create' ? <FolderPlus width={32} height={32} aria-hidden="true" /> : next === 'browse' ? <Folder width={32} height={32} aria-hidden="true" /> : null}
           </span>
           <span className="mew-project-add-choice-label whitespace-nowrap text-xs font-medium leading-4 sm:text-sm">{copy[next]}</span>
         </button>)}
       </nav>}
-      {mode === 'workspace' && <div ref={workspace}><ProjectCatalogPanel paths={paths} beforeMutation={beforeMutation} onProjectsChanged={onProjectsChanged}
-        onBusyChange={value => { busyRef.current = value; setBusy(value) }} onOpen={async path => {
-          try {
-            const result = await onOpen(path)
-            if (result !== false && alive.current) { setExpanded(false); setMode(null) }
-            return result
-          } finally {
-            busyRef.current = false
-            if (alive.current) setBusy(false)
-          }
-        }} /></div>}
       {mode === 'create' && <form className="min-w-0" noValidate onSubmit={event => { event.preventDefault(); submit() }}>
         <label className="mb-1.5 block text-xs font-medium text-ink-secondary" htmlFor={`${id}-name`}>{t('project.name')}</label>
         <div className="relative min-w-0">

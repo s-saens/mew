@@ -4,6 +4,7 @@ import { DemoError, type DemoWorkspaceStore } from './workspace-store.ts'
 
 const join = (parent: string, name: string) => `${parent.replace(/\/$/, '')}/${name}`
 const basename = (path: string) => path.split('/').at(-1) ?? ''
+const inManagedRoot = (store: DemoWorkspaceStore, projectPath: string) => projectPath.startsWith(`${join(store.workspacePath, '.mew/projects')}/`)
 const parentOf = (path: string) => path.slice(0, path.lastIndexOf('/'))
 
 function folderName(name: string): string {
@@ -21,8 +22,8 @@ function registry(store: DemoWorkspaceStore): RegisteredProject[] {
   const saved = store.getState<RegisteredProject[]>('project-registry', [])
   const mine = store.getState<RootProjectTabState>('root-projects', { paths: [store.workspacePath], icons: {} })
   const icons = store.getState<Record<string, string>>('project-icons', {})
-  for (const path of mine.paths) if (!saved.some(project => project.path === path)) saved.push({ path, name: basename(path), managed: false, mine: true, icon: null })
-  const projects = saved.map(project => ({ ...project, mine: mine.paths.includes(project.path), icon: icons[project.path] ?? null }))
+  for (const path of mine.paths) if (!saved.some(project => project.path === path)) saved.push({ path, name: basename(path), managed: false, inManagedRoot: inManagedRoot(store, path), mine: true, icon: null })
+  const projects = saved.map(project => ({ ...project, inManagedRoot: inManagedRoot(store, project.path), mine: mine.paths.includes(project.path), icon: icons[project.path] ?? null }))
   store.setState('project-registry', projects)
   return projects
 }
@@ -80,7 +81,7 @@ export const handleDemoProjects: DemoHttpHandler = ({ store, request, url, body,
     }
     let project = projects.find(project => project.path === target)
     if (!project) {
-      project = { path: target, name: basename(target), managed, mine: true, icon: null }
+      project = { path: target, name: basename(target), managed, inManagedRoot: inManagedRoot(store, target), mine: true, icon: null }
       projects.push(project)
     }
     store.setState('project-registry', projects)

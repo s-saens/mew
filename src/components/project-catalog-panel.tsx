@@ -140,13 +140,14 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
           const hasChildren = rows.some(child => child.parentPath === row.path)
           const project = byPath.get(row.path)!
           const mine = paths.includes(row.path) || imported.has(row.path)
+          const showPath = !project.inManagedRoot || duplicates.has(project.name)
           return <div key={row.path} ref={selection ? ref : undefined} data-catalog-project={row.path} data-project-depth={row.depth} data-active={row.path === activePath || undefined} className="mew-project-catalog-row" style={{ paddingLeft: Math.min(row.depth, 5) * 12 }}>
             {selection && <MenuReorderHandle {...handleProps} aria-label={`${project.name} · ${t('project.reorder')}`} onMove={direction => reorder(visualIndex, visualIndex + direction)} />}
             {selection && hasChildren && <button type="button" className="mew-project-catalog-pin" aria-label={`${project.name} · ${search || expanded.has(row.path) ? '−' : '+'}`} aria-expanded={!!search || expanded.has(row.path)} disabled={!!search} onClick={() => setExpanded(previous => { const next = new Set(previous); if (next.has(row.path)) next.delete(row.path); else next.add(row.path); return next })}>{search || expanded.has(row.path) ? <NavArrowDown width={14} /> : <NavArrowRight width={14} />}</button>}
             <button type="button" disabled={busy} title={project.path} onClick={() => { discoveryRequest.current?.abort(); setLoading(false); if (selection) void onOpen(project.path); else void importProject(project) }} onContextMenu={event => onContextMenu?.(project.path, event)} className="mew-project-catalog-open"
-              aria-label={`${project.name}${duplicates.has(project.name) ? ` (${project.path})` : ''} · ${t(mine ? 'project.inMine' : 'project.addToMine')}`}>
+              aria-label={`${project.name}${showPath ? ` (${project.path})` : ''} · ${t(mine ? 'project.inMine' : 'project.addToMine')}`}>
               <ProjectIcon icon={project.icon ?? 'i:folder'} size={16} />
-              <span className="min-w-0 flex-1"><span className="block truncate">{project.name}</span>{duplicates.has(project.name) && <span className="block truncate text-xs text-ink-secondary">{project.path}</span>}</span>
+              <span className="flex min-w-0 flex-1 items-baseline gap-2"><span className="min-w-0 truncate">{project.name}</span>{showPath && <span className="min-w-0 truncate text-xs text-ink-secondary">{project.path}</span>}</span>
               {!selection && (mine ? <Check width={16} height={16} className="shrink-0 text-ink-secondary" aria-hidden="true" /> : <Plus width={16} height={16} className="shrink-0 text-ink-secondary" aria-hidden="true" />)}
             </button>
             {selection && renderActions?.(row.path)}

@@ -123,17 +123,9 @@ test('empty onboarding offers an icon trigger and opens project choices in a mod
     assert.ok(dialog)
     assert.equal(dialog.getAttribute('aria-modal'), 'true')
     assert.equal(view.win.document.querySelector('#root')?.contains(dialog), false, 'setup is portaled outside the project panel')
-    assert.deepEqual(view.choices(), ['create', 'clone', 'workspace', 'browse'])
-    assert.deepEqual([...view.win.document.querySelectorAll('[data-project-add-choice]')].map(element => element.getAttribute('aria-label')), ['새 프로젝트', 'Git 클론', '워크스페이스', '경로 탐색'])
+    assert.deepEqual(view.choices(), ['create', 'clone', 'browse'])
+    assert.deepEqual([...view.win.document.querySelectorAll('[data-project-add-choice]')].map(element => element.getAttribute('aria-label')), ['새 프로젝트', 'Git 클론', '경로 탐색'])
     assert.equal(view.fixture.calls.length, 0, 'opening project choices does not query or import projects')
-    await view.choose('workspace')
-    assert.equal(view.step(), 'workspace')
-    assert.equal(view.win.document.querySelectorAll('[data-catalog-project]').length, 3)
-    assert.equal(view.fixture.calls.filter(call => call[0] === 'pin').length, 0, 'browsing does not add a personal project')
-    assert.equal(view.win.document.querySelector('.mew-project-catalog-toggle'), null)
-    await view.fixture.click('[data-project-add-back]')
-    assert.equal(view.step(), 'choices')
-    assert.equal(view.win.document.activeElement?.getAttribute('data-project-add-choice'), 'workspace')
     await view.choose('browse')
     assert.equal(view.win.document.querySelectorAll('[role="dialog"]').length, 2, 'external browsing uses the established folder dialog above project setup')
     await view.fixture.key('Escape')
@@ -146,87 +138,7 @@ test('empty onboarding offers an icon trigger and opens project choices in a mod
     assert.equal(view.win.document.querySelector('[role="dialog"]'), null)
     assert.equal(view.win.document.activeElement?.getAttribute('aria-label'), '프로젝트 추가')
     await view.fixture.click('button[aria-label="프로젝트 추가"]')
-    assert.deepEqual(view.choices(), ['create', 'clone', 'workspace', 'browse'])
-  } finally { await view.close() }
-})
-
-test('workspace import disambiguates names, filters paths and pins before refreshing and opening', async () => {
-  const view = mount()
-  try {
-    await view.fixture.mount({ onboarding: true, paths: ['/mine'] })
-    await view.open()
-    await view.choose('workspace')
-    assert.ok(view.win.document.querySelector('[data-catalog-project="/workspace/shared"]')?.textContent.includes('/workspace/shared'))
-    await view.fixture.input('.mew-project-catalog-search input', '/workspace/')
-    assert.equal(view.win.document.querySelectorAll('[data-catalog-project]').length, 1)
-    await view.fixture.click('[data-catalog-project="/workspace/shared"] button')
-    assert.deepEqual(Array.from(view.fixture.calls, call => Array.from(call)), [['catalog'], ['before'], ['pin', '/workspace/shared'], ['changed'], ['open', '/workspace/shared']])
-    assert.equal(view.step(), 'closed')
-  } finally { await view.close() }
-})
-
-test('failed opening retries an imported project without pinning twice and existing personal projects remain available', async () => {
-  const view = mount()
-  try {
-    view.fixture.failOpen = true
-    await view.fixture.mount({ onboarding: true, paths: ['/mine'] })
-    await view.open()
-    await view.choose('workspace')
-    await view.fixture.click('[data-catalog-project="/workspace/shared"] button')
-    assert.match(view.win.document.querySelector('[role="alert"]')?.textContent ?? '', /프로젝트를 열지 못했습니다/)
-    assert.equal(view.step(), 'workspace')
-    view.fixture.failOpen = false
-    await view.fixture.click('[data-catalog-project="/workspace/shared"] button')
-    assert.equal(view.fixture.calls.filter(call => call[0] === 'pin').length, 1)
-    assert.equal(view.fixture.calls.filter(call => call[0] === 'open').length, 2)
-    await view.fixture.mount({ onboarding: true, paths: ['/mine'] })
-    await view.open()
-    await view.choose('workspace')
-    await view.fixture.click('[data-catalog-project="/mine"] button')
-    assert.equal(view.fixture.calls.filter(call => call[0] === 'pin').length, 1, 'an existing personal project is not pinned again')
-    assert.equal(view.fixture.calls.at(-1)?.[1], '/mine')
-  } finally { await view.close() }
-})
-
-test('busy workspace imports block duplicate actions, close/back buttons, outside, Escape and browser Back', async () => {
-  const view = mount()
-  try {
-    view.fixture.pendingPin = true
-    await view.fixture.mount({ onboarding: true })
-    await view.open()
-    await view.choose('workspace')
-    await view.fixture.click('[data-catalog-project="/workspace/shared"] button')
-    assert.equal(view.win.document.querySelector('[data-project-add-back]')?.getAttribute('disabled'), '')
-    await view.fixture.click('[data-catalog-project="/workspace/shared"] button')
-    await view.fixture.click('[data-project-add-back]')
-    await view.fixture.click('[data-project-add-close]')
-    await view.fixture.outside()
-    await view.fixture.key('Escape')
-    await view.fixture.back()
-    assert.equal(view.step(), 'workspace')
-    assert.equal(view.fixture.calls.filter(call => call[0] === 'pin').length, 1)
-    await view.fixture.finish()
-    assert.equal(view.step(), 'closed')
-  } finally { await view.close() }
-})
-
-test('catalog load errors recover inside the modal and unmatched searches show the existing empty state', async () => {
-  const view = mount()
-  try {
-    view.fixture.registryError = true
-    await view.fixture.mount({ onboarding: true })
-    await view.open()
-    await view.choose('workspace')
-    assert.match(view.win.document.querySelector('[role="alert"]')?.textContent ?? '', /Catalog unavailable/)
-    view.fixture.registryError = false
-    await view.fixture.click('button[aria-label="다시 시도"]')
-    assert.equal(view.win.document.querySelectorAll('[data-catalog-project]').length, 3)
-    await view.fixture.input('.mew-project-catalog-search input', 'does-not-exist')
-    assert.equal(view.win.document.querySelectorAll('[data-catalog-project]').length, 0)
-    assert.ok(view.win.document.querySelector('.mew-project-catalog-list p')?.textContent)
-    await view.fixture.back()
-    assert.equal(view.step(), 'closed', 'browser Back dismisses the Add popup at any step')
-    assert.equal(view.win.document.activeElement?.getAttribute('aria-label'), '프로젝트 추가')
+    assert.deepEqual(view.choices(), ['create', 'clone', 'browse'])
   } finally { await view.close() }
 })
 
@@ -327,7 +239,7 @@ test('an external Add request opens the same modal without fetching project data
     await view.fixture.mount({ openRequested: true })
     assert.equal(view.step(), 'choices')
     assert.equal(view.win.document.querySelectorAll('[role="dialog"]').length, 1)
-    assert.deepEqual(view.choices(), ['create', 'clone', 'workspace', 'browse'])
+    assert.deepEqual(view.choices(), ['create', 'clone', 'browse'])
     assert.equal(view.fixture.calls.length, 0)
     await view.fixture.click('[data-project-add-close]')
     assert.equal(view.step(), 'closed')

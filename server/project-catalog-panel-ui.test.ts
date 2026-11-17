@@ -8,7 +8,7 @@ import { connectTestBrowser } from './test-browser.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-test('project Add uses an accessible responsive popup and preserves workspace import, hierarchy and retry', { timeout: 60_000 }, async () => {
+test('project Add uses an accessible responsive popup without a Workspace choice', { timeout: 60_000 }, async () => {
   const source = `import React,{useState} from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {ProjectAddInline} from '${root}/src/components/project-add-inline.tsx';
@@ -73,11 +73,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const add = page.getByRole('button', { name: 'Add project', exact: true })
     const dialog = page.getByRole('dialog')
     const close = page.locator('[data-project-add-close]')
-    const workspaceMode = page.getByRole('button', { name: 'Workspace', exact: true })
     const back = page.getByRole('button', { name: 'Previous choices', exact: true })
     const search = page.getByRole('textbox', { name: 'Search projects', exact: true })
-    const row = (project: string) => page.locator(`[data-catalog-project="${project}"]`)
-    const visibleRows = () => page.locator('[data-catalog-project]').evaluateAll(elements => elements.map(element => element.getAttribute('data-catalog-project')))
     const assertFocusOnAdd = async () => {
       await dialog.waitFor({ state: 'detached' })
       await page.waitForFunction(element => element === element?.ownerDocument.activeElement, await add.elementHandle())
@@ -154,87 +151,16 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await page.evaluate('history.back()')
     await assertFocusOnAdd()
     await add.click()
-    assert.equal(queries, 0, 'opening the four setup choices waits for workspace selection')
-    await workspaceMode.click()
-    await page.getByRole('alert').waitFor()
-    assert.match(await page.getByRole('alert').textContent() ?? '', /Catalog unavailable/)
-    const retry = page.getByRole('button', { name: 'Try again', exact: true })
-    await retry.focus()
-    assert.equal(await retry.evaluate(element => element === element.ownerDocument.activeElement), true)
-    failQuery = false
-    await page.keyboard.press('Enter')
-    await row('/projects/main/nested/deep').waitFor()
-    assert.equal(queries, 2)
-    assert.deepEqual(await visibleRows(), ['/projects/main', '/projects/main/nested', '/projects/main/nested/deep', '/other/main', projects[4].path])
-    assert.equal(await row('/projects/main/nested').getAttribute('data-project-depth'), '1')
-    assert.equal(await row('/projects/main/nested/deep').getAttribute('data-project-depth'), '2')
-    assert.equal(await page.getByRole('button', { name: 'main (/projects/main) · In My projects', exact: true }).isEnabled(), true, 'an existing personal shortcut can still be opened')
-    assert.equal(await page.getByRole('button', { name: 'main (/other/main) · Add to My projects', exact: true }).count(), 1)
-    assert.equal(await row('/projects/main/nested').getByRole('button').count(), 1, 'one row action imports and opens the project')
-
-    await search.fill('deep')
-    assert.deepEqual(await visibleRows(), ['/projects/main', '/projects/main/nested', '/projects/main/nested/deep'], 'search retains all project ancestors')
-    await search.fill('no-matching-project')
-    assert.equal(await page.locator('[data-catalog-project]').count(), 0)
-    assert.equal(await page.getByText('No matching projects.').isVisible(), true)
-    await search.fill('/other/')
-    assert.deepEqual(await visibleRows(), ['/other/main'], 'path search distinguishes duplicate project names')
-    await search.fill('')
-    await row('/projects/main/nested').locator('.mew-project-catalog-open').focus()
-    await page.keyboard.press('Enter')
-    await page.waitForFunction('window.opens.length===1')
-    assert.deepEqual(mutations, [{ path: '/projects/main/nested', added: true }])
-    assert.deepEqual(await page.evaluate('window.events'), ['before', 'put', 'changed', 'open'])
-    assert.deepEqual(await page.evaluate('window.opens'), ['/projects/main/nested'], 'import adds the personal shortcut before opening')
-    await add.waitFor()
-    await add.click(); await workspaceMode.click()
-    const importedNested = page.getByRole('button', { name: 'nested · In My projects', exact: true })
-    await importedNested.click()
-    await page.waitForFunction('window.opens.length===2')
-    assert.deepEqual(mutations, [{ path: '/projects/main/nested', added: true }], 'opening an imported project reuses its shortcut')
-    await add.click(); await workspaceMode.click()
-
-    failPin = true
-    await page.getByRole('button', { name: 'deep · Add to My projects', exact: true }).click()
-    await page.getByRole('alert').waitFor()
-    assert.match(await page.getByRole('alert').textContent() ?? '', /Shortcut save failed/)
-    assert.equal(await page.evaluate('window.changes'), 2, 'failed shortcut mutation does not refresh personal paths or open the project')
-    assert.deepEqual(await page.evaluate('window.opens'), ['/projects/main/nested', '/projects/main/nested'])
-    assert.equal(await page.getByRole('button', { name: 'deep · Add to My projects', exact: true }).isEnabled(), true)
-    await retry.focus(); await page.keyboard.press('Enter')
-    await page.getByRole('alert').waitFor({ state: 'detached' })
-    await row('/projects/main/nested/deep').waitFor()
-
-    for (const [viewport, panelWidth] of [[1100, 200], [1100, 240], [390, 390], [320, 320]]) {
-      await page.setViewportSize({ width: viewport, height: 700 })
-      await page.evaluate(width => { (globalThis as unknown as { setPanelWidth: (value: number) => void }).setPanelWidth(width) }, panelWidth)
-      for (const theme of ['dark', 'light']) {
-        await page.locator('html').evaluate((element, theme) => { element.className = theme }, theme)
-        const bounds = await page.locator('#catalog-host').evaluate(element => ({ width: element.clientWidth, scrollWidth: element.scrollWidth, right: element.getBoundingClientRect().right }))
-        assert.equal(bounds.width, panelWidth)
-        assert.ok(bounds.scrollWidth <= bounds.width, `${panelWidth}px ${theme} catalog must not overflow horizontally`)
-        assert.ok(bounds.right <= viewport)
-        await assertDialogFits(viewport, theme)
-        await page.screenshot({ path: `/tmp/mew-project-catalog-${panelWidth}-${theme}.png` })
-      }
-    }
-    await back.focus(); await page.keyboard.press('Space')
-    assert.equal(await workspaceMode.isVisible(), true)
-    assert.equal(await workspaceMode.evaluate(element => element === element.ownerDocument.activeElement), true, 'returning to the four setup choices restores workspace focus')
-    assert.equal(await page.locator('[data-catalog-project]').count(), 0)
-    const previousQueries = queries
-    await workspaceMode.click()
-    await row('/projects/main').waitFor()
-    assert.equal(queries, previousQueries + 1, 'reopening refreshes the catalog')
+    assert.equal(await page.getByRole('button', { name: 'Workspace', exact: true }).count(), 0, 'Add excludes the catalog choice')
+    assert.equal(queries, 0, 'Add does not fetch the project catalog')
 
     await close.click()
     await assertFocusOnAdd()
     await page.setViewportSize({ width: 1100, height: 700 })
+    failQuery = false
     await page.evaluate('window.showSwitcher(true)')
     await page.locator('[data-project-switcher]').click()
-    assert.deepEqual(await page.locator('[data-project-row]').evaluateAll(elements => elements.map(element => ({ path: element.getAttribute('data-project-row'), depth: element.getAttribute('data-project-depth') }))), [
-      { path: '/other', depth: '0' }, { path: '/projects/main', depth: '0' }, { path: '/projects/main/nested', depth: '1' }, { path: '/projects/main/nested/deep', depth: '2' },
-    ], 'My Projects groups nested shortcuts beneath their nearest pinned ancestor')
+    await page.locator('[data-catalog-project="/projects/main"]').waitFor()
     const desktopProjects = page.getByRole('menu', { name: 'Choose project', exact: true })
     const desktopAdd = desktopProjects.getByRole('button', { name: 'Add project', exact: true })
     await desktopAdd.click()
@@ -267,6 +193,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const mobileProjects = page.getByRole('dialog', { name: 'Project selection', exact: true })
     await mobileProjects.waitFor()
     const mobileAdd = mobileProjects.getByRole('button', { name: 'Add project', exact: true })
+    const mobileClose = mobileProjects.getByRole('button', { name: 'Project selection · Close', exact: true })
+    const addBox = await mobileAdd.boundingBox(), closeBox = await mobileClose.boundingBox()
+    assert.ok(addBox && closeBox && addBox.x + addBox.width <= closeBox.x, 'Add sits immediately to the left of Close')
+    assert.equal(await mobileProjects.evaluate(element => element.ownerDocument.defaultView!.getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)', 'mobile project panel has a transparent background')
     await mobileAdd.click()
     const nestedAdd = page.getByRole('dialog', { name: 'Add project', exact: true })
     await nestedAdd.waitFor()

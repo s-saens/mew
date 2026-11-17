@@ -1,6 +1,6 @@
 ---
 title: "UI workspace panels, Dock, and gestures"
-description: "Workspace geometry, zoom-aware viewport height, safe areas, Dock layout and F1–F12 selection, panel handle borders, tab motion, and mobile gestures. Covers layout restoration and removal of legacy task panel entries."
+description: "Workspace geometry, safe areas, Dock layout, mobile project panel appearance, panel borders, tab motion, and gestures. Covers layout restoration and removal of legacy task panel entries."
 created: "2026-11-03"
 updated: "2026-11-08"
 상위파일: "ui-contracts.md"
@@ -14,7 +14,7 @@ Workspace zoom converts the visible viewport bottom into zoomed CSS coordinates 
 
 For a positioned Dock (`data-position`), reserve insets only in the workspace. Mobile horizontal docks stay 48px high and vertical docks 48px wide. Protect the panel footer when the Dock is top/side, hidden, or unavailable. The older unpositioned Dock fallback retains its fixed-edge spacing.
 
-Body portals do not inherit workspace padding. `DialogFrame` and `SettingsModal` use `.mew-dialog-overlay` with the greater of each dialog gutter and device inset. Keep the backdrop viewport-sized and the dialog/internal scrolling inside the safe area. Settings and mobile project selection fill that area. Preserve focus, dismissal, layers, and desktop size limits.
+Body portals do not inherit workspace padding. `DialogFrame` and `SettingsModal` use `.mew-dialog-overlay` with the greater of each dialog gutter and device inset. Keep the backdrop viewport-sized and the dialog/internal scrolling inside the safe area. Settings and mobile project selection fill that area; project selection uses a transparent surface without a dark backdrop. Preserve focus, dismissal, layers, and desktop size limits.
 
 `server/workspace-safe-area-ui.test.ts` checks the viewport setting, exact header offsets and compact heights, all four Dock positions without duplicate insets, full-height and ordinary dialogs, the actual settings panel, click dismissal, and overflow across portrait, landscape, narrow landscape, a keyboard-sized viewport and desktop. The isolated Chromium fixture substitutes safe-area CSS environment values; it does not verify Safari's device-provided values or an installed iPhone session. See the [implementation record](../work/workspace-safe-area.md).
 

@@ -99,7 +99,6 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     const dialog = page.locator('[role=dialog].mew-project-add-dialog')
     const createMode = dialog.getByRole('button', { name: '새 프로젝트', exact: true })
     const cloneMode = dialog.getByRole('button', { name: 'Git 클론', exact: true })
-    const workspaceMode = dialog.getByRole('button', { name: '워크스페이스', exact: true })
     const browseMode = dialog.getByRole('button', { name: '경로 탐색', exact: true })
     const back = dialog.getByRole('button', { name: '이전 선택지로', exact: true })
     const create = dialog.getByRole('button', { name: '프로젝트 만들기', exact: true })
@@ -112,9 +111,9 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await assertFullWidthAdd()
     await add.click()
     const choices = dialog.getByRole('navigation').getByRole('button')
-    assert.equal(await choices.count(), 4)
+    assert.equal(await choices.count(), 3)
     const boxes = await choices.evaluateAll(elements => elements.map(element => { const box = element.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width } }))
-    assert.ok(boxes.every(box => Math.abs(box.y - boxes[0].y) <= 1) && boxes.every((box, index) => index === 0 || box.x > boxes[index - 1].x), 'the four project choices share one horizontal row')
+    assert.ok(boxes.every(box => Math.abs(box.y - boxes[0].y) <= 1) && boxes.every((box, index) => index === 0 || box.x > boxes[index - 1].x), 'the three project choices share one horizontal row')
     for (const choice of await choices.all()) {
       const icon = await choice.locator('.mew-project-add-choice-icon').boundingBox(), label = await choice.locator('.mew-project-add-choice-label').boundingBox()
       assert.ok(icon && label)
@@ -129,7 +128,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(await add.textContent(), '', 'the project panel trigger contains only the plus icon')
     assert.equal(await inline.getByRole('navigation').count(), 0, 'the popup is portaled outside the project panel')
     if (mobile) {
-      for (const target of [createMode, cloneMode, workspaceMode, browseMode, dialog.locator('[data-project-add-close]')]) {
+      for (const target of [createMode, cloneMode, browseMode, dialog.locator('[data-project-add-close]')]) {
         const box = await target.boundingBox()
         assert.ok(box && box.height >= 44, 'mobile project choices keep 44px touch targets')
       }
@@ -219,7 +218,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(await add.isVisible(), true)
     await assertFullWidthAdd()
     await add.click()
-    assert.equal(await dialog.getByRole('navigation').getByRole('button').count(), 4)
+    assert.equal(await dialog.getByRole('navigation').getByRole('button').count(), 3)
     assert.equal(await dialog.getByRole('button', { name: 'GitHub 로그인', exact: true }).count(), 0, 'GitHub connection appears within the clone choice')
     await cloneMode.click()
     await dialog.getByRole('button', { name: 'GitHub 로그인', exact: true }).waitFor()
@@ -249,24 +248,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
 
     await page.evaluate('window.reset()')
     await add.click()
-    assert.equal(await dialog.getByRole('navigation').getByRole('button').count(), 4)
-    assert.equal(catalogReads, 0, 'setup choices do not fetch the workspace catalog until selected')
-    await workspaceMode.click()
-    await dialog.getByRole('button', { name: 'Shared orchard · 내 프로젝트에 추가', exact: true }).waitFor()
-    assert.equal(catalogReads, 1)
-    await back.click()
-    assert.equal(await browseMode.isVisible(), true)
-    assert.equal(await createMode.isVisible(), true)
-    assert.equal(await workspaceMode.evaluate(element => element === element.ownerDocument.activeElement), true, 'Back returns directly to all four choices and restores workspace focus')
-    assert.equal(await back.count(), 0)
+    assert.equal(await dialog.getByRole('navigation').getByRole('button').count(), 3)
+    assert.equal(catalogReads, 0, 'setup choices do not fetch the workspace catalog')
+    assert.equal(await dialog.getByRole('button', { name: '워크스페이스', exact: true }).count(), 0)
     await dialog.locator('[data-project-add-close]').click()
-    await dialog.waitFor({ state: 'detached' })
-    assert.equal(await add.getAttribute('aria-expanded'), 'false', 'the close action dismisses the popup')
-    await add.click(); await workspaceMode.click()
-    await dialog.getByRole('button', { name: 'Shared orchard · 내 프로젝트에 추가', exact: true }).click()
-    await page.getByText('Opened', { exact: true }).waitFor()
-    assert.deepEqual(imports, [{ path: '/shared/Orchard', added: true }])
-    assert.deepEqual(await page.evaluate('window.opened'), ['/shared/Orchard'])
 
     await page.evaluate('window.reset({canManageFolders:false})')
     await add.click()
@@ -291,7 +276,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await add.click(); await createMode.click()
     assert.equal(await name.inputValue(), 'Draft')
     await back.click()
-    for (const [locale, labels] of [['en', ['New project', 'Git clone', 'Workspace', 'Browse']], ['zh-CN', ['新建项目', 'Git 克隆', '工作区', '浏览路径']], ['ja', ['新規作成', 'クローン', 'ワークスペース', 'パス参照']]] as const) {
+    for (const [locale, labels] of [['en', ['New project', 'Git clone', 'Browse']], ['zh-CN', ['新建项目', 'Git 克隆', '浏览路径']], ['ja', ['新規作成', 'クローン', 'パス参照']]] as const) {
       await page.evaluate(locale => (globalThis as unknown as { locale: (locale: string) => void }).locale(locale), locale)
       for (const label of labels) await dialog.getByRole('navigation').getByRole('button', { name: label, exact: true }).waitFor()
       assert.equal(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth), true)

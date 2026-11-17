@@ -12,7 +12,7 @@ test('managed clone and connected repository APIs support members, scope the acc
   let role: Role = 'member'
   const owner = 'managed-clone-member@example.test'
   const originalClone = projectGit.clone, originalRepositories = projectGit.repositories
-  const expected = { path: '/fixture/cloned', name: 'cloned', managed: true, mine: true, icon: null }
+  const expected = { path: '/fixture/cloned', name: 'cloned', managed: true, inManagedRoot: true, mine: true, icon: null }
   projectGit.clone = async (account, input) => {
     assert.equal(account, owner)
     assert.equal(input, 'https://github.com/example/cloned.git')

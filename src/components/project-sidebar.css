@@ -18,6 +18,9 @@
   color: var(--color-ink-secondary);
   font-size: 12px;
 }
+.mew-project-heading-add { flex: none; }
+.mew-project-heading-add button { display: flex; width: 28px; height: 28px; align-items: center; justify-content: center; color: var(--color-ink-secondary); }
+.mew-project-heading-add button:hover { color: var(--color-ink); background: var(--color-surface-hover); }
 .mew-project-sidebar-list { min-height: 0; flex: 1; overflow: auto; padding: 6px; }
 .mew-project-sidebar-list .mew-sortable-menu-row { margin-bottom: 2px; }
 .mew-project-sidebar-list .mew-action-menu-item { min-height: 36px; padding: 6px; gap: 8px; border-radius: 4px; font-size: 14px; line-height: 20px; }
@@ -48,6 +51,12 @@
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   box-shadow: none;
 }
+.mew-project-selection-overlay { background: var(--color-workspace); }
+:root.theme-gradient .mew-project-selection-overlay { background-color: var(--color-surface-deep); background-image: var(--theme-background-image, none); }
+:root:is(.theme-gradient, :not(.dark)) .mew-project-selection-overlay { background-color: var(--color-workspace); }
+:root.theme-gradient .mew-project-selection-overlay { background-color: var(--color-surface-deep); }
+:root:is(.theme-gradient, :not(.dark)) .mew-project-selection-overlay > .mew-mobile-project-panel,
+.mew-project-selection-overlay > .mew-mobile-project-panel { background: transparent !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; box-shadow: none !important; }
 .mew-dialog.mew-project-selection-frame { position: absolute; inset: 0; z-index: 100; width: 100%; padding: 0; overflow: hidden; background: var(--color-surface); color: var(--color-ink); }
 .mew-mobile-project-panel .mew-project-sidebar-heading { height: 44px; }
 .mew-mobile-project-panel .mew-project-sidebar-heading button { width: 36px; height: 36px; }

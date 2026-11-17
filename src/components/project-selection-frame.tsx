@@ -18,6 +18,10 @@ export function ProjectSelectionFrame({ host, labelledBy, busy, onClose, restore
     closeOnEscape: event => ref.current?.contains(event.target as Node) ?? false,
   })
 
+  useLayoutEffect(() => {
+    if (!ref.current?.contains(document.activeElement)) ref.current?.focus({ preventScroll: true })
+  }, [])
+
   useLayoutEffect(() => () => {
     if (ref.current?.contains(document.activeElement)) restoreRef.current?.()?.focus({ preventScroll: true })
   }, [])

@@ -1,4 +1,5 @@
-import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useWorkspaceApi } from '../api/workspace-api-context'
 import { Folder } from 'iconoir-react'
 import { ActionMenuItem } from '@mew/ui'
 import { projectTabIndex } from '@mew/shortcuts'
@@ -29,6 +30,7 @@ export function ProjectDraftSelector({ paths, icons, basePath, canUseAgent, canM
   restoreFocus: () => HTMLElement | null
 }) {
   const { t, locale } = useI18n()
+  const { fetchProjectRegistry } = useWorkspaceApi()
   const copy = projectPanelCopy(locale)
   const titleId = useId()
   const anchor = useRef<HTMLDivElement>(null)
@@ -38,6 +40,15 @@ export function ProjectDraftSelector({ paths, icons, basePath, canUseAgent, canM
   const [scope, setScope] = useState<'my' | 'all'>('my')
   const [opening, setOpening] = useState(false)
   const [catalogBusy, setCatalogBusy] = useState(false)
+  const [managedPaths, setManagedPaths] = useState<Set<string>>(new Set())
+  const pathsKey = paths.join('\0')
+  useEffect(() => {
+    const controller = new AbortController()
+    void fetchProjectRegistry(controller.signal, true).then(result => {
+      if (!controller.signal.aborted) setManagedPaths(new Set(result.projects.filter(project => project.inManagedRoot).map(project => project.path)))
+    }).catch(() => {})
+    return () => controller.abort()
+  }, [fetchProjectRegistry, pathsKey])
   const rows = useMemo(() => projectHierarchy(paths), [paths])
   const labelCounts = useMemo(() => {
     const counts = new Map<string, number>()
@@ -70,6 +81,10 @@ export function ProjectDraftSelector({ paths, icons, basePath, canUseAgent, canM
       <div className="mew-project-sidebar-heading">
         <Folder width={14} height={14} aria-hidden="true" />
         <h2 id={titleId} className="min-w-0 flex-1 truncate">{copy.title}</h2>
+        <div className="mew-project-heading-add" inert={busy || undefined}>
+          <ProjectAddInline basePath={basePath} paths={paths} canUseAgent={canUseAgent} canManageFolders={canManageFolders}
+            onOpen={open} beforeMutation={beforeMutation} onProjectsChanged={onProjectsChanged} />
+        </div>
         <PanelCloseButton disabled={busy} aria-label={`${copy.title} · ${t('common.close')}`} onClick={onClose} />
       </div>
       <div className="flex shrink-0 items-center gap-1 border-b border-edge p-1" data-project-scope>
@@ -96,15 +111,11 @@ export function ProjectDraftSelector({ paths, icons, basePath, canUseAgent, canM
               icon={<span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true"><ProjectIcon icon={icons[path] ?? 'i:folder'} size={16} /></span>}
               hint={index < 9 && <kbd className="whitespace-nowrap font-sans text-[11px]">Alt+{index + 1}</kbd>}
               onClick={() => { void open(path) }}>
-              <span className="min-w-0 flex-1 text-left"><span className="block truncate">{labelOf(path)}</span>
-                {(labelCounts.get(labelOf(path)) ?? 0) > 1 && <span className="block truncate text-[10px] text-ink-muted">{path}</span>}
+              <span className="flex min-w-0 flex-1 items-baseline gap-2 text-left"><span className="min-w-0 truncate">{labelOf(path)}</span>
+                {(!managedPaths.has(path) || (labelCounts.get(labelOf(path)) ?? 0) > 1) && <span className="min-w-0 truncate text-[10px] text-ink-muted">{path}</span>}
               </span>
             </ActionMenuItem>
           </div>) : <ProjectCatalogPanel paths={paths} beforeMutation={beforeMutation} onProjectsChanged={onProjectsChanged} onBusyChange={setCatalogBusy} onOpen={open} />}
-        </div>
-        <div className="mew-project-inline-add" inert={busy || undefined}>
-          <ProjectAddInline basePath={basePath} paths={paths} canUseAgent={canUseAgent} canManageFolders={canManageFolders}
-            onOpen={open} beforeMutation={beforeMutation} onProjectsChanged={onProjectsChanged} />
         </div>
       </div>
     </div>

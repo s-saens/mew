@@ -46,6 +46,18 @@ test('migrates every account shortcut and active legacy root into the shared YAM
   assert.deepEqual(store.readMine('a@example.test')?.paths, [first], 'subsequent reads use YAML')
 })
 
+test('catalog marks paths inside the managed root by location, including nested and previously linked projects', () => {
+  const store = fixture()
+  const inside = path.join(store.managedRoot, 'inside')
+  const nested = path.join(inside, 'nested')
+  const outside = `${store.managedRoot}-other`
+  for (const directory of [nested, outside]) fs.mkdirSync(directory, { recursive: true })
+  for (const directory of [inside, nested, outside]) store.link('a@example.test', directory)
+  for (const rows of [store.snapshot('a@example.test'), store.list('a@example.test')]) {
+    assert.deepEqual(rows.map(project => [project.path, project.inManagedRoot]), [[inside, true], [nested, true], [outside, false]])
+  }
+})
+
 test('creation uses only the name and defaults to an initialized Git repository', async () => {
   const store = fixture()
   const created = await store.create('A@example.test', '새 프로젝트')

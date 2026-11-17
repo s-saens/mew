@@ -1,6 +1,6 @@
 ---
 title: "Projects and file navigation"
-description: "Explains project selection with collapsed nested projects, single- and multi-project modes, files, preserved task documents, Git operations, and per-account GitHub connections. Covers setup, personal shortcuts, optional disk deletion, and the multi-project database limitation."
+description: "Explains project selection, managed and external project paths, single- and multi-project modes, files, Git operations, and per-account GitHub connections. Covers setup, shortcuts, optional disk deletion, and the multi-project database limitation."
 updated: "2026-11-17"
 상위파일:
   - "MOC.md"
@@ -18,7 +18,7 @@ The **workspace** contains every project registered with this Mew instance. **My
 
 ### Create a project
 
-In the Projects panel, the **+** button follows the selected My or All list. It opens a popup with four choices in a horizontal row, each with a square icon above its name: **New project**, **Git clone**, **Workspace**, and **Browse**. The centered **+** button opens the same popup when your list is empty. Choose **New project**, enter a name, and click **Create project** to create and open it. The Git icon inside the field starts enabled; turn it off if you want a regular folder.
+In the Projects panel, the **+** button opens a popup with three choices in a horizontal row, each with a square icon above its name: **New project**, **Git clone**, and **Browse**. The centered **+** button opens the same popup when your list is empty. Choose **New project**, enter a name, and click **Create project** to create and open it. The Git icon inside the field starts enabled; turn it off if you want a regular folder.
 
 Mew stores managed projects in `~/.mew/projects/<name>` on the server. It creates `.mew/` for settings and an empty `.mew/wiki/` as the initial Wiki folder. Git-enabled projects also get `.git/` and `.gitignore`. An existing folder with the same name is never overwritten.
 
@@ -32,14 +32,11 @@ To select an accessible repository, connect GitHub from this popup; no project n
 
 ### Use an existing project
 
-In the Projects panel, select **All** to search the registered workspace catalog. Choose a project to add it to My projects and open it. Projects already in your list reuse their shortcut. With My projects empty, use **+ → Workspace** from the setup panel instead.
+The project selection list includes registered projects. Choose a project to open it. Projects outside the server-managed `~/.mew/projects` directory show their full path beside the name; duplicate names also show paths when needed to distinguish them.
 
-The **+** popup offers both existing-project sources directly:
+Choose **+ → Browse** to open the server folder picker. Linking an existing folder preserves its location and contents, registers it with the workspace, adds it to My projects, and opens it. It does not copy the folder into managed storage.
 
-- **Workspace** lists registered projects. Choose a project to add it to My projects and open it. Duplicate names show a path detail to distinguish them.
-- **Browse** opens the server folder picker. Find an existing folder and open it. Linking preserves its location and contents, registers it with the workspace, adds it to My projects, and opens it. It does not copy the folder into managed storage.
-
-Use the back arrow to return from a form or the workspace catalog directly to the four choices. Closing the folder picker also returns there and focuses **Browse**. X, clicking outside, Esc, or browser Back closes the popup from any step and returns focus to **+**. A nested folder browser or menu closes first. While a project operation is running, the popup stays open. Errors keep your input available for retry.
+Use the back arrow to return from a form to the three choices. Closing the folder picker also returns there and focuses **Browse**. X, clicking outside, Esc, or browser Back closes the popup from any step and returns focus to **+**. A nested folder browser or menu closes first. While a project operation is running, the popup stays open. Errors keep your input available for retry.
 
 The linked-folder picker retains its path field, home/parent navigation, and keyboard navigation. Folder suggestions and favorites appear when your account has the required server-file access. Up/Down and Enter choose a suggestion; Enter without a selected suggestion navigates to the typed path. Relative paths start from the displayed folder, and `~` opens the server user's home. Esc or Back closes suggestions first. Owner and manager folder/Git tools remain available under their existing permissions. Creating a folder or cloning selects the result inside the picker; linking it is a separate action.
 
@@ -51,7 +48,7 @@ Open **Layout** in the top bar to choose **Single-project mode** or **Multi-proj
 
 The mode choices appear when the server supports concurrent workspaces. After a source update, the operator must load the updated server code as well as build the browser assets; an older server continues to show the existing single-project layout.
 
-Multi-project mode starts with the current project in one narrow, full-height panel on the left. Use **Add project panel** in the empty area to open a new panel, then choose a project in its My/All selector. Close the selector to discard the unselected panel. Choosing an already-open project focuses its existing panel. Each panel has its own bottom Dock, so one project can show an agent while another shows Git or a document. Resources, active sessions, Layout, fullscreen, and the menu remain in one shared top bar; panels share the page background.
+Multi-project mode starts with the current project in one narrow, full-height panel on the left. Use **Add project panel** in the empty area to open a new panel, then choose a project in its selector. Close the selector to discard the unselected panel. Choosing an already-open project focuses its existing panel. Each panel has its own bottom Dock, so one project can show an agent while another shows Git or a document. Resources, active sessions, Layout, fullscreen, and the menu remain in one shared top bar; panels share the page background.
 
 - Click the project name to open that panel's **project selection panel**. Selecting a project already open elsewhere focuses its existing panel.
 - Drag the six-dot handle to move the panel between columns or rows. Arrow keys on the handle also move it. Drag a boundary, or focus it and use arrow keys, to resize.
@@ -64,12 +61,10 @@ Postgres database tools and saves of database-bound pages are currently unavaila
 
 If your previous project folder is unavailable, Mew restores the first available project in My projects. If none is available, it returns to project setup while preserving the saved entries.
 
-The header shows the current project's icon and name. Clicking it opens **Projects** in a sidebar to the left of the file explorer on desktop, or in a full-screen panel on mobile. Directly below the panel heading, **My / All** switches between your personal shortcuts and every registered workspace project. The control looks and works like the file explorer's **Wiki / Files** switch. My is selected initially; reopening the panel keeps your current scope. The current My row is highlighted. Each project shares its icon with the file explorer.
-
-Use Left/Right on the scope buttons to switch and move focus, Home to select My, and End to select All. All loads its searchable catalog when selected. Choosing a catalog project adds it to My projects before opening it. Scope switching is disabled while that operation runs.
+The header shows the current project's icon and name. Clicking it opens project selection in a sidebar to the left of the file explorer on desktop, or in a full-screen transparent panel on mobile. The mobile panel has **+** immediately left of Close. The current project row is highlighted. Each project shares its icon with the file explorer.
 
 - Select a row to switch projects without refreshing. Document tabs, layout, and scroll positions are restored per project. Your other connected screens follow the switch; other users' active projects stay as they are. Running agents keep their original working directories.
-- Use **+** below either list to open the project setup popup. The workspace catalog is available in **All** and under **Workspace** in the popup. In a project's context menu, choose **Delete → Remove from My Projects** to remove only your shortcut, preserving the project, other users' shortcuts, and all files. If other shortcuts remain, removing the current one first opens another project. Removing your last shortcut returns to the centered project panel. My projects only contains registered catalog entries.
+- Use **+** to open the project setup popup. In a project's context menu, choose **Delete → Remove from My Projects** to remove only your shortcut, preserving the project, other users' shortcuts, and all files. If other shortcuts remain, removing the current one first opens another project. Removing your last shortcut returns to the centered project panel. My projects only contains registered catalog entries.
 - Nested Git/Mew projects are discovered in the shared catalog. In project selection, nested projects start collapsed beneath their nearest registered parent; expand a parent to see its children. Search reveals matching nested projects and their parent paths. Select a project when you want to change the active root.
 - In My, drag the left handle to reorder shortcuts. **↑/↓** on the handle or **Shift+↑/↓** on the row also reorders them. The **Alt+1…9** numbers on the right follow your order.
 - `Alt+P` opens Projects and focuses its first available item; `Alt+1…9` switches in personal list order. Within My, Up/Down and Home/End navigate, and Enter/Space selects. Existing modal, IME, repeated-key, and remote-screen input boundaries apply. `Ctrl/Cmd+number` selects tabs in the current panel.

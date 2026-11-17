@@ -17,7 +17,7 @@ export class ProjectRegistryError extends Error {
 
 type RegisteredProject = { path: string; name: string; managed: boolean; discovered?: boolean }
 type Registry = { version: 1; projects: RegisteredProject[]; myProjects: Record<string, StoredRootProjects>; deletedPaths?: string[]; excludedPaths?: string[] }
-export type RegistryProject = RegisteredProject & { mine: boolean; icon: string | null; parentPath?: string }
+export type RegistryProject = RegisteredProject & { mine: boolean; icon: string | null; inManagedRoot: boolean; parentPath?: string }
 const accountKey = (account: string) => account.trim().toLowerCase()
 const validPath = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 4096 && !value.includes('\0') && path.isAbsolute(value)
 
@@ -225,6 +225,12 @@ export class ProjectRegistry {
     if (changed) this.write(state)
   }
 
+  private isInManagedRoot(directory: string): boolean {
+    let root = path.resolve(this.managedRoot)
+    try { root = fs.realpathSync(root) } catch { /* The managed root may not exist yet. */ }
+    return withinPath(root, directory)
+  }
+
   private rows(state: Registry, account: string, withIcons = true): RegistryProject[] {
     const mine = new Set(state.myProjects[accountKey(account)]?.paths ?? [])
     const registered = new Set(state.projects.map(project => project.path))
@@ -237,7 +243,7 @@ export class ProjectRegistry {
         if (parent === ancestor) break
         ancestor = parent
       }
-      return { ...project, mine: mine.has(project.path), icon: withIcons && fs.existsSync(project.path) ? readProjectIcon(project.path) : null, ...(parentPath ? { parentPath } : {}) }
+      return { ...project, inManagedRoot: this.isInManagedRoot(project.path), mine: mine.has(project.path), icon: withIcons && fs.existsSync(project.path) ? readProjectIcon(project.path) : null, ...(parentPath ? { parentPath } : {}) }
     })
   }
 
@@ -260,7 +266,7 @@ export class ProjectRegistry {
     if (!mine.paths.includes(project.path)) mine.paths.push(project.path)
     state.myProjects[key] = mine
     this.write(state)
-    return { ...project, mine: true, icon: readProjectIcon(canonical) }
+    return { ...project, inManagedRoot: this.isInManagedRoot(project.path), mine: true, icon: readProjectIcon(canonical) }
   }
 
   setMine(account: string, directory: unknown, added: unknown): StoredRootProjects {
@@ -351,7 +357,7 @@ export class ProjectRegistry {
       if (!mine.paths.includes(project.path)) mine.paths.push(project.path)
       state.myProjects[key] = mine
       this.write(state)
-      return { ...project, mine: true, icon: null }
+      return { ...project, inManagedRoot: this.isInManagedRoot(project.path), mine: true, icon: null }
     } catch (error) {
       fs.rmSync(directory, { recursive: true, force: true })
       throw error
