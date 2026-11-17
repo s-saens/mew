@@ -61,7 +61,7 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
   const [lifecycleBusy, setLifecycleBusy] = useState(false)
   const [installing, setInstalling] = useState(false)
   const runtimeBusy = lifecycleBusy || runtime?.installing === true
-  const [confirm, setConfirm] = useState<'uninstall' | 'logout' | null>(null)
+  const [confirm, setConfirm] = useState<'uninstall' | 'logout' | 'reset' | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -145,6 +145,7 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
   }
 
   const reset = async () => {
+    setConfirm(null)
     setSaving(true)
     setError(null)
     try {
@@ -196,11 +197,18 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
                 {!runtime?.installed && runtime?.installable && <button type="button" disabled={runtimeBusy} onClick={install} className="rounded bg-accent px-2.5 py-1 text-xs text-ink-on-accent disabled:opacity-40">{uiText("설치")}</button>}
                 {runtime?.installed && <button type="button" disabled={runtimeBusy} onClick={() => window.dispatchEvent(new CustomEvent('mew:open-agent-runtime', { detail: runtimeId }))} className="rounded border border-edge px-2.5 py-1 text-xs text-ink-secondary hover:bg-surface-hover disabled:opacity-40">{uiText("로그인")}</button>}
                 {runtime?.installed && runtime.logoutable && <button type="button" disabled={runtimeBusy} onClick={() => setConfirm('logout')} className="rounded border border-warning px-2.5 py-1 text-xs text-warning hover:bg-surface-hover disabled:opacity-40">{uiText("로그아웃")}</button>}
-                {runtime?.installed && runtime.uninstallable && <button type="button" disabled={runtimeBusy} onClick={() => setConfirm('uninstall')} className="rounded border border-danger px-2.5 py-1 text-xs text-danger hover:bg-danger/10 disabled:opacity-40">{uiText("런타임 삭제")}</button>}
               </div>
               <RuntimeInstallProgress runtimeId={runtimeId} busy={installing || runtime?.installing === true} installation={runtime?.installation} />
             </section>
             {runtime?.installed && Object.hasOwn(SUBSCRIPTION_URLS, runtimeId) && <AgentAccountCard runtime={runtimeId} />}
+            <section className="rounded border border-edge px-3 py-2">
+              <h3 className="text-sm font-medium text-ink">{uiText("관리")}</h3>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <button type="button" disabled={saving || runtimeBusy || !loaded || loadFailed} onClick={() => setConfirm('reset')} className="rounded border border-edge px-2.5 py-1 text-xs text-ink-secondary hover:bg-surface-hover disabled:opacity-40">{uiText("실행 설정 초기화")}</button>
+                <button type="button" disabled={saving || runtimeBusy || !runtime?.installed || !runtime.uninstallable} onClick={() => setConfirm('uninstall')} className="rounded border border-danger px-2.5 py-1 text-xs text-danger hover:bg-danger/10 disabled:opacity-40">{uiText("런타임 삭제")}</button>
+              </div>
+              {runtime?.installed && !runtime.uninstallable && <p className="mt-2 text-xs text-ink-secondary">{runtimeId === 'codex' || runtimeId === 'claude' ? uiText("Mew에 포함된 연결 프로그램은 자동 삭제할 수 없습니다. 별도로 설치한 CLI는 공급자의 제거 방법을 이용하세요.") : uiText("이 런타임은 자동 삭제를 지원하지 않습니다. 공급자의 설치 방법에 따라 직접 삭제하세요.")}</p>}
+            </section>
             <details className="rounded border border-edge px-3 py-2">
             <summary className="cursor-pointer text-sm font-medium text-ink">{uiText("고급 실행 설정")}</summary>
             <div className="mt-3 space-y-3">
@@ -276,13 +284,7 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
           </div>
         )}
         <div className="flex items-center justify-between gap-2 border-t border-edge px-4 py-2.5">
-          <button
-            type="button"
-            onClick={reset}
-            disabled={saving}
-            className="rounded px-2 py-1 text-xs text-ink-muted hover:bg-surface-hover hover:text-ink disabled:opacity-40"
-          >
-            {uiText("기본값으로 되돌리기")}</button>
+          <div />
           <div className="flex gap-1.5">
             <button type="button" onClick={onClose} className="rounded border border-edge px-3 py-1 text-xs text-ink-secondary hover:bg-surface-hover hover:text-ink">
               {uiText("취소")}</button>
@@ -296,7 +298,8 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
             </button>
           </div>
         </div>
-      {confirm === 'uninstall' && <ConfirmDialog message={uiText("{p0}을 삭제할까요?", { p0: label })} detail={uiText("계정과 API 키 설정은 남아 있을 수 있습니다.")} confirmLabel={uiText("삭제")} danger onConfirm={uninstall} onCancel={() => setConfirm(null)} />}
+      {confirm === 'reset' && <ConfirmDialog message={uiText("{p0} 실행 설정을 초기화할까요?", { p0: label })} detail={uiText("저장한 실행 파일, 추가 인자와 환경 변수를 지웁니다. 모델 기본값과 공급자 로그인은 유지됩니다.")} confirmLabel={uiText("초기화")} danger onConfirm={reset} onCancel={() => setConfirm(null)} />}
+      {confirm === 'uninstall' && <ConfirmDialog message={uiText("{p0}을 삭제할까요?", { p0: label })} detail={uiText("등록된 삭제 명령을 실행합니다. 계정과 Mew 실행 설정은 유지됩니다.")} confirmLabel={uiText("삭제")} danger onConfirm={uninstall} onCancel={() => setConfirm(null)} />}
       {confirm === 'logout' && <ConfirmDialog message={uiText("{p0}에서 로그아웃할까요?", { p0: label })} confirmLabel={uiText("로그아웃")} danger onConfirm={logout} onCancel={() => setConfirm(null)} />}
     </DialogFrame>
   )

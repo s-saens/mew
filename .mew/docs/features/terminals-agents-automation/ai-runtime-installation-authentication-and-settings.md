@@ -8,7 +8,7 @@ updated: "2026-10-31"
 status_hash: "ce50d3fa70fce93520dfd200e419db9b718cebd2b370a52a9250e624fc80aed1"
 files: ["src/components/RuntimeInstallProgress.tsx", "src/components/AgentPanel.tsx", "src/components/RuntimeSettingsModal.tsx", "src/components/agentRuntimes.tsx", "server/agentRuntimes.ts", "server/agentRuntimeInstall.ts", "server/agentDefaults.ts"]
 commits: []
-description: "Feature contract for agent runtime installation, authentication, and model, effort, and permission defaults. Covers connector status, advanced execution settings, composer defaults, and provider-specific interfaces."
+description: "Feature contract for agent runtime installation, authentication, and model, effort, and permission defaults. Covers connector status, runtime removal, execution-settings reset, composer defaults, and provider-specific interfaces."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -39,6 +39,7 @@ description: "Feature contract for agent runtime installation, authentication, a
 - Selector rows and the settings dialog display installation status and logs using the shared `RuntimeInstallProgress`. They poll approximately every 1 second and stop after completion. Height-limited logs follow new output while preserving the scroll position when reading earlier logs. Progress is queried again on refresh or reentry.
 - The server keeps the latest installation status and the last 12,000 characters of output for each runtime in memory. It resets them on retry, and Antigravity also outputs download size and percentage, verification, and extraction stages.
 
+- The management section makes execution-settings reset and runtime removal visible. Each requires confirmation; unsupported automatic removals remain disabled with manual-removal guidance. Reset clears account-scoped execution settings, not saved model defaults or provider login.
 - Runtime settings separate installation and account controls from advanced execution settings, explain Claude and Codex connector scope, and support clearing command/argument overrides and removing individual saved environment variables. Other masked values are preserved.
 - The runtime settings dialog appears above the list through the shared `DialogFrame` body portal, and interactions inside it do not close the dropdown behind it.
 
