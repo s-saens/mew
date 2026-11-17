@@ -27,8 +27,8 @@ description: "Agent conversation feedback, collapsed summaries and expanded answ
 - In an empty conversation, use a centered, translated prompt to guide the user to start chatting.
 - Use ↑/↓ in the conversation area to move between questions. From the middle of a long answer, ↑ first returns to that answer's question.
 - Clicking a bubble or answer body focuses the conversation area for question navigation without displaying a border around the entire area. Keep the focus border during keyboard navigation, and hide it when the area is clicked with a pointer, even if it already has focus. Preserve the individual focus indicators of child buttons and links. In `server/agent-history-ui.test.ts`, check clicking an answer after using the input field, clicking again after keyboard navigation, and restoring focus after leaving the area.
-- Click collapsed bubbles to expand their content. Place question copy controls outside the bubble on the left. For collapsed answers, place the stop button to the right of the first line and hide the time. Expanded answers have a bottom bar with status and duration at the left, a centered upward-chevron collapse button, and a stop button on the right while work is in progress. Copy and reply buttons sit vertically outside the right side of the narrower bubble.
-- Keep the expanded answer's bottom bar at the bottom of the conversation viewport within its own bubble. Do not display an expanded top bar or the top `질문으로` button.
+- Click collapsed bubbles to expand their content. Place question copy controls outside the bubble on the left. For collapsed answers, place the stop button to the right of the first line and hide the time. Expanded answers use the full bubble width. Their top bar shows status and duration on the left and copy, reply, and the in-progress stop control on the right. Clicking either bar collapses the answer; action buttons work independently.
+- Keep both expanded answer bars within their own bubble as they stick to the conversation viewport. Do not display the top `질문으로` button.
 
 ### Scope
 
@@ -56,7 +56,7 @@ description: "Agent conversation feedback, collapsed summaries and expanded answ
 
 ### Reply to a message
 
-Swipe a user question or agent answer left with touch or a mouse to insert the full text as a Markdown block quote at the start of the composer draft. User questions also have a Reply button; agent answers show one to the right when expanded. Messages without text, such as attachment-only messages, cannot be quoted. The quote is editable and removable like other draft text and follows the normal sending and queue behavior. Reply is unavailable in CLI mode, while editing a queued message, and in history previews.
+Swipe a user question or agent answer left with touch or a mouse to insert the full text as a Markdown block quote at the start of the composer draft. User questions also have a Reply button; agent answers show one in the top bar when expanded. Messages without text, such as attachment-only messages, cannot be quoted. The quote is editable and removable like other draft text and follows the normal sending and queue behavior. Reply is unavailable in CLI mode, while editing a queued message, and in history previews.
 
 ### Immediate message and reply feedback
 
@@ -311,13 +311,13 @@ Verification: `server/agent-history-ui.test.ts` checks ↑/↓ from the middle o
 
 Set the top-right corner radius of user chat bubbles and the top-left corner radius of agent answer task bubbles to 0. Keep the existing rounding on other corners, applying it equally in collapsed and expanded states.
 
-Do not show expand arrows in collapsed question, answer, or task groups. Expand by clicking the collapsed content or pressing Enter or Space on its focused button, and announce the state with `aria-expanded`. Collapse an expanded answer using the centered upward-chevron button in its bottom bar. While reading long answers, the bottom bar sticks to the bottom edge of the conversation viewport and does not move above its own answer bubble's top. Retain a background and divider so content does not show through behind the bar, and hide it for collapsed answers.
+Do not show expand arrows in collapsed question, answer, or task groups. Expand by clicking the collapsed content or pressing Enter or Space on its focused button, and announce the state with `aria-expanded`. Collapse an expanded answer by clicking its top or bottom bar, or by pressing Enter or Space on its focused collapse control. While reading long answers, the bottom bar sticks to the bottom edge of the conversation viewport and does not move above its own answer bubble's top. Retain a background and divider so content does not show through behind the bar, and hide it for collapsed answers.
 
-Place the question copy button outside the bubble background on the left in both collapsed and expanded states. Copy the entire question without changing its collapse state. Make an expanded answer bubble narrower and place its copy and reply icon buttons vertically in the space at its upper right. These buttons scroll with the bubble. Copying retains the expanded state.
+Place the question copy button outside the bubble background on the left in both collapsed and expanded states. Copy the entire question without changing its collapse state. Place copy and reply icon buttons at the right of the expanded answer's top bar. Copying and replying retain the expanded state.
 
-For collapsed answer summaries, show the original text of the last answer in up to two lines fitted to the panel width, with an ellipsis at the overflowing end. Put the status dot inline before the first line, so the second line starts at the dot's left edge. Do not use a fixed 80-character limit. Place the stop button at the right of the first line while work is in progress, reserving only the width needed for the button on that line. Do not show task duration in collapsed answers or reserve space or an extra line for it. Expanded answers hide the summary and show the status dot at the left of the bottom bar, followed by task duration. Center the collapse button independently of the duration width. Update elapsed time while work is in progress, and do not reserve time space for old transcripts without timing data. Copy the entire answer without changing its collapse state.
+For collapsed answer summaries, show the original text of the last answer in up to two lines fitted to the panel width, with an ellipsis at the overflowing end. Put the status dot inline before the first line, so the second line starts at the dot's left edge. Do not use a fixed 80-character limit. Place the stop button at the right of the first line while work is in progress, reserving only the width needed for the button on that line. Do not show task duration in collapsed answers or reserve space or an extra line for it. Expanded answers hide the summary and show the status dot at the left of the top bar, followed by task duration. The bottom bar has a centered upward chevron. Update elapsed time while work is in progress, and do not reserve time space for old transcripts without timing data. Copy the entire answer without changing its collapse state.
 
-Expanded answers have no top bar. The bottom bar stays within its own bubble and remains available at the viewport bottom while scrolling a long answer. Place the stop button at the right end of the bottom bar while work is in progress. Give icon buttons translated accessible names and tooltips.
+The top and bottom bars stay within their own bubble and remain available at the viewport edges while scrolling a long answer. When the bars overlap, the top bar takes priority. Place the stop button with the top bar actions while work is in progress. Action buttons do not collapse the answer. Give icon buttons translated accessible names and tooltips.
 
 Do not add the former `질문으로` button again without an explicit follow-up request. Retain ↑/↓ question navigation in the conversation area.
 
@@ -332,7 +332,7 @@ Completed tasks preserve the full transcript at termination. Thus, even after th
 
 - Replace the input for opening a session ID directly with unified topic, content, and ID search. Combine the local index, external CLI records, and runtime list, and restore conversations only through list selection after request ID and existing occupancy checks ([Search behavior](#history-search), [Selection rationale](../../decisions/0084-agent-history-search.md)).
 
-- Place question copy outside the bubble background and expanded answer copy and reply controls to the right of the bubble ([Bubble display contract](#task-bubble-status)).
+- Place question copy outside the bubble background and expanded answer copy and reply controls in the top bar ([Bubble display contract](#task-bubble-status)).
 
 - Show explicit command execution and runtime open errors as small translucent floating notices over the content area. Scroll long errors inside the notice, and retain existing task error records and detail windows. Recoverable command-status polling and connection failures use the loading behavior below while automatic recovery remains active.
 
@@ -340,7 +340,7 @@ Completed tasks preserve the full transcript at termination. Thus, even after th
 
 - Foreground, network `online`, `pageshow`, and verified Mewlink transport recovery cancel a pending retry delay and retry once immediately. `online` alone does not bypass Mewlink transport readiness. Duplicate recovery events cannot create a second connecting socket or overlapping status read, replay prompts or `/clear`, or revive a fatal connection or permanent read failure. Focus restoration across the retained inert app follows the remote contract.
 
-- Keep the expanded answer's bottom bar sticky within its bubble and compensate for the conversation viewport's bottom padding. Preserve collapse state and copy, stop, reply, and input behavior ([Bubble display contract](#task-bubble-status)).
+- Keep the expanded answer's top and bottom bars sticky within its bubble and compensate for the conversation viewport's padding. Preserve collapse state and copy, stop, reply, and input behavior ([Bubble display contract](#task-bubble-status)).
 
 - Retain click, Enter, Space, and accessibility state behavior for collapsed groups. Apply two-line ellipsis truncation to answer summaries, reserving only the width needed for the stop button on the first line and hiding task duration in collapsed answers ([Bubble display contract](#task-bubble-status)).
 
@@ -406,7 +406,7 @@ Completed tasks preserve the full transcript at termination. Thus, even after th
 
 - User verification criteria: In the middle of a long response, confirm that the bottom `접기` button stays at the bottom of the viewport, appears only within that bubble, and collapses the response on click, Enter, or Space.
 
-- User verification criteria: In a long expanded response, confirm that the status and elapsed time are on the left of the sticky bottom bar, the collapse chevron is centered, and Stop is on the right during work. Confirm that Copy and Reply appear outside the upper-right edge and work independently, and that no top bar is displayed.
+- User verification criteria: In a long expanded response, confirm that status and elapsed time appear at the left of the sticky top bar, with Copy, Reply, and an in-progress Stop control at the right. Confirm that either bar collapses the answer, that the action buttons do not collapse it, and that the answer uses the full width.
 
 - 2026-10-05: Passed 3 history, input, and connection UI checks. On desktop and mobile in both themes, verified Copy on the first line and time on the second, summary width per line, time display for short responses, transcripts without times, full response copying, Enter/Space toggling, and existing question navigation and cache restoration. Targeted lint, document boundary, and link checks passed. The full type check failed due to an out-of-scope `변경사항` translation key error in `GitWorkbench.tsx`. No build or server restart was performed.
 

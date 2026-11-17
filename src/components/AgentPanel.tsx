@@ -5233,8 +5233,20 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
     const canStop = busy === true && !item.done
     const actionSpace = canStop ? 30 : 0
     return (
-      <div data-agent-turn className="flex min-w-0 items-start gap-1">
-      <div className="min-w-0 flex-1 rounded-lg rounded-tl-none border border-edge bg-surface">
+      <div data-agent-turn className="min-w-0 rounded-lg rounded-tl-none border border-edge bg-surface">
+        {open && <div data-agent-turn-header className="sticky -top-3 z-20 flex h-8 items-center rounded-tr-lg border-b border-edge bg-surface">
+          <button type="button" aria-expanded={true} aria-label={uiText("접기")} data-tip={uiText("접기")} onClick={() => { if (!hasSelection()) toggle(item.key) }}
+            className="flex h-full min-w-0 flex-1 items-center gap-1.5 px-2.5 text-left text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-ink">
+            <span className={`size-1.25 shrink-0 rounded-full ${BUBBLE_DOT[state]}`} title={BUBBLE_LABEL[state]} aria-label={BUBBLE_LABEL[state]} />
+            {durationMs != null && <span data-agent-duration className="min-w-0 truncate text-[11px] leading-4 tabular-nums text-ink-muted">{formatDuration(durationMs)}</span>}
+          </button>
+          <div data-agent-turn-actions className="flex shrink-0 items-center">
+            {canStop && <button type="button" onClick={() => send({ type: 'cancel' })} className="flex size-8 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover hover:text-ink" aria-label={uiText("중단")} title={uiText("중단")} data-tip={uiText("중단")}><span className="size-2 rounded-[1px] bg-current" /></button>}
+            {answerText && <CopyButton text={answerText} label={uiText("이 답변 복사")} rail />}
+            {onReply && <button type="button" data-agent-reply-button onClick={onReply} aria-label={t('comment.reply')} data-tip={t('comment.reply')}
+              className="flex size-8 items-center justify-center rounded text-ink-muted hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"><Undo width={16} height={16} aria-hidden="true" /></button>}
+          </div>
+        </div>}
         {!open && <div data-agent-turn-header className="relative min-h-9">
           <button type="button" aria-expanded={false} onClick={() => { if (!hasSelection()) toggle(item.key) }}
             className="flex w-full min-w-0 items-start px-3 py-2 text-left text-xs text-ink-secondary hover:text-ink">
@@ -5321,30 +5333,13 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
           </div>
         )}
         {open && (
-          <div data-agent-turn-footer className="sticky -bottom-3 z-10 grid h-6.5 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center rounded-b-lg border-t border-edge bg-surface px-1">
-            <div className="flex min-w-0 items-center gap-1.5 pl-1.5">
-              <span className={`size-1.25 shrink-0 rounded-full ${BUBBLE_DOT[state]}`} title={BUBBLE_LABEL[state]} aria-label={BUBBLE_LABEL[state]} />
-              {durationMs != null && <span data-agent-duration className="min-w-0 truncate text-[11px] leading-4 tabular-nums text-ink-muted">{formatDuration(durationMs)}</span>}
-            </div>
-            <button type="button" aria-expanded={true} aria-label={uiText("접기")} data-tip={uiText("접기")} onClick={() => toggle(item.key)}
-              className="flex size-6 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-ink">
+          <div data-agent-turn-footer className="sticky -bottom-3 z-10 h-6.5 rounded-b-lg border-t border-edge bg-surface">
+            <button type="button" aria-expanded={true} aria-label={uiText("접기")} data-tip={uiText("접기")} onClick={() => { if (!hasSelection()) toggle(item.key) }}
+              className="flex h-full w-full items-center justify-center rounded-b-lg text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-ink">
               <NavArrowUp width={16} height={16} aria-hidden="true" />
             </button>
-            {canStop && <button type="button" onClick={() => send({ type: 'cancel' })}
-              className="mr-0.5 flex size-5 justify-self-end items-center justify-center rounded text-ink-secondary hover:bg-surface-raised hover:text-ink"
-              aria-label={uiText("중단")} title={uiText("중단")} data-tip={uiText("중단")}>
-              <span className="size-2 rounded-[1px] bg-current" />
-            </button>}
           </div>
         )}
-      </div>
-      {open && <div data-agent-turn-actions className="flex w-8 shrink-0 flex-col items-center gap-1">
-        {answerText && <CopyButton text={answerText} label={uiText("이 답변 복사")} rail />}
-        {onReply && <button type="button" data-agent-reply-button onClick={onReply} aria-label={t('comment.reply')} data-tip={t('comment.reply')}
-          className="flex size-8 items-center justify-center rounded text-ink-muted hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-ink">
-          <Undo width={16} height={16} aria-hidden="true" />
-        </button>}
-      </div>}
       </div>
     )
   }
