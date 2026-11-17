@@ -1,12 +1,14 @@
 ---
 title: "Windows installation wizard"
-description: "Defines the native Windows x64 installer for a private WSL 2 environment, pinned prebuilt runtime, reboot resume, launch control, and data-preserving repair. Separates implementation from signed publication and clean-Windows acceptance."
-updated: "2026-11-05"
+description: "Defines Windows x64 preparation through the npm CLI and native wizard: an owned WSL 2 environment, pinned runtime, reboot resume, login startup, private launch/stop control, and data-preserving repair. Separates implementation from publication and clean-Windows acceptance."
+updated: "2026-11-17"
 ---
 
 # Windows installation wizard
 
 The wizard delivers one `mew-windows-setup-x64.exe`. It prepares the computer, installs Mew, and opens the first-administrator page in the Windows browser. Users do not enter WSL, package-manager, Node, or compiler commands. Administrator approval and a Windows restart remain visible when Windows requires them.
+
+The npm entry point also uses this preparation engine. With Windows Node.js 24 and npm installed, `npx mew-ide` stages a persistent launcher, prepares Mew's dedicated WSL environment, and opens the Windows browser. It does not ask for Linux commands, database credentials, a workspace, or a port. Windows may still require its own administrator approval and restart. The [CLI distribution contract](cli-distribution.md) owns managed Postgres and the shared account flow.
 
 **Publication status:** the installer source and release path are implemented; no signed installer has been published or accepted on a clean Windows machine. The [release procedure](../operations/cli-release.md#windows-installation-wizard) owns publication gates. Until those gates pass, the [manual Windows guide](../../../docs/guides/getting-started-en.md#windows-wsl-2) remains the usable installation route.
 
@@ -21,6 +23,7 @@ The wizard delivers one `mew-windows-setup-x64.exe`. It prepares the computer, i
 | `launcher-core.ps1` / `launch.ps1` | Own the WSL CLI process, validate local readiness addresses, and reopen the browser through private local control. |
 | `launch-linux.sh` | Invoke the shared bundled CLI with private Node, managed workspace/data paths, and installer transport. |
 | `build.mjs` / `downloads.json` | Pin prerequisite identities and embed the matching published runtime checksum in the installer. |
+| `apps/cli/src/windows-bootstrap.mjs` / `npm-setup.ps1` | Stage the npm installation, invoke the shared preparation engine, register login startup, resume after reboot, and open the persistent controller. |
 
 The native wizard installs a **dedicated WSL 2 Ubuntu 24.04 x64 environment**. It invokes the existing Linux runtime and UI, rather than maintaining another application implementation. Existing Linux-only login-desktop and provider installation features motivate this default. Native Windows core support remains a separate [platform implementation](windows-native.md), with its own feature and verification limits. ARM64 is rejected by this first wizard because ordinary Chrome automatic installation on Linux ARM64 lacks the same supported path. [ADR 0143](../decisions/0143-windows-installation-wizard.md) records the alternatives and consequences.
 
@@ -38,6 +41,8 @@ The app files live under `%LOCALAPPDATA%\Programs\Mew`. The wizard does not weak
 
 Setup journals pending, reboot, import, provision, and ready phases. Windows feature activation and WSL package installation have separate preparation checkpoints: a feature restart can continue into package installation, without repeating the same failed stage indefinitely. When Windows needs a restart, setup saves a copy of the same installer and a user-specific HKCU RunOnce entry. It does not force a reboot. After sign-in, the same wizard resumes; running it manually is also supported. Failure or cancellation preserves the existing environment and user data. Windows virtualization or policy restrictions remain actionable setup failures rather than hidden workarounds.
 
+For npm installation, `apps/cli/tools/prepare-windows-assets.mjs` copies the shared scripts and pinned prerequisites into the package's `windows-assets/` directory before packing. The launcher stages those files and its dependency closure under `%LOCALAPPDATA%\Programs\Mew\<version>`, outside the disposable npx cache. It obtains the same version's Linux x64 checksum from the immutable runtime release and writes the installer manifest. A missing, ambiguous, or invalid checksum fails before provisioning. Reboot resume runs the staged PowerShell script with fixed arguments; it does not download or select a new npm version at login.
+
 Ubuntu rootfs and private Node downloads use exact official URLs and pinned SHA-256 hashes. Mew uses the Linux x64 archive from `mew-cli-v<version>`. The installer builder requires that immutable runtime release to exist and embeds its checksum. Downloads are cached by checksum, extracted only after verification, and retried without accepting partial files. The CLI dependency tree is bundled at build time; user machines do not run `npm install` or compile dependencies. Checksums provide transfer integrity; release signing and protected publication provide a separate publisher boundary.
 
 The compiler download follows [Inno Setup's publisher-verification guidance](https://jrsoftware.org/isdl-verify.php). Preserve its built-in copyright and website notices under the [Inno Setup license](https://jrsoftware.org/files/is/license.txt). Private distribution import and explicit version selection follow [Microsoft's WSL command contract](https://learn.microsoft.com/en-us/windows/wsl/basic-commands#import-a-distribution).
@@ -51,7 +56,9 @@ An interrupted initial import with no distribution registration can quarantine i
 
 The shortcut runs an unelevated controller. One controller per Windows SID owns its CLI process. Repeated shortcut launches request another local address through the private named-pipe channel rather than creating a competing server. The controller consumes structured CLI responses in memory and opens the Windows browser only after readiness. It validates the loopback host, HTTP scheme, port, path, and exact setup-fragment shape. It never persists or logs a setup URL.
 
-The shared [first-administrator contract](first-owner-setup.md) owns enrollment and the private stdin/stdout protocol. Reopening unfinished setup rotates its capability through trusted CLI-host IPC without restarting Mew. An initialized installation receives only its base URL. Reopen errors use a fixed safe response and visible recovery guidance while preserving the running host; pending requests have bounded waits. Closing the controller's input requests graceful shutdown of the CLI host it owns. This is not an automatic startup service or permission to stop unrelated instances.
+The shared [first-administrator contract](first-owner-setup.md) owns enrollment and the private stdin/stdout protocol. Reopening unfinished setup rotates its capability through trusted CLI-host IPC without restarting Mew. An initialized installation receives only its base URL. Reopen errors use a fixed safe response and visible recovery guidance while preserving the running host; pending requests have bounded waits. Closing the controller's input requests graceful shutdown of the CLI host it owns. The private controller also accepts a stop request from the same OS account; it closes only its own CLI process and never terminates a WSL distribution or unrelated server.
+
+The npm path registers a per-user Task Scheduler entry after successful preparation, with an interactive logon trigger and standard privileges. The task invokes the fixed Windows controller, which starts the owned WSL distribution and the bundled Linux CLI. Startup does not depend on a previously opened Ubuntu terminal or an npx cache directory. The Linux invocation remains in installer IPC mode, so it does not register a second service inside WSL. It uses the CLI's default port 5000 and collision fallback. `npx mew-ide status` and `stop` address the active installed version; automatic startup can be disabled without removing accounts, projects, or the private environment.
 
 ## Reinstall, update, and removal
 
@@ -62,3 +69,5 @@ Uninstall removes the Windows launcher and shortcuts and clears only its own mat
 ## Verification boundary
 
 Isolated tests cover plan decisions, ownership conflicts, restart resume, pinned downloads, protocol validation, and data-preserving paths. PowerShell parsing and mocked Windows execution do not establish successful WSL import, UAC handling, reboot resume, browser forwarding, distribution repair, signing, or a usable clean-host app. Those require the Windows acceptance matrix in the release procedure. No application deployment, launcher execution, or host WSL modification is authorized by tests or builds in this repository.
+
+The npm bootstrap tests use injected download, staging, and PowerShell operations. They check versioned checksums, payload persistence, preparation-before-launch ordering, restart handling, failure propagation, and x64 bounds. On 2026-11-17 the available Windows PowerShell executable could not start from the development WSL host (`UtilAcceptVsock: accept4 failed 110`), so real PowerShell parsing and mocked-engine checks remain blocked in this environment. This is separate from passing portable module tests and does not establish Windows acceptance.

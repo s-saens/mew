@@ -1,7 +1,35 @@
+---
+description: "The mew-ide npm installer's prerequisites, unattended first launch, managed database, background operation, and publication status. Includes the package license."
+---
+
 # Mew CLI
 
-Run a prebuilt Mew workspace locally. See the
-[project README](https://github.com/s-saens/mew#readme) for installation and usage.
+With Node.js 24 and npm installed, run:
+
+```sh
+npx mew-ide
+```
+
+The installer prepares Mew and local Postgres without asking for configuration,
+then opens the first-administrator page in your browser. Windows users start in
+CMD or PowerShell; Mew prepares its dedicated WSL environment. OS installation
+may require administrator approval or a restart. npm may ask permission to
+download the package; `npx --yes mew-ide` suppresses that npm-owned prompt.
+
+On Linux/macOS, the normal command runs Mew in the background and registers
+login startup. Run it again to reopen Mew. `npx mew-ide status` checks readiness;
+`npx mew-ide stop` stops the instance while preserving data and login startup.
+`npx mew-ide disable-autostart` removes Mew's login registration.
+Use `--foreground` for terminal-owned execution and `--no-autostart` to omit
+login registration. Windows uses the managed installation's launcher.
+
+After administrator creation, the remote-access popup presents Mewlink,
+Tailscale, and Cloudflare Tunnel. Return through **Menu → Mewlink**. Provider
+login remains a browser action; installation does not register remote accounts.
+
+The initial npm package and runtime releases have not yet been published or
+accepted on clean supported hosts. Until publication, use the source installation
+in the [project README](https://github.com/s-saens/mew#readme).
 
 ## License
 

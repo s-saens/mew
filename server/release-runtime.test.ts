@@ -39,9 +39,12 @@ test('runtime fixture resolves compiled imports, native worker URLs, package exp
     'server/demo-repository-fixture.mjs': 'import "../tools/private-fixture.mjs"',
     'server/worker.ts': 'export const worker: string = "compiled"',
     'server/browser-dependencies.ts': 'export const install: boolean = true',
+    'server/release-providers-routes.ts': 'export const applicationRoute = true',
+    'server/release-runtime.ts': 'throw new Error("build tool must not ship")',
     'server/login-desktop-x11.py': 'import ctypes\n',
     'server/worker.mjs': 'export { worker } from "./worker.ts"',
-    'server/entry.ts': `import { value } from '../shared/value.ts';
+    'server/entry.ts': `import './release-providers-routes.ts';
+import { value } from '../shared/value.ts';
 import { number } from '@mew/fixture';
 import data from '../shared/data.json';
 const worker = new URL('./worker.ts', import.meta.url);
@@ -80,6 +83,8 @@ console.log(JSON.stringify({value, number, data, worker: worker.pathname.endsWit
   await fs.symlink('../../packages/fixture', path.join(output, 'node_modules', '@mew', 'fixture'))
   await validateRuntimeLinks(output)
   await validateCompiledImports(output)
+  assert.match(await fs.readFile(path.join(output, 'server/release-providers-routes.js'), 'utf8'), /applicationRoute/)
+  await assert.rejects(fs.access(path.join(output, 'server/release-runtime.js')), { code: 'ENOENT' })
   const { stdout } = await exec(process.execPath, [path.join(output, 'server', 'entry.js')])
   assert.deepEqual(JSON.parse(stdout), { value: 'ok', number: 42, data: { enabled: true }, worker: true, command: 'worker.js', templateCommand: 'node flag server/worker.js' })
   assert.match(await fs.readFile(path.join(output, 'server', 'worker.mjs'), 'utf8'), /worker\.js/)

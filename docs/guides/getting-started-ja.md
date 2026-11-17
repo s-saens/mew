@@ -1,6 +1,6 @@
 ---
 title: "Getting started with mew"
-updated: "2026-11-11"
+updated: "2026-11-17"
 description: "Installation, first sign-in, remote access, host browser setup, updates, and data retention for Mew. Includes the link.mew.run entry; the legacy locale filename is retained for existing links."
 ---
 
@@ -129,16 +129,9 @@ cd ~/apps/mew
 
 ### Run with 1 command (after the first release is published)
 
-If you have Node.js 24, run the following in your working folder to download the prebuilt app. **The implementation is ready, but the first npm package and GitHub release have not been published.**
+The unscoped `npx mew-ide` installer prepares local Postgres, browser administrator setup, and login startup without a Mew configuration questionnaire. Windows users start from CMD or PowerShell; the installer prepares its dedicated WSL environment. The first public package and runtime releases remain pending.
 
-```bash
-cd /path/to/workspace
-npx @liiiiv/mew-cli@latest
-```
-
-Targets x64/arm64 on Linux with glibc 2.35 or later and macOS 15 or later. On Windows, run it on Ubuntu 22.04 or later under WSL 2. On the first run, enter the owner's email address, log in with the displayed temporary password, and change it. Existing accounts, conversations, and device registrations are reused. Register Mewlink using the [Remote access](#remote-access) instructions; the registration link and a QR code for the online connection address also appear in the terminal.
-
-Press Ctrl+C to exit, then run the same command again to use the latest release. If a previous clone uses `.data/`, stop the previous server and specify `--data-dir /path/to/old/mew/.data`. [Execution and data contract](../../.mew/docs/development/cli-distribution.md) · [Publishing procedure](../../.mew/docs/operations/cli-release.md)
+Follow the [current one-command installation instructions](getting-started-en.md#run-with-one-command-after-the-first-release) for prerequisites, commands, data preservation, and publication status.
 
 <a id="remote-access"></a>
 

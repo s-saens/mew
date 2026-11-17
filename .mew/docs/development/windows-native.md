@@ -1,7 +1,7 @@
 ---
 title: "OS execution layer and Windows native support"
-description: "Owns the design that separates Windows, POSIX, and Linux implementations while retaining the shared mew server and UI, along with the contracts for psmux, Job Objects, private ACLs, mutually authenticated named pipes, and platform-specific releases. Distinguishes native execution from the managed WSL installation wizard and separates isolated checks from actual Windows and release gates."
-updated: "2026-11-05"
+description: "Owns Windows native execution contracts for psmux, Job Objects, private ACLs, authenticated named pipes, and platform releases. Distinguishes this implementation from the default npm-managed WSL path and separates isolated checks from actual Windows acceptance."
+updated: "2026-11-17"
 상위파일:
   - "architecture.md"
   - "../operations/cli-release.md"
@@ -27,7 +27,7 @@ packages/tmux-term/src/server/backends/  tmux·psmux
 apps/cli/src/platform/            OS 경로·브라우저 열기
 ```
 
-The [Windows installation wizard](windows-installer.md) is a separate delivery path: a native setup UI prepares a dedicated WSL 2 environment and invokes the same prebuilt Linux CLI. Its first x64 release prioritizes compatibility with existing Linux-only login-desktop and provider installation features. It does not remove this native Windows implementation or restore the retired Mewnager management UI. [ADR 0143](../decisions/0143-windows-installation-wizard.md) owns that choice.
+The default npm path, `npx mew-ide` from Windows CMD or PowerShell, now uses the [managed WSL preparation engine](windows-installer.md). The native setup wizard shares that engine. Both prioritize compatibility with existing Linux-only login-desktop and provider installation features. This does not remove the native Windows implementation described here or restore the retired Mewnager management UI. [ADR 0143](../decisions/0143-windows-installation-wizard.md) owns the original managed-environment choice; the CLI distribution contract owns the unattended npm entry point.
 
 ## OS-specific contracts
 
@@ -58,14 +58,9 @@ Windows file boundaries normalize drives and case according to `path.win32.relat
 
 Windows prebuilt targets are Node.js 24 on x64/arm64 and Windows 10 1809 or later and Windows 11. Git features require Git for Windows on PATH. User working folders, accounts/conversations/device registrations in `%LOCALAPPDATA%/mew/data`, and runtimes in `%LOCALAPPDATA%/mew/cache/runtimes` are kept separate. Locations specified through CLI options or `MEW_DATA_DIR` take precedence.
 
-After the first public release, run the following in PowerShell. No npm or GitHub runtimes were published during the current work.
+The default npm entry point on Windows prepares the managed Linux runtime instead of selecting this native target. Native Windows runtime archives and platform adapters remain available to the release and source verification paths; they do not establish the support scope of the managed installer. No npm or GitHub runtime was published as part of this implementation work.
 
-```powershell
-cd C:\work\project
-npx @liiiiv/mew-cli@latest
-```
-
-The first run uses the existing owner setup flow, loopback server, browser opening, and Mewlink device registration. To update, exit the CLI and run the same command again. Windows shutdown requests graceful termination through IPC, then forcibly terminates after the timeout. While using the cache as the installation, the CLI does not clone, pull, or rebuild. For source development, a separate Windows release build in an MSVC environment must prepare the process host.
+Native execution uses the existing owner setup flow, loopback server, browser opening, and Mewlink device registration. Windows shutdown requests graceful termination through IPC, then forcibly terminates after the timeout. The CLI does not clone, pull, or rebuild a prebuilt runtime. For source development, a separate Windows release build in an MSVC environment must prepare the process host.
 
 Recurring tasks run every minute through a single Task Scheduler entry for the current user with standard privileges, identified by a hash of the state path. The private `windows-schedules.cron` uses 5-field cron expressions supporting numbers, ranges, lists, steps, and month/day-of-week aliases, along with PowerShell commands, evaluated in OS local time. A file stamp prevents duplicates within the same minute, and saving an empty configuration removes only mew's task. When the server starts from a new runtime, it updates the runner path for saved schedules. Existing Windows Task Scheduler entries are not modified. The task has a 1-minute limit, and each control call has a 30-second limit; long-running agent tasks run in separate psmux sessions. Tasks run while logged in, with no contract to retroactively run tasks missed during logout or sleep.
 

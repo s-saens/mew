@@ -17,6 +17,7 @@ const RESOURCE = /\.(?:ts|tsx|js|mjs|cjs|json|css|svg|txt|png|webp|woff2?|ttf|wa
 const SKILL_RESOURCE = /\.(?:md|ya?ml|py|txt|json|png|svg|tsv|csv|toml)$/
 const EXCLUDED = /(?:^|\/)(?:\.[^/]+|node_modules|dist|target|build|runtime|fixtures)(?:\/|$)|(?:\.test|\.browser\.test|-fixture)\.[^/]+$|\.d\.(?:ts|mts)$/
 const SOURCE_DIRS = ['server', 'shared', 'packages', 'resources/help', 'resources/skills', 'resources/skills/.vendor']
+const RELEASE_BUILD_TOOLS = new Set(['release-runtime.ts', 'release-tmux.ts', 'release-psmux.ts', 'release-windows-verify.ts'])
 
 export interface RuntimeManifest {
   version: string
@@ -105,7 +106,7 @@ async function copySourceTree(source: string, target: string, relative = '', res
   await fs.mkdir(target, { recursive: true })
   for (const entry of await fs.readdir(source, { withFileTypes: true })) {
     const name = relative ? `${relative}/${entry.name}` : entry.name
-    if (excluded.test(name) || /^release-/.test(entry.name) || /(?:benchmark|browser-test)/.test(entry.name)) continue
+    if (excluded.test(name) || RELEASE_BUILD_TOOLS.has(entry.name) || /(?:benchmark|browser-test)/.test(entry.name)) continue
     const input = path.join(source, entry.name), output = path.join(target, outputPath(entry.name))
     if (entry.isSymbolicLink()) throw new Error(`Unexpected source symlink: ${input}`)
     if (entry.isDirectory()) await copySourceTree(input, output, name, resources, excluded)
@@ -182,6 +183,23 @@ export async function validateCompiledImports(directory: string) {
 async function verifyNativeDependencies(directory: string) {
   const script = `import { createRequire } from 'node:module';
 const require = createRequire(new URL('./package.json', import.meta.url));
+const { pathToFileURL } = await import('node:url');
+const path = await import('node:path');
+const fs = await import('node:fs/promises');
+const { execFileSync } = await import('node:child_process');
+const wrapperRoot = path.resolve(path.dirname(require.resolve('embedded-postgres')), '..');
+const wrapper = JSON.parse(await fs.readFile(path.join(wrapperRoot, 'package.json'), 'utf8'));
+if (wrapper.version !== '18.6.0-beta.19') throw new Error('Postgres distribution version mismatch');
+const pgPlatform = process.platform === 'win32' ? 'windows' : process.platform;
+if (pgPlatform !== 'windows' || process.arch === 'x64') {
+const postgres = await import(pathToFileURL(require.resolve('@embedded-postgres/' + pgPlatform + '-' + process.arch)).href);
+const { ensureSymlinks } = await import(pathToFileURL(path.join(wrapperRoot, 'dist/symlinks.js')).href);
+await ensureSymlinks(postgres.postgres, true);
+for (const binary of [postgres.initdb, postgres.postgres]) {
+  const output = execFileSync(binary, ['--version'], {encoding:'utf8',timeout:10000});
+  if (!/18\\.6/.test(output)) throw new Error('Postgres binary version mismatch');
+}
+}
 const pty = require('node-pty'); if (typeof pty.spawn !== 'function') throw new Error('node-pty missing');
 const rtc = require('node-datachannel'); const peer = new rtc.PeerConnection('release-check', { iceServers: [] }); peer.close(); rtc.cleanup();
 await import('./packages/tmux-term/src/server/pty-helper.js').then(module => module.preparePtyHelper());

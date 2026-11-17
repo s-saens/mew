@@ -1,6 +1,6 @@
 ---
 title: "0143: Guide Windows installation through a private WSL runtime"
-description: "Accepts a native x64 setup wizard that owns an isolated WSL 2 runtime and invokes the shared prebuilt CLI. Adds installation-only launch control after Mewnager retirement while preserving native Windows code, user data, and publication gates."
+description: "Accepts a native x64 setup wizard with an isolated WSL 2 runtime and installation-only launch control. Preserves native Windows code, user data, and publication gates; ADR 0179 extends the same preparation engine to npm delivery."
 status: accepted
 date: "2026-11-05"
 ---
@@ -35,3 +35,8 @@ This decision partially extends the delivery direction of ADR 0210: installation
 The normal path becomes setup → required Windows approval/restart → browser administrator creation. WSL still consumes disk and runtime resources; the wizard hides routine preparation, not the underlying runtime. Default Linux home storage avoids crossing the Windows/Linux filesystem for normal project work. Performance is not claimed to have been benchmarked.
 
 The first wizard is x64-only and needs network access. OS policy, disabled virtualization, signing credentials, first runtime publication, and clean-machine verification remain release concerns. Uninstall preserves the environment, so disk reclamation is an explicit separate action. The [work record](../work/guided-installation-and-first-owner.md) distinguishes local verification from publication and actual Windows installation.
+
+[ADR 0179](0179-unattended-npm-installation.md) extends this delivery choice with
+the `npx mew-ide` entry, reusing the owned WSL preparation engine and adding login
+startup. The ownership, preservation, first-owner security, x64 boundary, and
+publication gates established here remain in force.

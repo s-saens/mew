@@ -46,6 +46,7 @@ for (const failure of [false, true]) {
         assert.equal(env.MEW_DISTRIBUTION, 'release')
         if (failure) throw new Error('fixture installation failed')
       },
+      prepareDatabase: async () => ({ databaseUrl: 'postgres://fixture', stop: async () => {} }),
       host: async () => { trace.push('host'); return 0 },
     })
     if (failure) await assert.rejects(operation, /fixture installation failed/)

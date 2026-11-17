@@ -59,7 +59,7 @@ Edit documents together, leave comments, chat, and share documents with guests. 
 
 [Collaboration and sharing](docs/guides/collaboration.md) · [Mobile controls](docs/guides/editor.md#mobile-and-fullscreen)
 
-Also available: [PDF annotation](docs/guides/editor.md#reading-and-annotating-pdfs), [remote browser](docs/guides/browser.md), [Postgres tables](docs/guides/database.md), and [command buttons and schedules](docs/guides/commands.md). Database tables need a Postgres connection.
+Also available: [PDF annotation](docs/guides/editor.md#reading-and-annotating-pdfs), [remote browser](docs/guides/browser.md), [Postgres tables](docs/guides/database.md), and [command buttons and schedules](docs/guides/commands.md). The prebuilt installer prepares local Postgres automatically; source installations can configure their own connection.
 
 ## Get started
 
@@ -87,11 +87,13 @@ Setup installs dependencies, asks for your workspace folder, then builds and sta
 
 > **Windows installer:** A single-file x64 wizard is implemented in source, including Windows preparation and browser account creation. Its first signed EXE and clean-Windows acceptance are pending. Use the manual Windows guide for now. [Release status](.mew/docs/operations/cli-release.md#windows-installation-wizard).
 
-> **Prebuilt CLI:** `npx @liiiiv/mew-cli@latest` is implemented, but the first npm package and GitHub runtime release have not been published. Use source installation for now. [Release status](.mew/docs/operations/cli-release.md).
+> **Prebuilt CLI:** The `npx mew-ide` installation flow uses default settings, prepares Postgres, and opens browser administrator setup. Windows starts from CMD or PowerShell and prepares a dedicated WSL environment. Login startup keeps Mew available after reboot and sign-in. The first npm package, matching runtime releases, and clean-platform acceptance are still pending; use source installation until publication. [Installation contract](.mew/docs/development/cli-distribution.md) · [Release status](.mew/docs/operations/cli-release.md).
 
 ## Open it from another device
 
 [Mewlink](https://link.mew.run) helps another browser connect to your running mew instance. It handles device registration and connection setup; workspace data travels directly between the host and the connecting browser. You do not need your own domain or router port forwarding.
+
+After creating the first administrator, Mew opens one popup with **Mewlink**, **Tailscale**, and **Cloudflare Tunnel**. Open **Menu → Mewlink** to return to the same choices later. Local installation requires no remote-service account; follow the selected provider's sign-in and setup steps when you want remote access.
 
 1. On the host, sign in as owner and open **Menu → Mewlink → Register device**.
 2. Follow the registration link, sign in to Mewlink, and choose your username and device name.

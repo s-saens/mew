@@ -1,6 +1,6 @@
 ---
 title: "Getting started with mew"
-updated: "2026-11-11"
+updated: "2026-11-17"
 description: "Installation, first sign-in, remote access, host browser setup, updates, and data retention for Mew. Includes the link.mew.run entry; the legacy locale filename is retained for existing links."
 ---
 
@@ -133,16 +133,9 @@ cd ~/apps/mew
 
 ### Run with one command (after the first release)
 
-After installing Node.js 24, run the following command in your working folder to download the prebuilt app. **The implementation is ready, but the first npm package and GitHub runtime package have not yet been published.**
+The unscoped `npx mew-ide` installer prepares local Postgres, browser administrator setup, and login startup without a Mew configuration questionnaire. Windows users start from CMD or PowerShell; the installer prepares its dedicated WSL environment. The first public package and runtime releases remain pending.
 
-```bash
-cd /path/to/workspace
-npx @liiiiv/mew-cli@latest
-```
-
-Supports x64/arm64 on Linux with glibc 2.35 or later and macOS 15 or later. On Windows, run in Ubuntu 22.04 or later on WSL 2. On first use, enter the owner email, log in with the temporary password shown in the terminal, and change the password. Existing accounts, sessions, and device registrations are preserved. Follow [Remote access](#remote-access) to register with Mewlink; the terminal also displays the registration link and a QR code for the online address.
-
-Press Ctrl+C to stop, then run the same command again to use the latest published version. If an old clone uses `.data/`, stop the old server first, then pass `--data-dir /path/to/old/mew/.data`. [Runtime and data contracts](../../.mew/docs/development/cli-distribution.md) · [Release steps](../../.mew/docs/operations/cli-release.md)
+Follow the [current one-command installation instructions](getting-started-en.md#run-with-one-command-after-the-first-release) for prerequisites, commands, data preservation, and publication status.
 
 <a id="remote-access"></a>
 

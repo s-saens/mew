@@ -1,14 +1,14 @@
 {
-  "name": "@liiiiv/mew-cli",
+  "name": "mew-ide",
   "version": "0.1.0",
-  "description": "Run a prebuilt mew workspace locally and connect through Mewlink.",
+  "description": "Install and run Mew with a managed database and browser-first setup.",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
-  "bin": { "mew": "bin/mew.mjs" },
-  "files": ["bin", "src", "LICENSE"],
+  "bin": { "mew-ide": "bin/mew.mjs", "mew": "bin/mew.mjs" },
+  "files": ["bin", "src", "windows-assets", "LICENSE"],
   "engines": { "node": ">=24 <25" },
   "repository": { "type": "git", "url": "git+https://github.com/s-saens/mew.git", "directory": "apps/cli" },
   "publishConfig": { "access": "public" },
-  "scripts": { "test": "node --test test/*.test.mjs" },
+  "scripts": { "test": "node --test test/*.test.mjs", "prepack": "node tools/prepare-windows-assets.mjs" },
   "dependencies": { "qrcode-terminal": "0.12.0", "tar": "7.5.22" }
 }

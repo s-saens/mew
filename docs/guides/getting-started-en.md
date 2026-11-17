@@ -1,7 +1,7 @@
 ---
 title: "Getting started with mew"
-updated: "2026-11-11"
-description: "Installation, first sign-in, remote access, host browser setup, updates, and data retention for Mew. Covers source setup, experimental Termux prerequisites and limits, first-administrator creation, the link.mew.run entry, and Windows wizard/prebuilt release limits."
+updated: "2026-11-17"
+description: "Source installation and upcoming npx mew-ide delivery with managed Postgres, Windows WSL preparation, login startup, browser administrator setup, and three remote-access choices. Covers platform prerequisites, data preservation, experimental Termux limits, and pending publication."
 ---
 
 # Getting started with mew
@@ -128,18 +128,25 @@ cd ~/apps/mew
 
 ### Run with one command (after the first release)
 
-With Node.js 24 installed, run this from your workspace to download a prebuilt app. **The implementation is ready; the first npm package and GitHub runtime release still need to be published.**
+Install Node.js 24 and npm, then run:
 
 ```bash
-cd /path/to/workspace
-npx @liiiiv/mew-cli@latest
+npx mew-ide
 ```
 
-The launcher prepares missing browsers before starting the server; Linux preparation may need sudo and network access. Ordinary Chrome automatic installation on Linux/WSL supports x64; arm64 requires a compatible explicit `MEW_CHROME_EXECUTABLE`.
+**The initial npm package, matching runtime releases, and clean-platform acceptance remain pending.** Until publication, use the source installation above.
 
-Supports Linux glibc 2.35+ and macOS 15+, on x64/arm64. On Windows, use Ubuntu 22.04+ inside WSL 2. On a fresh installation, the launcher opens a browser form where you choose the administrator email and password. No temporary-password step is required. Existing accounts, conversations, and device registration are reused. Follow [remote access](#remote-access) to register with Mewlink; the terminal also prints registration and online address QR codes.
+The installer uses defaults without asking for a workspace, port, or database connection. It prepares local Postgres and browser prerequisites, starts Mew, and opens administrator creation in your browser. Default access is `http://localhost:5000`; if that port is occupied, Mew selects a nearby available port and opens the actual address. Existing accounts and data are reused.
 
-Press Ctrl+C to stop. Run the same command again to use the latest release. If your old clone uses `.data/`, pass `--data-dir /path/to/old/mew/.data` and stop the old server first. [Runtime and data contract](../../.mew/docs/development/cli-distribution.md) · [Release procedure](../../.mew/docs/operations/cli-release.md)
+On Linux/macOS, Mew runs in the background and registers login startup. Run `npx mew-ide` again to reopen it, `npx mew-ide status` to check it, or `npx mew-ide stop` to stop it while preserving data. Use `--foreground` for terminal-owned execution or `--no-autostart` to omit login registration. To update, stop the running instance and run `npx mew-ide@latest`.
+
+On Windows x64, run the command in **CMD or PowerShell**. Mew prepares its dedicated WSL environment and opens the Windows browser; you do not enter Ubuntu commands or install Linux Node.js yourself. Windows may require administrator approval and a restart. Login startup launches the owned environment after sign-in. Existing unrelated WSL distributions are preserved.
+
+After creating the administrator, choose **Mewlink**, **Tailscale**, or **Cloudflare Tunnel** in the remote-access popup. **Menu → Mewlink** opens the same popup later. Provider sign-in is separate from local installation.
+
+Linux uses glibc 2.35+, and macOS requires 15+, on x64/arm64. Browser preparation may require OS authorization and network access. Ordinary Chrome automatic installation on Linux/WSL supports x64; arm64 requires a compatible explicit `MEW_CHROME_EXECUTABLE`. npm may ask permission to download the package; `npx --yes mew-ide` suppresses that npm-owned prompt.
+
+For existing source data on POSIX, stop the old server and pass `--data-dir /path/to/old/mew/.data`. The managed Windows installation owns separate paths and does not adopt another WSL environment. [Runtime and data contract](../../.mew/docs/development/cli-distribution.md) · [Release procedure](../../.mew/docs/operations/cli-release.md)
 
 <a id="remote-access"></a>
 

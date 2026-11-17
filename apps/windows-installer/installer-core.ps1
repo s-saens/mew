@@ -104,10 +104,10 @@ function Get-MewDownload($Item, [string]$Cache, [string]$Extension) {
   } finally { Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue }
 }
 
-function Set-MewResume([string]$Name, [string]$Executable) {
+function Set-MewResume([string]$Name, [string]$Executable, [string[]]$Arguments = @()) {
   $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce'
   New-Item -Path $key -Force | Out-Null
-  Set-ItemProperty -LiteralPath $key -Name $Name -Value (ConvertTo-MewArgument $Executable)
+  Set-ItemProperty -LiteralPath $key -Name $Name -Value ((@($Executable) + $Arguments | ForEach-Object { ConvertTo-MewArgument $_ }) -join ' ')
 }
 
 function Remove-MewResume([string]$Name) {
@@ -158,7 +158,7 @@ exit $LASTEXITCODE
   if ($process.ExitCode -notin @(0, 3010, 1641)) { throw 'Windows preparation was cancelled or failed. Run Mew Setup again when you are ready.' }
 }
 
-function Invoke-MewSetup([string]$AppRoot, [string]$StateRoot, [string]$ResumeExecutable, [string]$Sid, [string]$Architecture, [string]$Wsl) {
+function Invoke-MewSetup([string]$AppRoot, [string]$StateRoot, [string]$ResumeExecutable, [string]$Sid, [string]$Architecture, [string]$Wsl, [string[]]$ResumeArguments = @()) {
   if (-not $StateRoot) { $StateRoot = Join-Path $env:LOCALAPPDATA 'mew\windows-install' }
   if (-not $Sid) { $Sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value }
   if (-not $Architecture) { $Architecture = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE } }
@@ -189,7 +189,7 @@ function Invoke-MewSetup([string]$AppRoot, [string]$StateRoot, [string]$ResumeEx
       $boot = Get-MewBootStamp
       if ($state.phase -eq 'reboot') {
         if ($state.boot -eq $boot) {
-          Set-MewResume $identity.ResumeName $ResumeExecutable
+          Set-MewResume $identity.ResumeName $ResumeExecutable $ResumeArguments
           return 3010
         }
         if ($state.preparationStage -ne 'features' -or -not (Test-MewWindowsFeaturesReady)) { throw 'Windows could not finish preparing Mew. Check hardware virtualization and Windows updates, then run Setup again. Your data is preserved.' }
@@ -203,7 +203,7 @@ function Invoke-MewSetup([string]$AppRoot, [string]$StateRoot, [string]$ResumeEx
         Write-MewState $stateFile $state
         if (Test-MewWindowsReady $Wsl) { break }
         if ($stage -eq 'wsl' -or -not (Test-MewWindowsFeaturesReady)) {
-          Set-MewResume $identity.ResumeName $ResumeExecutable
+          Set-MewResume $identity.ResumeName $ResumeExecutable $ResumeArguments
           return 3010
         }
       }

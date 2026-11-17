@@ -1,7 +1,7 @@
 ---
 title: "Table Databases (/db)"
-description: "Explains opening the database list from the explorer toolbar and floating editor buttons and viewing recorded document references, inserting Postgres document databases, matching plus-only row/column addition bars, table conversion and undo, calendar and Gantt ranges, keyboard cell navigation with immediate typing, header type menus, search, grouping, and sorting. Also covers primary columns, immediate linked-page title previews, filename changes after saving, row-page sharing, read-only references, and backups."
-updated: "2026-11-07"
+description: "Explains document databases with CLI-managed Postgres or an external connection, opening and editing tables, recorded document references, row/column controls, conversion and undo, calendar/Gantt views, search, grouping, sorting, and keyboard navigation. Covers primary columns, linked-page title and filename changes, sharing, read-only references, and backups."
+updated: "2026-11-17"
 상위파일:
   - "MOC.md"
 ---
@@ -9,7 +9,9 @@ Use this to embed editable data tables in documents or display existing Postgres
 
 ## Creating and Editing Tables
 
-An operator must first configure `DATABASE_URL` on the server. The logged-in account needs the database feature and access to all project files; making changes also requires permission to modify files. If connection settings are missing or the connection fails, only DB features become unavailable; other editing features continue to work.
+The prebuilt `mew-ide` installer prepares local Postgres automatically; no connection-string setup is needed. Source installations configure `DATABASE_URL` explicitly. An existing explicit URL keeps its external database. The first prebuilt publication remains pending; see the [installation status](getting-started-en.md#run-with-one-command-after-the-first-release).
+
+The logged-in account needs the database feature and access to all project files; making changes also requires permission to modify files. If connection settings are missing or the connection fails, only DB features become unavailable; other editing features continue to work. Managed CLI startup requires its database to become ready before the application starts. [Database storage and preservation](../../.mew/docs/development/managed-postgres.md).
 
 1. Open a Markdown document in the project in **Hotview**.
 2. Type `/db` at the insertion point and select **Database**.

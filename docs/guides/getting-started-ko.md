@@ -1,5 +1,5 @@
 ---
-updated: "2026-11-11"
+updated: "2026-11-17"
 title: "Getting started with mew"
 description: "Installation, first sign-in, remote access, host browser setup, updates, and data retention for Mew. Includes the link.mew.run entry; the legacy locale filename is retained for existing links."
 ---
@@ -133,16 +133,9 @@ cd ~/apps/mew
 
 ### Run with one command (after the release is published)
 
-With Node.js 24 installed, you can download the prebuilt executable from your working folder using the following command. **The implementation is ready; publishing the first npm and GitHub releases is a separate step.**
+The unscoped `npx mew-ide` installer prepares local Postgres, browser administrator setup, and login startup without a Mew configuration questionnaire. Windows users start from CMD or PowerShell; the installer prepares its dedicated WSL environment. The first public package and runtime releases remain pending.
 
-```bash
-cd /내/워크스페이스
-npx @liiiiv/mew-cli@latest
-```
-
-Supports Linux with glibc 2.35 or later and macOS 15 or later, on x64/arm64. On Windows, run it on Ubuntu 22.04 or later in WSL 2. On first use, enter the owner email, log in with the displayed temporary password, and change the password. Existing accounts, conversations, and device registrations are reused. For Mewlink registration, follow [External access](#connect-remotely) below; the registration link and a QR code for the online address also appear in the terminal.
-
-Exit with Ctrl+C and run the same command again to use the latest version. If your existing clone used `.data/`, specify `--data-dir /기존/mew/.data` and stop the old server first. [Runtime and data contract](../../.mew/docs/development/cli-distribution.md) · [Publishing procedure](../../.mew/docs/operations/cli-release.md)
+Follow the [current one-command installation instructions](getting-started-en.md#run-with-one-command-after-the-first-release) for prerequisites, commands, data preservation, and publication status.
 
 <a id="remote-access"></a>
 

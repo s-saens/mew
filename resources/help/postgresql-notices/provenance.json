@@ -1,0 +1,24 @@
+{
+  "embeddedPostgresVersion": "18.6.0-beta.19",
+  "postgresMajor": 18,
+  "postgresVersion": "18.6",
+  "upstreamBinarySource": "https://github.com/zonkyio/embedded-postgres-binaries/tree/c56022003f8b1a6284567c365f44738b7e83514b",
+  "files": [
+    {
+      "file": "embedded-postgres-MIT.txt",
+      "url": "https://raw.githubusercontent.com/leinelissen/embedded-postgres/728b862543732f5a8d7d51e49cfca96f6b2ee98a/LICENSE.md",
+      "sha256": "e094f576ecd150e7cad723e0bd56c13bd42ce9f4df61af14f439d852b39ad4d4"
+    },
+    {
+      "file": "zonky-Apache-2.0.txt",
+      "url": "https://raw.githubusercontent.com/zonkyio/embedded-postgres-binaries/c56022003f8b1a6284567c365f44738b7e83514b/LICENSE",
+      "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+    },
+    {
+      "file": "PostgreSQL-COPYRIGHT.txt",
+      "url": "https://raw.githubusercontent.com/postgres/postgres/REL_18_6/COPYRIGHT",
+      "sha256": "3d6af92ff8a4c2cdf69afb1cf44edea727922f5cd0cf8b5f72b11cdecac8fdfd"
+    }
+  ],
+  "bundledLibraryNoticeReview": "Required per-platform before public release; these notices do not establish completeness for bundled third-party libraries."
+}

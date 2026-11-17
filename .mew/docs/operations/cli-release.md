@@ -1,7 +1,7 @@
 ---
 title: "CLI Releases and npm Publishing"
-description: "Release procedure for @liiiiv/mew-cli and Linux, macOS, and Windows x64/arm64 runtimes. Covers the signed Windows installation wizard, native helpers, browser manifests, checksums, licensing, CI and npm/OIDC gates; hands-on platform acceptance and initial releases remain incomplete."
-updated: "2026-11-07"
+description: "Release procedure for the unscoped mew-ide npm installer, managed Postgres, Windows WSL bootstrap assets, login startup, and prebuilt runtimes. Covers package identity, protected publishing, licensing, and pending clean-platform acceptance."
+updated: "2026-11-17"
 상위파일:
   - "../../../docs/deployment/native.md"
   - "../development/cli-distribution.md"
@@ -9,7 +9,11 @@ updated: "2026-11-07"
 
 ## Distribution Structure
 
-Usage follows the [CLI Distribution Contract](../development/cli-distribution.md). GitHub executables are published to `s-saens/mew`. The root app remains a private development workspace, and only `apps/cli/` is published as the `@liiiiv/mew-cli` npm package. Transferring GitHub ownership does not change the npm scope or package name. Do not use the unscoped name `mew-cli`, which another project already uses. The person performing the actual publication must verify administrative access to the npm `@liiiiv` scope and initial package creation.
+Usage follows the [CLI Distribution Contract](../development/cli-distribution.md). GitHub executables are published to `s-saens/mew`. Publish **only `apps/cli/`**, the unscoped `mew-ide` package; the root source workspace has the same name but is not the executable distribution. An npm organization named `mew-ide` does not reserve the unscoped package. The publisher must verify current package-name availability and account permissions before initial publication. Runtime tag names remain `mew-cli-v<version>` and do not change with the npm name.
+
+The npm package must contain the Windows bootstrap payload generated from the existing installer sources. Inspect a real `npm pack --dry-run` after its preparation step; `--ignore-scripts` alone does not generate missing payload files. Check that the pinned Linux runtime version and checksum match the CLI version. Retain the existing native Windows runtime assets for their separate supported path; the default Windows npm experience prepares managed WSL.
+
+Runtime production dependencies include the pinned embedded Postgres distribution and its platform binary package. Preserve their bundled licenses and notices. Verify executable version checks and a fresh private cluster on each release host, alongside relaunch/data preservation and explicit external `DATABASE_URL` use. The [managed Postgres contract](../development/managed-postgres.md) owns storage and lifecycle.
 
 `server/release-runtime.ts` prepares the prebuilt `dist/`, server, shared sources, and workspace packages in a separate temporary directory. It converts TypeScript to JS and adjusts relative imports, child worker paths, package exports, and JSON import attributes. After separately installing production dependencies, it actually loads node-pty and node-datachannel and checks the tmux helper and shared package imports. oxlint is a production dependency because the server's code checking feature uses it.
 
@@ -78,7 +82,7 @@ npm publish --access public
 
 In the npm package's Trusted publisher settings, register GitHub organization/user `s-saens`, repository `mew`, workflow file `cli-release.yml`, and environment `npm-publish`. If a configuration exists under the previous owner, delete it and create a new one. Allow the direct `npm publish` used by the current workflow, and configure it immediately before publishing. The first publication with the new configuration must be completed within 2 days of registration. `repository.url` in `apps/cli/package.json` must also match the new repository. Subsequent publications use the workflow's OIDC; do not put long-lived npm tokens in the repository. [Official npm trusted publishing guide](https://docs.npmjs.com/trusted-publishers/).
 
-For the next version, update the CLI package version and the root version in its lockfile together, then create executables with a matching new tag. The npm package version and runtime tag must always correspond. To update, users exit the CLI and rerun `npx @liiiiv/mew-cli@latest` in their working directory. An older version can be selected with `npx @liiiiv/mew-cli@<버전>`, but backward compatibility of the persistent data schema must be checked separately.
+For the next version, update the CLI package version and the root version in its lockfile together, then create executables with a matching new tag. The npm package version and runtime tag must always correspond. To update, users stop the background instance with `npx mew-ide stop`, then run `npx mew-ide@latest` in their working directory. A repeated start while an instance is running only reopens it. An older version can be selected with `npx mew-ide@<version>`, but account and Postgres schema compatibility must be checked separately; incompatible cluster majors are never reset automatically.
 
 ## Publishing Gates
 
@@ -88,4 +92,4 @@ For the next version, update the CLI package version and the root version in its
 - In an empty working directory on each supported OS, perform hands-on checks of browser first-owner creation, one-time setup closure, explicit temporary-password automation, editing, terminal use, relaunching, and preservation of account/device registrations. Fixture verification for the current implementation work does not replace these hands-on checks.
 - Check initial Mewlink registration, the online QR code, and local login, editing, and terminal use from an external browser. Other NATs and mobile networks follow the [existing remote verification scope](../development/remote-access.md#verification-and-remaining-gates).
 
-The current code and isolated verification are ready; actual CI builds, GitHub Release publication, initial npm package publication, and the hands-on checks above have not been performed.
+The work record distinguishes actual local checks from publication and platform acceptance. Before advertising `npx mew-ide`, verify clean Linux/macOS installation, Windows CMD/PowerShell through WSL preparation and required reboot resume, background startup after terminal closure, login startup, stop/reopen, fresh administrator creation, the three-provider popup, and working document tables with managed Postgres. Actual release publication, npm publication, and these clean-host checks remain separate gates.

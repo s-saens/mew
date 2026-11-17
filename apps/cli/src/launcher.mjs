@@ -6,6 +6,7 @@ import qrcode from 'qrcode-terminal'
 import { acquireDataLock, checkLegacyInstance } from './lock.mjs'
 import { windowsEnvironment, browserArgs } from './platform/index.mjs'
 import { prepareBrowserDependencies } from './browser-dependencies.mjs'
+import { preparePostgres } from './postgres.mjs'
 
 export async function checkPort(port) {
   if (!port) return
@@ -32,6 +33,7 @@ export function runtimeEnvironment(runtime, options, env = process.env) {
     MEW_DATA_DIR: options.dataDir,
     MEW_TEAM_PORT: String(options.port),
     MEW_BIND: '127.0.0.1',
+    ...(options.databaseUrl ? { DATABASE_URL: options.databaseUrl } : {}),
     MEW_MULTIPLEXER: path.join(runtime, 'bin', process.platform === 'win32' ? 'psmux.exe' : 'tmux'),
     ...(process.platform === 'win32' ? { MEW_WINDOWS_PROCESS_HOST: path.join(runtime, 'native', 'windows', 'process-host.exe') } : {}),
     PATH: [path.join(runtime, 'bin'), path.join(runtime, 'node_modules', '.bin'), env.PATH || env.Path].filter(Boolean).join(path.delimiter),
@@ -39,11 +41,32 @@ export function runtimeEnvironment(runtime, options, env = process.env) {
   return process.platform === 'win32' ? windowsEnvironment(environment) : environment
 }
 
-export async function runHost(runtime, options, { log = options.installer ? console.error : console.log, error = console.error, forkImpl = fork, input = process.stdin, output = process.stdout, browser = openBrowser } = {}) {
+export async function runHost(runtime, options, { log = options.installer ? console.error : console.log, error = console.error, forkImpl = fork, input = process.stdin, output = process.stdout, browser = openBrowser, onReady, onControl, reopenTimeout = 8000 } = {}) {
   const child = forkImpl(path.join(runtime, 'server/cli-host.js'), [], {
     cwd: options.workspace, env: runtimeEnvironment(runtime, options), execArgv: [], stdio: options.installer ? ['inherit', process.stderr, process.stderr, 'ipc'] : ['inherit', 'inherit', 'inherit', 'ipc'],
   })
-  let ready = false, prompting = false, printedRemote = '', exitSignal = null
+  let ready = false, prompting = false, printedRemote = '', exitSignal = null, databaseFailed = false
+  options.databaseFailure?.catch(() => { databaseFailed = true; error('The managed database stopped unexpectedly. Mew is stopping; check its local log.'); child.kill('SIGTERM') })
+  const openRequests = []
+  let firstReady
+  const initialReady = new Promise(resolve => { firstReady = resolve })
+  onControl?.({ async reopen() {
+    await initialReady
+    if (!child.connected) throw new Error('Mew is not running.')
+    return new Promise((resolve, reject) => {
+      const request = {
+        resolve: value => { clearTimeout(timer); resolve(value) },
+        reject: error => { clearTimeout(timer); reject(error) },
+      }
+      const timer = setTimeout(() => {
+        const index = openRequests.indexOf(request)
+        if (index >= 0) openRequests.splice(index, 1)
+        reject(new Error('Mew did not return a browser address. Try reopening it.'))
+      }, reopenTimeout)
+      openRequests.push(request)
+      if (openRequests.length === 1) send({ type: 'setup-url-request' })
+    })
+  } })
   let pendingSetupRequests = 0
   const abort = new AbortController()
   let shutdownTimer
@@ -88,7 +111,7 @@ export async function runHost(runtime, options, { log = options.installer ? cons
       return
     }
     if (message.type === 'ready') {
-      if (ready && (!options.installer || pendingSetupRequests === 0)) return
+      if (ready && pendingSetupRequests === 0 && openRequests.length === 0) return
       const reopening = ready
       let browserUrl = message.url
       if (message.setupUrl) {
@@ -97,7 +120,10 @@ export async function runHost(runtime, options, { log = options.installer ? cons
         browserUrl = message.setupUrl
       }
       ready = true
-      if (reopening) pendingSetupRequests--
+      firstReady()
+      onReady?.(browserUrl)
+      for (const request of openRequests.splice(0)) request.resolve(browserUrl)
+      if (reopening && pendingSetupRequests > 0) pendingSetupRequests--
       clearTimeout(timeout)
       if (!reopening) {
         log(`워크스페이스: ${options.workspace}\nmew: ${message.url}\n외부 접속: 계정 관리 → 원격 접속 → 기기 등록\n종료: Ctrl+C`)
@@ -118,6 +144,7 @@ export async function runHost(runtime, options, { log = options.installer ? cons
       return
     }
     if (message.type === 'error') {
+      for (const request of openRequests.splice(0)) request.reject(new Error('Could not reopen Mew.'))
       if (options.installer && message.code === 'setup-reopen-failed' && pendingSetupRequests > 0) {
         pendingSetupRequests--
         output.write('MEW_INSTALLER_ERROR {"code":"reopen-failed"}\n')
@@ -129,9 +156,11 @@ export async function runHost(runtime, options, { log = options.installer ? cons
   try {
     return await new Promise((resolve, reject) => {
       child.once('error', reject)
-      child.once('exit', (code, signal) => resolve(exitSignal === 'SIGINT' ? 130 : exitSignal === 'SIGTERM' ? 143 : code ?? (signal || !ready ? 1 : 0)))
+      child.once('exit', (code, signal) => resolve(databaseFailed ? 1 : exitSignal === 'SIGINT' ? 130 : exitSignal === 'SIGTERM' ? 143 : code ?? (signal || !ready ? 1 : 0)))
     })
   } finally {
+    firstReady()
+    for (const request of openRequests.splice(0)) request.reject(new Error('Mew stopped.'))
     abort.abort()
     installerInput?.close()
     clearTimeout(timeout)
@@ -141,13 +170,25 @@ export async function runHost(runtime, options, { log = options.installer ? cons
   }
 }
 
-export async function launch({ prepare, options, version, target, prepareBrowsers = prepareBrowserDependencies, host = runHost }) {
+export async function launch({ prepare, options, version, target, prepareBrowsers = prepareBrowserDependencies, prepareDatabase = preparePostgres, host = runHost, control }) {
   await checkLegacyInstance(options.legacyPidfile)
-  await checkPort(options.port)
+  if (options.explicitPort || options.port !== 5000) await checkPort(options.port)
+  else {
+    let found = false
+    for (let port = 5000; port < 5020; port++) {
+      try { await checkPort(port); options = { ...options, port }; found = true; break } catch (error) { if (port === 5019) throw error }
+    }
+    if (!found) throw new Error('No local port is available for Mew.')
+  }
   const unlock = await acquireDataLock(options.dataDir)
+  let database
   try {
+    await control?.start()
     const runtime = await prepare({ cacheDir: options.cacheDir, version, target, log: options.installer ? console.error : console.log })
-    await prepareBrowsers(runtime, { env: runtimeEnvironment(runtime, options), installer: options.installer })
-    return await host(runtime, options)
-  } finally { await unlock() }
+    await prepareBrowsers(runtime, { env: runtimeEnvironment(runtime, options), installer: options.installer, checkOnly: options.service })
+    database = await prepareDatabase(runtime, { dataDir: options.dataDir, databaseUrl: options.databaseUrl, env: runtimeEnvironment(runtime, options) })
+    return await host(runtime, { ...options, databaseUrl: database.databaseUrl, databaseFailure: database.failure })
+  } finally {
+    try { await database?.stop() } finally { try { await control?.close() } finally { await unlock() } }
+  }
 }

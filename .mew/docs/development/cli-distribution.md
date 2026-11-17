@@ -1,7 +1,7 @@
 ---
 title: "Single-Command Execution and Prebuilt Distribution"
-description: "Defines prebuilt CLI execution, first-owner browser setup and private installer IPC, browser preparation, runtime manifests, persistent data, updates, and package boundaries."
-updated: "2026-11-05"
+description: "Defines unattended mew-ide installation, managed Postgres, persistent background execution and login startup, Windows WSL bootstrap, browser-first administrator setup, and runtime/package boundaries. Publication and clean-platform acceptance remain separate."
+updated: "2026-11-17"
 상위파일:
   - "architecture.md"
   - "../operations/cli-release.md"
@@ -9,26 +9,29 @@ updated: "2026-11-05"
 
 ## User Flow
 
-After the first release and npm package are published, run `npx @liiiiv/mew-cli@latest` from a working folder on a computer with Node.js 24 installed. The launcher downloads the server, UI, and dependencies for that version, OS, and architecture and runs the local server in the foreground. Cloning the app repository, building TypeScript/Vite on the user's computer, compiling C/C++, and installing tmux are not required. Git operations require Git on the host; installation and authentication for external AI tools follow existing procedures.
+After the first release and npm package are published, run `npx mew-ide` from a working folder on a computer with Node.js 24 and npm installed. Installation uses defaults without asking for a workspace, port, or database connection. The launcher downloads the versioned server, UI, dependencies, and terminal binaries, prepares browser prerequisites, and provisions [managed Postgres](managed-postgres.md). Cloning the repository, building the app, installing Docker, and compiling native dependencies are not part of the user flow. Git operations still require Git; external AI providers retain their installation and authentication requirements.
 
-On a fresh installation, it opens the first-administrator form in the browser. Choose an email and permanent password to enter the workspace signed in. Existing accounts are reused without resetting their passwords; missing owners on a previously initialized installation require local recovery. The [first-administrator contract](first-owner-setup.md) owns freshness, one-time capabilities, and recovery. After signing in, proceed with existing Mewlink registration through **Mewlink → Remote Access → Register Device**. The launcher prints a QR code when the registration completion link or online access address changes. It does not add new central authentication or anonymous work permissions. Initial registration requires Mewlink login in the browser and selection of a device name.
+The normal POSIX entry installs a durable copy of the CLI and its dependencies, registers login startup, and starts Mew in the background. The first browser opens when the host is ready. `--foreground` retains terminal-owned execution; `--no-autostart` omits login registration. Windows CMD/PowerShell uses the [managed WSL installation](windows-installer.md). Native Windows host code remains available as a separate implementation, but is not the default npm installation route.
 
-Existing registration is reused on the next run. Ctrl+C stops the local server and preserves persistent state. Sleep, central disconnection, WebRTC direct connection limitations, and the scope of actual external network verification follow the [Remote Access Contract](remote-access.md).
+On a fresh installation, choose the administrator email and password in the browser. The [first-administrator contract](first-owner-setup.md) retains the private, locally armed setup capability; ordinary HTTP cannot enable enrollment. After successful creation, one popup presents **Mewlink**, **Tailscale**, and **Cloudflare Tunnel**. The same popup opens from **Menu → Mewlink**. Provider accounts, network permissions, and external sign-in remain under the user's control; installation does not silently register a remote account or expose the host publicly. [Remote access](remote-access.md) owns the provider controls and limits.
+
+Existing accounts, registrations, and database contents are reused. On POSIX, running the command again reopens the existing instance through private OS-user control instead of starting another server. `npx mew-ide status` checks readiness and `npx mew-ide stop` stops that instance without deleting data or disabling the next login's startup. `npx mew-ide disable-autostart` removes only Mew's login registration. In foreground mode, Ctrl+C stops the owned host. Sleep and remote connectivity limits follow the remote-access contract.
 
 ## Execution Contract
 
-The `mew-ide` metadata in the root `package.json` and the executable package `apps/cli` are separate. The root does not expose `main` or `bin`; the actual `mew` command is provided by `bin/mew.mjs` in `@liiiiv/mew-cli`.
+Only `apps/cli` is the published npm package, named `mew-ide`, with `mew-ide` and `mew` executable aliases. The root source workspace also has `mew-ide` metadata but has no executable entry; do not publish the root. The npm organization name does not reserve or replace the unscoped package name.
 
 | Item | Boundary |
 | --- | --- |
-| npm package | `apps/cli/`, `@liiiiv/mew-cli`, executable `mew`, initial version `0.1.0` |
+| npm package | `apps/cli/`, `mew-ide`, executables `mew-ide` and `mew`, initial version `0.1.0` |
 | Supported runtime | Pinned to Node.js major 24. Linux glibc 2.35 or later and macOS 15 or later, each on x64/arm64. Native Windows x64/arm64 follows its [platform contract](windows-native.md); the [guided Windows installer](windows-installer.md) uses managed WSL 2 for feature compatibility |
 | Executable distribution | `mew-cli-v<버전>` releases in GitHub `s-saens/mew`, `mew-runtime-<platform>-<arch>.tar.gz` |
 | Default working folder | The current folder where the command is run. Change with `--workspace` |
 | Configuration | Reads existing XDG `mew/config.env`, with CLI options and explicit environment variables taking precedence. Uses the folder for this run as the working folder instead of the previous `MEW_WORKSPACE` |
 | Persistent data | Precedence: `--data-dir` → explicit `MEW_DATA_DIR` → existing config.env → XDG data `mew/`. Not stored in the app cache |
-| Executable cache | `${XDG_CACHE_HOME:-~/.cache}/mew/runtimes/<버전>-<OS>-<arch>-node24`, change with `--cache-dir` |
-| Local access | loopback `127.0.0.1`, configured port or 5000. `--port 0` selects an available port |
+| Runtime storage | A durable sibling `<data-dir>.runtimes/<version>-<OS>-<arch>-node24`, outside account storage and temporary npx downloads. Override with `--cache-dir` |
+| Database storage | Private sibling `<data-dir>.postgres`; explicit `DATABASE_URL` retains the external database instead |
+| Local access | Loopback `127.0.0.1`, default port 5000 with automatic fallback through 5019. Explicit ports fail on conflict; `--port 0` selects an available port |
 | First owner | Browser creation through a locally armed one-time link. Explicit `--owner-email` retains temporary-password automation; ordinary HTTP cannot enable enrollment |
 | Multiple existing owners | Select an existing owner with `--owner-email`. If unspecified, uses the first owner in the existing account list |
 | Browser | Opens the local address after the server is listening, including a private setup fragment when needed. `--no-open` skips opening; terminal output contains only the base address |
@@ -44,17 +47,19 @@ After comparing the target file checksum in `SHA256SUMS` against the actual byte
 
 The archive cache for an already verified version is reused without another archive download. Browser dependency preparation may still need network access when a required browser is missing. If the cache is corrupted, users are instructed to delete only that executable distribution's folder, without deleting account data or user projects. Checksums verify release transfer integrity; they are not signatures that independently establish whether the provider's account has been compromised.
 
-The runtime manifest must declare `browserDependencies: "server/browser-dependencies.js"` and include that required file. The CLI rejects obsolete or incomplete runtimes that omit the declaration or installer. Before starting the server host, it runs this installer in a child process with `--install`, forwarding preparation output and stopping launch on failure. Browser downloads and system package prompts complete before the application host is forked and its 60-second readiness timer starts. Cancellation is forwarded to the installer child and prevents host launch. The [browser dependency contract](browser-dependencies.md) owns pinned Chromium, ordinary Chrome reuse, explicit overrides, privilege requirements, and platform limits. Browser binaries are host downloads rather than npm or runtime-archive contents.
+The runtime manifest must declare `browserDependencies: "server/browser-dependencies.js"` and include that installer. Initial preparation uses `--install` in the invoking terminal before background launch; login startup uses `--check`, so it cannot wait for a hidden sudo prompt or silently install software. OS authorization may still be required for missing native libraries. npm itself may ask permission to download an uncached package; `npx --yes mew-ide` suppresses that npm-owned confirmation. Neither is a Mew configuration questionnaire. Browser preparation finishes before the application's 60-second readiness timer starts. The [browser dependency contract](browser-dependencies.md) owns browser platform limits.
+
+The POSIX daemon exposes only a private local socket in a mode-0700 control directory, with a mode-0600 socket. A repeated launch asks the host to rotate a pending setup capability through its existing IPC and opens the returned URL without writing it to logs or disk. The control endpoint and managed database live outside account data so provisioning does not make a fresh installation look like damaged account storage. Startup uses pinned installed files and never executes `npx` or selects a newer version at login.
 
 The runtime then starts `server/cli-host.js` as a separate process. IPC in `cli-host.ts` carries listener addresses, the private first-owner setup URL and refresh requests, public remote status, and explicit legacy owner-creation responses. It does not send registration keys or login-session tokens. The raw setup capability travels only to the trusted launcher and browser, not ordinary logs. The [first-administrator contract](first-owner-setup.md) defines the installer stdin/stdout protocol. Parent termination, IPC disconnection, and SIGINT/SIGTERM cause the host to shut down.
 
-The launcher sets `MEW_DISTRIBUTION=release`. App update status checks in this distribution do not call Git. It rejects source builds, restarts, pull operations, and individual updates to bundled tmux, and directs users to rerun `npx @liiiiv/mew-cli@latest`. Existing update boundaries for external agents remain in place. Automatic replacement of the running app is not provided, and npx also handles checking the latest npm version.
+The launcher sets `MEW_DISTRIBUTION=release`. App update status checks in this distribution do not call Git. It rejects source builds, restarts, pull operations, and individual updates to bundled tmux, and directs users to rerun `npx mew-ide@latest`. Existing update boundaries for external agents remain in place. Automatic replacement of the running app is not provided, and npx also handles checking the latest npm version.
 
 ## Verification and application
 
 Isolated fixtures check CLI downloads, caching, escape links, duplicate launches, owner creation, conflicts, cancellation, working folders, actual readiness events, remote status filtering, runtime source transformation, worker/import/export handling, exclusion of personal files, and blocking release operations. Native loading, supported platforms, and actual external connectivity checks in the [release procedure](../operations/cli-release.md) are separate gates.
 
-App builds, starting/restarting the current server, GitHub Release creation, and npm publishing were not performed during this implementation work. Therefore, npm commands for the unpublished package are not presented as an already available installation path.
+The implementation work record distinguishes local checks from clean-platform installation, OS login/reboot acceptance, and publication. Until the matching runtime release and npm package are published and accepted on supported hosts, these commands describe the delivery contract rather than an available public installer.
 
 ## Documentation and product resources
 

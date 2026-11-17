@@ -206,10 +206,10 @@ test('databaseService 통합', async (t) => {
         await svc.updateCell(project, db.id, row.id, age.id, 27)
         await svc.updateColumn(project, db.id, primary, { type: 'page' })
         let current = await svc.getView(project, db.id)
-        const pagePath = current.rows[0].pagePath!
+        let pagePath = current.rows[0].pagePath!
         assert.equal(pagePath, '문서/사람/송상훈.md')
         assert.equal(current.ownerPath, '문서/사람/_사람.md')
-        const absolute = path.join(root, project, pagePath)
+        let absolute = path.join(root, project, pagePath)
         const initial = await fs.readFile(absolute, 'utf8')
         const properties = parse(initial.match(/^---\n([\s\S]*?)\n---/)![1])
         assert.equal(properties.title, '송상훈')
@@ -223,7 +223,11 @@ test('databaseService 통합', async (t) => {
         await svc.updateCell(project, db.id, row.id, age.id, 29)
         assert.match(await fs.readFile(absolute, 'utf8'), /나이: 29/)
         await svc.updateCell(project, db.id, row.id, primary, '새 제목')
-        assert.equal((await svc.getView(project, db.id)).rows[0].pagePath, pagePath)
+        const oldAbsolute = absolute
+        pagePath = (await svc.getView(project, db.id)).rows[0].pagePath!
+        assert.equal(pagePath, '문서/사람/새 제목.md')
+        absolute = path.join(root, project, pagePath)
+        await assert.rejects(fs.access(oldAbsolute), { code: 'ENOENT' })
         assert.match(await fs.readFile(absolute, 'utf8'), /title: 새 제목/)
         assert.match(await fs.readFile(absolute, 'utf8'), /보존할 본문/)
         await svc.renameColumn(project, db.id, age.id, '연령')

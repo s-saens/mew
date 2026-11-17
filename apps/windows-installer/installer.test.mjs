@@ -155,6 +155,12 @@ public class MewClosedRequestFixture : MemoryStream {
 '@
     $fake=[MewClosedRequestFixture]::new()
     Assert (-not (Test-MewOpenRequest $fake)) 'closed requester is contained'
+    foreach ($operation in @(1,2,9)) {
+      $request=[IO.MemoryStream]::new([byte[]]@($operation))
+      $expected=if ($operation -in @(1,2)) { $operation } else { 0 }
+      Assert ((Read-MewControllerRequest $request) -eq $expected) 'controller accepts only open and owned stop operations'
+      $request.Dispose()
+    }
     Send-MewOpenReply $fake 'MEW_INSTALLER_ERROR {"code":"reopen-failed"}'
     Assert $fake.Closed 'closed requester cleanup is contained'
     $next=[IO.MemoryStream]::new()
@@ -165,6 +171,10 @@ public class MewClosedRequestFixture : MemoryStream {
     $owner=[pscustomobject]@{}
     $owner|Add-Member ScriptMethod GetAccessControl { $acl=[pscustomobject]@{}; $acl|Add-Member ScriptMethod GetOwner { return @{Value='S-1-5-21-other'} }; return $acl }
     Reject { Assert-MewObjectOwner $owner 'S-1-5-21-ours' }
+    function New-Item { }
+    function Set-ItemProperty { param($LiteralPath,$Name,$Value); $script:resumeValue=$Value }
+    Set-MewResume fixture 'C:\\Windows\\powershell.exe' @('-File','C:\\Mew path\\resume.ps1')
+    Assert ($script:resumeValue -eq '"C:\\Windows\\powershell.exe" "-File" "C:\\Mew path\\resume.ps1"') 'npm reboot resume preserves exact executable arguments'
   `.replace('next safe response\n"', 'next safe response`n"'))
 })
 

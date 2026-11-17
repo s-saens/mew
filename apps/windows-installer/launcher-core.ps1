@@ -75,19 +75,37 @@ function Request-MewOpen([string]$Name, [string]$Sid) {
   finally { if ($reader) { $reader.Dispose() }; $client.Dispose() }
 }
 
+function Request-MewStop([string]$Name, [string]$Sid) {
+  $rights = [IO.Pipes.PipeAccessRights]::ReadWrite -bor [IO.Pipes.PipeAccessRights]::ReadPermissions
+  $client = [IO.Pipes.NamedPipeClientStream]::new('.', $Name, $rights, [IO.Pipes.PipeOptions]::Asynchronous, [Security.Principal.TokenImpersonationLevel]::Anonymous, [IO.HandleInheritability]::None)
+  $reader = $null
+  try {
+    try { $client.Connect(1000) } catch [TimeoutException] { Write-Output 'Mew is already stopped.'; return }
+    Assert-MewObjectOwner $client $Sid
+    $client.WriteByte(2); $client.Flush()
+    $reader = [IO.StreamReader]::new($client, (New-Object Text.UTF8Encoding($false)), $false, 1024, $true)
+    $response = $reader.ReadLineAsync()
+    if (-not $response.Wait(10000) -or $response.GetAwaiter().GetResult() -ne 'MEW_INSTALLER_STOPPED') { throw 'Mew could not stop its owned launcher. Try again shortly.' }
+    Write-Output 'Mew is stopping.'
+  } finally { if ($reader) { $reader.Dispose() }; $client.Dispose() }
+}
+
 function Close-MewOpenRequest($Pipe) {
   try { $Pipe.Disconnect() } catch [IO.IOException] { } catch [InvalidOperationException] { }
 }
 
-function Test-MewOpenRequest($Pipe) {
+function Read-MewControllerRequest($Pipe) {
   try {
     $buffer = New-Object byte[] 1
     $read = $Pipe.ReadAsync($buffer, 0, 1)
-    return $read.Wait(1000) -and $read.Result -eq 1 -and $buffer[0] -eq 1
-  } catch [IO.IOException] { return $false }
-  catch [AggregateException] { return $false }
-  catch [InvalidOperationException] { return $false }
+    if ($read.Wait(1000) -and $read.Result -eq 1 -and $buffer[0] -in @(1, 2)) { return [int]$buffer[0] }
+    return 0
+  } catch [IO.IOException] { return 0 }
+  catch [AggregateException] { return 0 }
+  catch [InvalidOperationException] { return 0 }
 }
+
+function Test-MewOpenRequest($Pipe) { return (Read-MewControllerRequest $Pipe) -eq 1 }
 
 function Send-MewOpenReply($Pipe, [string]$Line) {
   $bytes = [Text.Encoding]::UTF8.GetBytes($Line + "`n")
@@ -166,10 +184,13 @@ function Invoke-MewLaunch([string]$AppRoot) {
         else { $stderr = $process.StandardError.ReadLineAsync() }
       }
       if ($connection -and $connection.IsCompleted) {
-        $connected = $false
-        try { $connection.GetAwaiter().GetResult(); $connected = Test-MewOpenRequest $pipe }
+        $request = 0
+        try { $connection.GetAwaiter().GetResult(); $request = Read-MewControllerRequest $pipe }
         catch [IO.IOException] { }
-        if ($connected) {
+        if ($request -eq 2) {
+          Send-MewOpenReply $pipe 'MEW_INSTALLER_STOPPED'
+          return
+        } elseif ($request -eq 1) {
           # The CLI rotates an unfinished setup capability over its trusted host IPC.
           $pendingReply = $true; $pendingAt = $timer.ElapsedMilliseconds
           if ($opened) { $process.StandardInput.WriteLine('MEW_INSTALLER_OPEN'); $process.StandardInput.Flush() }
