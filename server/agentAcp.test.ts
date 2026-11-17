@@ -37,6 +37,54 @@ test('Codex 기본 OAuth는 서버 브라우저 표면을 공개한다', () => {
 
 const sdkUrl = import.meta.resolve('@agentclientprotocol/sdk')
 
+test('Claude config options supply and update model, effort and permission controls', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-claude-config-'))
+  const stub = path.join(dir, 'adapter.mjs')
+  fs.writeFileSync(stub, `
+import {AgentSideConnection,ndJsonStream,PROTOCOL_VERSION} from ${JSON.stringify(sdkUrl)};
+import {Readable,Writable} from 'node:stream';
+let model='sonnet',mode='default',effort='low';
+const config=()=>[
+ {id:'model',category:'model',type:'select',name:'Model',currentValue:model,options:[{group:'models',name:'Models',options:[{value:'sonnet',name:'Sonnet'},{value:'opus',name:'Opus'}]}]},
+ {id:'mode',category:'mode',type:'select',name:'Mode',currentValue:mode,options:[{value:'default',name:'Default'},{value:'plan',name:'Plan'}]},
+ {id:'effort',category:'thought_level',type:'select',name:'Effort',currentValue:effort,options:[{value:'low',name:'Low'},{value:'high',name:'High'}]}
+];
+new AgentSideConnection(conn=>({
+ initialize:async()=>({protocolVersion:PROTOCOL_VERSION,agentCapabilities:{loadSession:true}}),
+ newSession:async()=>({sessionId:'config-test',configOptions:config()}),
+ loadSession:async()=>({configOptions:config()}),
+ setSessionConfigOption:async({configId,value})=>{ if(configId==='model') model=value; else if(configId==='effort') effort=value; return {configOptions:config()} },
+ setSessionMode:async({modeId})=>{mode=modeId;return {}},
+ prompt:async({sessionId,prompt})=>{if(prompt[0].text==='queued'){if(model!=='opus')throw Error('queued model not applied');return {stopReason:'end_turn'}}model='sonnet';mode='plan';effort='high';await conn.sessionUpdate({sessionId,update:{sessionUpdate:'config_option_update',configOptions:config()}});return {stopReason:'end_turn'}},cancel:async()=>{}
+}),ndJsonStream(Writable.toWeb(process.stdout),Readable.toWeb(process.stdin)));
+`)
+  const session = await AgentSession.start('claude', { cmd: process.execPath, args: [stub] }, workspace)
+  t.after(async () => { await session.disposeAndWait(); fs.rmSync(dir, { recursive: true, force: true }) })
+  const last = () => session.snapshot()
+  assert.deepEqual(session.models?.availableModels.map(model => model.modelId), ['sonnet', 'opus'])
+  assert.equal(last().findLast(event => event.type === 'modes')?.modes.currentModeId, 'default')
+  assert.equal(last().findLast(event => event.type === 'thinking')?.thinking?.currentValue, 'low')
+  await session.setModel('opus')
+  assert.equal(session.models?.currentModelId, 'opus')
+  await session.setThinking('effort', 'high')
+  await session.setMode('plan')
+  assert.equal(last().findLast(event => event.type === 'modes')?.modes.currentModeId, 'plan')
+  await session.loadSession('config-test')
+  assert.equal(session.models?.currentModelId, 'opus')
+  assert.equal(last().findLast(event => event.type === 'thinking')?.thinking?.currentValue, 'high')
+  session.prompt('update')
+  const deadline = Date.now() + 5000
+  while (String(session.models?.currentModelId) !== 'sonnet') {
+    assert.ok(Date.now() < deadline, 'config update arrives')
+    await new Promise(resolve => setTimeout(resolve, 10))
+  }
+  while (session.busy) { assert.ok(Date.now() < deadline, 'first prompt completes'); await new Promise(resolve => setTimeout(resolve, 10)) }
+  session.prompt('queued', 'queued', [], [], { model: 'Opus', thinking: 'High', permission: 'Plan', modelId: 'opus' })
+  while (session.busy) { assert.ok(Date.now() < deadline, 'queued prompt completes'); await new Promise(resolve => setTimeout(resolve, 10)) }
+  assert.equal(last().findLast(event => event.type === 'turn_end')?.stopReason, 'end_turn')
+  assert.equal(session.models?.currentModelId, 'sonnet', 'message settings preserve the draft model')
+})
+
 test('Codex model and effort controls stay synchronized across model changes, config updates and failures', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-acp-effort-'))
   const stub = path.join(dir, 'adapter.mjs')

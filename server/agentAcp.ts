@@ -393,6 +393,7 @@ export class AgentSession {
   #models: SessionModelState | null = null
   #modes: SessionModeState | null = null
   #thinking: ThinkingState | null = null
+  #claudeModelConfigId: string | null = null
   #promptSettingsActive = false
   #capacitySettingsOverride = false
   #draftSettingsRevision = 0
@@ -685,7 +686,9 @@ export class AgentSession {
       this.#modes = modes
       this.#emit({ type: 'modes', modes })
     }
-    this.#useThinking(thinkingFrom(configOptions))
+    this.#claudeModelConfigId = null
+    if (configOptions) this.#useConfigOptions(configOptions)
+    else this.#useThinking(null)
   }
 
   /**
@@ -1177,7 +1180,10 @@ export class AgentSession {
   async #applyMessageSettings(settings: AgentMessageSettings) {
     const compositeEffort = this.runtime === 'antigravity' && settings.thinkingConfigId === MODEL_EFFORT_CONFIG_ID && settings.thinkingId
     const modelId = compositeEffort ? this.#effortModelId(settings.modelId ?? this.#models?.currentModelId ?? '', settings.thinkingId!) : settings.modelId
-    if (modelId) await this.#conn.unstable_setSessionModel({ sessionId: this.#sessionId, modelId })
+    if (modelId) {
+      if (this.#claudeModelConfigId) await this.#conn.setSessionConfigOption({ sessionId: this.#sessionId, configId: this.#claudeModelConfigId, value: modelId })
+      else await this.#conn.unstable_setSessionModel({ sessionId: this.#sessionId, modelId })
+    }
     if (!compositeEffort && settings.thinkingConfigId && settings.thinkingId) await this.#conn.setSessionConfigOption({ sessionId: this.#sessionId, configId: settings.thinkingConfigId, value: settings.thinkingId })
     if (settings.modeId) await this.#conn.setSessionMode({ sessionId: this.#sessionId, modeId: settings.modeId })
   }
@@ -1440,15 +1446,9 @@ export class AgentSession {
     // ACP가 실제 기록을 확인한 뒤에만 이 탭의 기준 세션을 바꾼다. 실패한 ID를 먼저 저장하면 다음
     // 프롬프트까지 `session not found`로 이어지고 브라우저 복원 포인터에도 유령 ID가 남는다.
     this.#resetConversation()
-    this.#adopt(sessionId, null, null, loaded.configOptions)
+    this.#adopt(sessionId, loaded.models ?? null, loaded.modes ?? null, loaded.configOptions)
     await this.#pushMeta()
     for (const event of replay) this.#emit(event, false)
-    const models = loaded.models ?? null
-    if (models) this.#useModels(models)
-    if (loaded.modes) {
-      this.#modes = loaded.modes
-      this.#emit({ type: 'modes', modes: loaded.modes })
-    }
     await measureAgentPhase(this.runtime, 'defaults', () => this.#applyDefaults())
     await this.#pushMeta()
     this.#saveTranscript()
@@ -1516,8 +1516,13 @@ export class AgentSession {
     }
     if (this.#capacitySettingsOverride && !this.#models?.availableModels.some(model => model.modelId === modelId)) throw new Error(`지원하지 않는 모델입니다: ${modelId}`)
     await this.#draftSettingChange(async () => {
-      if (!this.#capacitySettingsOverride) await this.#conn.unstable_setSessionModel({ sessionId: this.#sessionId, modelId })
-      if (this.#models) this.#useModels({ ...this.#models, currentModelId: modelId })
+      if (!this.#capacitySettingsOverride && this.#claudeModelConfigId) {
+        const result = await this.#conn.setSessionConfigOption({ sessionId: this.#sessionId, configId: this.#claudeModelConfigId, value: modelId })
+        this.#useConfigOptions(result.configOptions)
+      } else {
+        if (!this.#capacitySettingsOverride) await this.#conn.unstable_setSessionModel({ sessionId: this.#sessionId, modelId })
+        if (this.#models) this.#useModels({ ...this.#models, currentModelId: modelId })
+      }
     })
   }
 
@@ -1543,6 +1548,24 @@ export class AgentSession {
   }
 
   #useConfigOptions(configOptions: SessionConfigOption[], fallback: ThinkingState | null = null) {
+    if (this.runtime === 'claude') {
+      const model = configOptions.find(item => item.category === 'model' && item.type === 'select')
+      if (model && typeof model.currentValue === 'string' && Array.isArray(model.options)) {
+        const availableModels = model.options.flatMap((item: any) => 'options' in item ? item.options : [item])
+          .filter((item: any) => typeof item?.value === 'string')
+          .map((item: any) => ({ modelId: item.value, name: typeof item.name === 'string' ? item.name : item.value }))
+        this.#claudeModelConfigId = model.id
+        this.#useModels({ currentModelId: model.currentValue, availableModels })
+      }
+      const mode = configOptions.find(item => item.category === 'mode' && item.type === 'select')
+      if (mode && typeof mode.currentValue === 'string' && Array.isArray(mode.options)) {
+        const availableModes = mode.options.flatMap((item: any) => 'options' in item ? item.options : [item])
+          .filter((item: any) => typeof item?.value === 'string')
+          .map((item: any) => ({ id: item.value, name: typeof item.name === 'string' ? item.name : item.value, description: item.description }))
+        this.#modes = { currentModeId: mode.currentValue, availableModes }
+        this.#emit({ type: 'modes', modes: this.#modes })
+      }
+    }
     if (this.runtime === 'antigravity' && this.#models) {
       const option = configOptions.find(item => item.category === 'model' && item.type === 'select')
       if (typeof option?.currentValue === 'string' && this.#models.availableModels.some(item => item.modelId === option.currentValue)) {
