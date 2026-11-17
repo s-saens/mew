@@ -18,3 +18,11 @@ export function desktopAutoNat(env: NodeJS.ProcessEnv = process.env): boolean {
   if (value === '0') return false
   throw new Error('MEW_DESKTOP_AUTO_NAT은 0 또는 1이어야 합니다.')
 }
+
+/** Only addresses are needed by the viewer; host credentials stay on the server. */
+export function viewerIceServers(servers: DesktopIceServer[]): Array<{ urls: string | string[] }> {
+  return servers.flatMap(({ urls }) => {
+    const safe = (typeof urls === 'string' ? [urls] : urls).filter(url => /^stuns?:(?:\[[0-9a-f:.]+\]|[a-z0-9.-]+)(?::[0-9]{1,5})?$/i.test(url))
+    return safe.length ? [{ urls: safe }] : []
+  })
+}

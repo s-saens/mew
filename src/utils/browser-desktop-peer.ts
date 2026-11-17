@@ -1,6 +1,19 @@
 import type { LoginDesktopInput } from '../../shared/login-desktop.ts'
 import { desktopVideoFeedback } from './browser-video-feedback.ts'
 
+export function browserDesktopIceServers(value: unknown): RTCIceServer[] {
+  if (!Array.isArray(value) || value.length > 8) return []
+  const servers: RTCIceServer[] = []
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') return []
+    const urls = (entry as { urls?: unknown }).urls
+    const list = typeof urls === 'string' ? [urls] : urls
+    if (!Array.isArray(list) || !list.length || list.length > 8 || list.some(url => typeof url !== 'string' || url.length > 2048 || !/^stuns?:(?:\[[0-9a-f:.]+\]|[a-z0-9.-]+)(?::[0-9]{1,5})?$/i.test(url))) return []
+    servers.push({ urls: list })
+  }
+  return servers
+}
+
 export function browserDesktopPeer({ signal, stream, failed }: {
   signal: (message: unknown) => void
   stream: (stream: MediaStream) => void
@@ -50,7 +63,7 @@ export function browserDesktopPeer({ signal, stream, failed }: {
         }
         if (value.type !== 'offer' || generation < negotiation) return
         disposePeer(); negotiation = generation
-        const current = new RTCPeerConnection({ iceServers: [], bundlePolicy: 'max-bundle' })
+        const current = new RTCPeerConnection({ iceServers: browserDesktopIceServers(value.iceServers), bundlePolicy: 'max-bundle' })
         peer = current
         current.onicecandidate = event => { if (!closed && peer === current && event.candidate) signal({ type: 'candidate', negotiation: generation, candidate: event.candidate.toJSON() }) }
         current.ontrack = event => {

@@ -10,7 +10,7 @@ import { canUse } from './access-policy.ts'
 import { watchSocketAccess } from './access-socket.ts'
 import { resolveAuth, type RequestAuth } from './reqAuth.ts'
 import { remoteContext } from './remote-access-context.ts'
-import { desktopAutoNat, desktopIceServers } from './rtc-config.ts'
+import { desktopAutoNat, desktopIceServers, viewerIceServers } from './rtc-config.ts'
 import { webSocketOriginAllowed } from './websocket-origin.ts'
 
 export { BROWSER_DESKTOP_WS }
@@ -73,9 +73,11 @@ export class BrowserDesktopSession extends NativeBrowserSession {
   private createVideo() {
     const owner = this.viewer
     const current = () => this.viewer === owner && this.video === video && !this.closed
+    const iceServers = desktopIceServers()
     const video: BrowserDesktopVideo = new BrowserDesktopVideo({
-      iceServers: desktopIceServers(), autoNat: desktopAutoNat(),
-      emit: value => { if (current()) this.emitState(value) },
+      iceServers, autoNat: desktopAutoNat(),
+      // Share only public STUN addresses, never server credentials, with the viewer.
+      emit: value => { if (current()) this.emitState(value.type === 'offer' ? { ...value, iceServers: viewerIceServers(iceServers) } : value) },
       onVideo: mode => { if (!current()) return; this.negotiated = mode; return this.encode(mode, video) },
       keyframe: () => { if (current()) this.requestKeyframe() },
       onBitrate: bitrate => {

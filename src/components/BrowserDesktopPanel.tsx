@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { ArrowRight, Refresh } from 'iconoir-react'
 import { HoverTipLayer, LoadingIndicator } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
@@ -14,6 +14,26 @@ import { DockGrip } from './DockWorkspace'
 import { PanelCloseButton } from './panel-close-button'
 
 type Connection = 'connecting' | 'ready' | 'error' | 'closed'
+
+/** Keep the remote display out of ordinary page-wide media-extension scans. */
+function BrowserVideo({ video }: { video: RefObject<HTMLVideoElement | null> }) {
+  const host = useRef<HTMLDivElement>(null)
+  const root = useRef<ShadowRoot | null>(null)
+  useLayoutEffect(() => {
+    const surface = host.current!
+    root.current ??= surface.attachShadow({ mode: 'closed' })
+    const element = document.createElement('video')
+    element.autoplay = true
+    element.muted = true
+    element.playsInline = true
+    element.disablePictureInPicture = true
+    Object.assign(element.style, { display: 'block', width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none', userSelect: 'none' })
+    root.current.append(element)
+    video.current = element
+    return () => { if (video.current === element) video.current = null; element.remove() }
+  }, [video])
+  return <div ref={host} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full" />
+}
 
 export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed = true, streamUrl, reopen, onReady, embedded = false, onClose }: {
   url: string; navigationRequest?: number; nativeAllowed?: boolean
@@ -186,7 +206,7 @@ export function BrowserDesktopPanel({ url, navigationRequest = 0, nativeAllowed 
         </form>
         {addressError && <p role="alert" className="px-2 py-1 text-xs text-danger">{addressError}</p>}
       </> : <div ref={stage} data-browser-desktop data-login-desktop={embedded || undefined} tabIndex={0} role="application" aria-label={embedded ? uiText('로그인 화면') : uiText('브라우저')} className="relative min-h-0 flex-1 touch-none overflow-hidden bg-black outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent">
-        <video ref={video} playsInline autoPlay muted disablePictureInPicture className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain" />
+        <BrowserVideo video={video} />
         <textarea ref={keyboard} aria-label={embedded ? uiText('로그인 키보드 입력') : uiText('키보드 입력')} autoCapitalize="off" autoCorrect="off" spellCheck={false} className="absolute bottom-0 left-0 h-px w-px opacity-0" />
         {connection === 'connecting' && <div role="status" className="pointer-events-none absolute inset-0 flex items-center justify-center text-white"><LoadingIndicator size={20} /></div>}
         {(connection === 'error' || connection === 'closed') && <div role="alert" className="absolute inset-x-1 bottom-1 flex items-center gap-1 rounded bg-surface-raised px-2 py-1 text-xs"><span className="min-w-0 flex-1 select-text break-words">{error || uiText('연결이 끊겼습니다. 다시 연결해 주세요.')}</span><button type="button" className={iconButton} aria-label={uiText('다시 연결')} data-tip={uiText('다시 연결')} disabled={reopening} onClick={() => void reconnect()}><Refresh width={15} height={15} aria-hidden="true" /></button></div>}

@@ -42,6 +42,7 @@ test('login delegates to the shared native video panel, renews its job and clean
   page.setDefaultTimeout(4000)
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
+  await page.addInitScript(`(()=>{const original=Element.prototype.attachShadow;Element.prototype.attachShadow=function(options){const root=original.call(this,options);if(options.mode==='closed')window.testDisplayRoot=root;return root}})()`)
   await page.route('https://login-viewer.test/**', route => {
     const script = scripts.get(new URL(route.request().url()).pathname)
     return route.fulfill(script !== undefined ? { contentType: 'text/javascript', body: script } : { contentType: 'text/html', body: `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}*{box-sizing:border-box}section[role=dialog]{position:absolute;display:flex;flex-direction:column}section[role=dialog]>header{height:36px;flex-shrink:0}section[role=dialog]>div{display:flex;flex-direction:column;flex:1;min-height:0}.relative{position:relative}.absolute{position:absolute}.inset-0{inset:0}.flex{display:flex}.flex-col{flex-direction:column}.flex-1{flex:1}.h-full{height:100%}.w-full{width:100%}.min-h-0{min-height:0}.shrink-0{flex-shrink:0}[data-browser-desktop-panel]>header{height:32px;flex-shrink:0}[data-browser-desktop-panel]>header>span{flex:1}[data-login-desktop]{touch-action:none;overflow:hidden}video{width:100%;height:100%;object-fit:contain;pointer-events:none}textarea{position:absolute;width:1px;height:1px;opacity:0}</style><div id="root"></div><script type="module" src="/${entry.fileName}"></script>` })
@@ -94,7 +95,7 @@ test('login delegates to the shared native video panel, renews its job and clean
   await page.waitForFunction('(()=>{const bounds=document.querySelector("[role=dialog]").getBoundingClientRect();return bounds.left>=0&&bounds.right<=innerWidth})()')
   await page.waitForFunction('window.signals.some(value=>value.type==="resize"&&value.width<500)')
   await page.evaluate('window.peers.at(-1).play(400,800)')
-  await page.waitForFunction('document.querySelector("video").videoWidth===400')
+  await page.waitForFunction('window.testDisplayRoot?.querySelector("video").videoWidth===400')
   const mobile = (await stage.boundingBox())!
   await stage.click({ position: { x: mobile.width / 2, y: mobile.height / 2 } })
   const resizedClick = await page.evaluate<{ x: number; y: number }>('window.inputs.findLast(value=>value.type==="button"&&value.down)')

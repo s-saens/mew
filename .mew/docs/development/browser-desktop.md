@@ -1,6 +1,6 @@
 ---
 title: "Native Chrome browser desktop"
-description: "Defines the single Chrome H.264/WebRTC component and runtime used by login and the internal Browser, with one account browser profile and nativeBrowser permission. Covers virtual X11 isolation, native input, login bindings, terminal browser requests, session takeover, Mew Port removal, and host/central application limits."
+description: "Defines the single Chrome H.264/WebRTC component and runtime used by login and the internal Browser, with one account browser profile and nativeBrowser permission. Covers virtual X11 isolation, native input, login bindings, terminal browser requests, viewer ICE configuration, extension isolation, session takeover, Mew Port removal, and host/central application limits."
 created: "2026-11-05"
 updated: "2026-11-06"
 ---
@@ -34,7 +34,7 @@ An RTCP keyframe request, queue overflow, or material bitrate change triggers a 
 
 Pointer motion uses the unordered, non-retransmitted `motion` data channel. Buttons, wheel, keys, paste, and input release use the reliable `control` channel. The host validates channel purpose and input shape, rechecks authorization, limits input frequency, and injects into the session's private X server through XTest. Viewer coordinates map through the actual contained video rectangle. The viewer supports touch scrolling and an explicit software-keyboard action. Lost focus, detach, and close release held input.
 
-The viewer uses the browser's native WebRTC decoder in a `playsInline` video element. WebCodecs and its secure-context requirement are absent from this path, so ordinary HTTP access through a Tailscale address can display the stream. This does not guarantee that every phone, codec implementation, or network supports the required peer connection. Media and data-channel traffic use the direct WebRTC connection; the Mew signaling WebSocket does not carry video frames.
+The viewer uses the browser's native WebRTC decoder in a `playsInline` video element inside a closed shadow root. This hides the display from ordinary document-wide media scans without an extra canvas copy; extensions that instrument shadow roots can still detect it. WebCodecs and its secure-context requirement are absent from this path, so ordinary HTTP access through a Tailscale address can display the stream. This does not guarantee that every phone, codec implementation, or network supports the required peer connection. Media and data-channel traffic use the direct WebRTC connection; the Mew signaling WebSocket does not carry video frames.
 
 ## Permissions, profiles, and lifecycle
 
@@ -60,7 +60,7 @@ New Linux/WSL terminal sessions can forward `BROWSER` requests to the account's 
 
 The host implementation supports Linux and WSL. It requires ordinary Google Chrome selected through the [browser dependency contract](browser-dependencies.md), Xvfb, FFmpeg with `x11grab` and `libx264`, Python 3, libX11, libXtst, and the root `node-datachannel` runtime. Managed browser readiness alone does not prove these display and media prerequisites. macOS and native Windows support are not established by this implementation.
 
-The browser desktop uses `MEW_DESKTOP_ICE_SERVERS` and `MEW_DESKTOP_AUTO_NAT` for shared RTC settings, retaining the existing names for compatibility. Configuration lives in `server/rtc-config.ts` and transport helpers in `server/rtc/`. The shared Windows NAT route lookup uses the root `koffi` dependency to access the system IP Helper API; Mewlink uses the same helper. Direct connectivity, UDP permissions, and network support remain necessary; TURN media relay is not introduced. The standalone video helper defaults automatic NAT to false unless its caller explicitly enables it.
+The browser desktop uses `MEW_DESKTOP_ICE_SERVERS` and `MEW_DESKTOP_AUTO_NAT` for shared RTC settings, retaining the existing names for compatibility. Configuration lives in `server/rtc-config.ts` and transport helpers in `server/rtc/`. The shared Windows NAT route lookup uses the root `koffi` dependency to access the system IP Helper API; Mewlink uses the same helper. The host includes configured STUN addresses in the offer for the viewer to gather its own candidates; credentials and URLs containing user information or query data are not sent. Older offers without this field retain the previous empty viewer ICE configuration. Authenticated STUN configurations may not work for viewers. Direct connectivity, UDP permissions, and network support remain necessary; TURN media relay is not introduced. The standalone video helper defaults automatic NAT to false unless its caller explicitly enables it.
 
 ## Application and verification boundaries
 

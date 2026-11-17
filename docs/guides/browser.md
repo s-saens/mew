@@ -1,6 +1,6 @@
 ---
 title: "Login screens and the host browser"
-description: "Explains the shared host Chrome browser and login screens, permissions, prerequisites, session lifetimes, and the removal of Mew Port."
+description: "Explains the shared host Chrome browser and login screens, permissions, connection prerequisites, extension isolation, session lifetimes, and the removal of Mew Port."
 created: "2026-09-04"
 updated: "2026-11-07"
 ---
@@ -26,6 +26,6 @@ On a phone, tap to click and swipe to scroll. Tap a remote input field and then 
 
 The native Browser currently supports Linux/WSL and requires ordinary Google Chrome, Xvfb, FFmpeg with X11 capture and libx264, Python 3, libX11/libXtst, and Mew's existing native WebRTC dependency. `npm run browsers:check` checks browser executables; it does not establish the separate virtual-display and encoder prerequisites. Configure `MEW_CHROME_EXECUTABLE` if ordinary Chrome discovery fails. UI automation continues to use Playwright Chromium.
 
-Direct WebRTC uses the shared ICE/NAT settings. The video path works without WebCodecs or a secure-context requirement, including HTTP Tailscale addresses. A working Mew page alone does not prove that the peer-to-peer video route is reachable on another network. Mewlink must also admit `/api/browser-desktop/ws`; host and central updates are separate. A UI build does not reload a running server, so apply server changes with your normal restart procedure.
+Direct WebRTC uses the shared ICE/NAT settings, including STUN candidate gathering on both host and viewer. Some networks still block direct connections because Mew does not provide a TURN relay. The video display is isolated from ordinary page-wide media extension scans; extensions that inspect shadow roots may still detect it. The video path works without WebCodecs or a secure-context requirement, including HTTP Tailscale addresses. A working Mew page alone does not prove that the peer-to-peer video route is reachable on another network. Mewlink must also admit `/api/browser-desktop/ws`; host and central updates are separate. A UI build does not reload a running server, so apply server changes with your normal restart procedure.
 
 The [native browser contract](../../.mew/docs/development/browser-desktop.md) owns input, profile, authorization, and verification limits. The older DOM endpoint remains for compatibility; [its archived contract](../../.mew/docs/history/dom-browser-purpose-routing.md) is no longer the default Browser behavior. No implementation establishes that a particular provider login or CAPTCHA will succeed.
