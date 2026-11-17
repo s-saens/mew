@@ -421,7 +421,7 @@ export function WorkspaceApplication({ account, guest, renderWorkspace }: Props)
       onClosePanel={id => { if (draft?.panel.id === id) cancelDraft(); else if (board.panels.find(panel => panel.id === id)?.tool) closeTool(id); else void closePanel(id) }} onAdd={startDraft}
       labels={{ board: uiText('프로젝트 패널'), add: uiText('프로젝트 패널 추가'), select: uiText('프로젝트 선택'), close: uiText('프로젝트 패널 닫기'), move: uiText('프로젝트 패널 이동'), resizeColumn: uiText('프로젝트 패널 너비 조절'), resizeRow: uiText('프로젝트 패널 높이 조절') }} /></BrowserContext.Provider>
     {adding && <DialogFrame labelledBy={selectorTitle} busy={opening} restoreFocus={restoreActiveFocus} onClose={() => { if (!opening) setAdding(false) }} className="flex max-h-[80dvh] max-w-xl flex-col">
-      <header className="flex h-9 items-center border-b border-edge px-2"><span id={selectorTitle} className="flex-1 text-sm">{uiText('프로젝트 선택패널')}</span><PanelCloseButton onClick={() => setAdding(false)} disabled={opening} aria-label={t('common.close')} /></header>
+      <header className="flex h-9 items-center border-b border-edge px-2"><span id={selectorTitle} className="flex-1 text-sm">{uiText('프로젝트 선택')}</span><PanelCloseButton onClick={() => setAdding(false)} disabled={opening} aria-label={t('common.close')} /></header>
       <ProjectCatalogPanel paths={services.projects.paths} onOpen={async path => {
         const panel = replacing && [...current.current.board.panels, ...current.current.retained].find(candidate => candidate.id === replacing)
         if (!panel) return false

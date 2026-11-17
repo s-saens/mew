@@ -5,6 +5,11 @@
 .mew-project-board-panel[data-active] { border-color: color-mix(in srgb, var(--color-ink-secondary) 55%, var(--color-edge)); }
 .mew-project-board-panel[data-moving] { z-index: 4; opacity: .85; will-change: translate; }
 .mew-project-board-header { display: flex; align-items: center; flex-shrink: 0; height: 36px; min-width: 0; border-bottom: 1px solid var(--color-edge); background: var(--color-surface); color: var(--color-ink); }
+.mew-project-board-panel:has(> .mew-project-selection-frame) > :not(.mew-project-selection-frame) { visibility: hidden; }
+.mew-dialog.mew-project-selection-frame { background: transparent; }
+:root.theme-gradient .mew-dialog.mew-project-selection-frame { --color-surface: inherit; }
+.mew-dialog.mew-project-selection-frame .mew-project-sidebar-heading { height: 36px; padding-left: 26px; background: var(--color-surface); color: var(--color-ink); }
+.mew-dialog.mew-project-selection-frame .mew-project-sidebar-heading button { width: 24px; height: 24px; }
 .mew-project-board-grip { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 20px; height: 34px; padding: 0; color: var(--color-ink-muted); cursor: grab; touch-action: none; }
 .mew-project-board-grip:active { cursor: grabbing; }
 .mew-project-board-name { position: relative; isolation: isolate; display: flex; align-items: center; gap: 6px; flex: 0 1 auto; height: 100%; min-width: 0; margin-right: auto; padding: 0 6px; font-size: 12px; text-align: left; }
