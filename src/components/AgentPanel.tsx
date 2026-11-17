@@ -5235,8 +5235,8 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
     return (
       <div data-agent-turn className="min-w-0 rounded-lg rounded-tl-none border border-edge bg-surface">
         {open && <div data-agent-turn-header className="sticky -top-3 z-20 flex h-8 items-center rounded-tr-lg border-b border-edge bg-surface">
-          <button type="button" aria-expanded={true} aria-label={uiText("접기")} data-tip={uiText("접기")} onClick={() => { if (!hasSelection()) toggle(item.key) }}
-            className="flex h-full min-w-0 flex-1 items-center gap-1.5 px-2.5 text-left text-ink-secondary hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-ink">
+          <button type="button" aria-expanded={true} aria-label={uiText("접기")} onClick={() => { if (!hasSelection()) toggle(item.key) }}
+            className="flex h-full min-w-0 flex-1 items-center gap-1.5 px-2.5 text-left text-ink-secondary focus-visible:outline-2 focus-visible:outline-ink">
             <span className={`size-1.25 shrink-0 rounded-full ${BUBBLE_DOT[state]}`} title={BUBBLE_LABEL[state]} aria-label={BUBBLE_LABEL[state]} />
             {durationMs != null && <span data-agent-duration className="min-w-0 truncate text-[11px] leading-4 tabular-nums text-ink-muted">{formatDuration(durationMs)}</span>}
           </button>
@@ -5334,8 +5334,8 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
         )}
         {open && (
           <div data-agent-turn-footer className="sticky -bottom-3 z-10 h-6.5 rounded-b-lg border-t border-edge bg-surface">
-            <button type="button" aria-expanded={true} aria-label={uiText("접기")} data-tip={uiText("접기")} onClick={() => { if (!hasSelection()) toggle(item.key) }}
-              className="flex h-full w-full items-center justify-center rounded-b-lg text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-ink">
+            <button type="button" aria-expanded={true} aria-label={uiText("접기")} onClick={() => { if (!hasSelection()) toggle(item.key) }}
+              className="flex h-full w-full items-center justify-center rounded-b-lg text-ink-secondary focus-visible:outline-2 focus-visible:outline-ink">
               <NavArrowUp width={16} height={16} aria-hidden="true" />
             </button>
           </div>

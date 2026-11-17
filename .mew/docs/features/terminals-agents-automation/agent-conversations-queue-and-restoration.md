@@ -8,7 +8,7 @@ updated: "2026-11-11"
 status_hash: "b325d279cf16e291b2bcddda7cc0d70268647e336403acba780cb1081da44668"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-startup-queue.tsx", "src/utils/agent-startup-queue.ts", "src/hooks/use-agent-event-state.ts", "src/hooks/use-agent-work-history.ts", "src/utils/agent-work-loader.ts", "src/hooks/use-agent-tab-previews.ts", "src/hooks/use-agent-session-previews.ts", "src/utils/agent-tab-previews.ts", "src/utils/agentFold.ts", "src/hooks/useGridDrag.ts", "server/agentHost.ts", "server/agentWs.ts", "server/agentTranscript.ts", "server/agent-history-preview.ts", "server/agent-tab-preview.ts", "server/user-ui-routes.ts", "server/agent-session-search-service.ts", "server/agent-transcript-search.ts", "server/agent-runtime-history-search.ts"]
 commits: []
-description: "Agent conversation feedback, collapsed summaries and expanded answer controls, swipe-to-reply quoting, history search, queues, drafts, session conflicts, and restoration. Covers recovery indicators, relay liveness, permanent failures, and model-capacity retries."
+description: "Agent conversation feedback, collapsed summaries, expanded answer controls and hover behavior, swipe-to-reply quoting, history search, queues, drafts, session conflicts, and restoration. Covers recovery indicators and relay liveness."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -317,7 +317,7 @@ Place the question copy button outside the bubble background on the left in both
 
 For collapsed answer summaries, show the original text of the last answer in up to two lines fitted to the panel width, with an ellipsis at the overflowing end. Put the status dot inline before the first line, so the second line starts at the dot's left edge. Do not use a fixed 80-character limit. Place the stop button at the right of the first line while work is in progress, reserving only the width needed for the button on that line. Do not show task duration in collapsed answers or reserve space or an extra line for it. Expanded answers hide the summary and show the status dot at the left of the top bar, followed by task duration. The bottom bar has a centered upward chevron. Update elapsed time while work is in progress, and do not reserve time space for old transcripts without timing data. Copy the entire answer without changing its collapse state.
 
-The top and bottom bars stay within their own bubble and remain available at the viewport edges while scrolling a long answer. When the bars overlap, the top bar takes priority. Place the stop button with the top bar actions while work is in progress. Action buttons do not collapse the answer. Give icon buttons translated accessible names and tooltips.
+The top and bottom bars stay within their own bubble and remain available at the viewport edges while scrolling a long answer. When the bars overlap, the top bar takes priority. The collapse areas have no hover highlight or tooltip and retain their keyboard focus indicators. Place the stop button with the top bar actions while work is in progress. Action buttons do not collapse the answer. Give action icons translated accessible names and tooltips.
 
 Do not add the former `질문으로` button again without an explicit follow-up request. Retain ↑/↓ question navigation in the conversation area.
 

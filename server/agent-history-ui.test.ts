@@ -218,6 +218,16 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       await scroll.evaluate((el, top) => { el.scrollTop = top; el.dispatchEvent(new Event('scroll')) }, middle)
       const footer = answer42.locator('[data-agent-turn-footer]')
       const expandedHeader = answer42.locator('[data-agent-turn-header]')
+      for (const bar of [expandedHeader, footer]) {
+        const collapse = bar.locator('button[aria-expanded]')
+        assert.equal(await collapse.getAttribute('data-tip'), null, 'collapse bars do not show a hover tooltip')
+        assert.equal(await collapse.getAttribute('title'), null, 'collapse bars do not show a native tooltip')
+        await page.mouse.move(0, 0)
+        const background = await collapse.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).backgroundColor)
+        await collapse.hover({ position: { x: 8, y: 10 } })
+        const hoveredBackground = await collapse.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).backgroundColor)
+        assert.equal(hoveredBackground, background, 'hovering the collapse bar does not change its background')
+      }
       const fullWidth = await answer42.evaluate(el => ({ bubble: el.getBoundingClientRect().width, available: el.parentElement!.getBoundingClientRect().width }))
       assert.ok(Math.abs(fullWidth.bubble - fullWidth.available) <= 1, 'expanded answer uses the full available width')
       assert.equal(await expandedHeader.locator('[data-agent-duration]').textContent(), '2분 5초')
