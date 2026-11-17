@@ -17,6 +17,16 @@
   @media (width < 48rem) { @slot; }
 }
 
+[data-agent-tab-bar] { position: relative; outline: none; }
+[data-agent-tab-bar]:focus-visible::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border: 2px solid var(--color-ink);
+  pointer-events: none;
+}
+
 .agent-loading-bubbles {
   display: flex;
   flex: 1;

@@ -8,7 +8,7 @@ updated: "2026-11-05"
 status_hash: "3e9a3293848b77d07af2e0bbeb65a930bb54c18ce2da6a1b7543c145fb06a0b9"
 files: ["src/components/AgentPanel.tsx", "src/components/AgentSetPicker.tsx", "server/agentSets.ts", "server/agentCwd.ts"]
 commits: []
-description: "Runtime/model/effort/role presets, agent sets, and project tabs. Covers exact-model restoration, tab creation and ordering, keyboard-aware input focus on touch devices, shortcuts and swipes, AI Commit, and file AI actions that prepare titled reference-only drafts without submitting them."
+description: "Runtime/model/effort/role presets, agent sets, and project tabs. Covers exact-model restoration, tab creation and ordering, tab-bar focus indication, keyboard-aware input focus, shortcuts and swipes, AI Commit, and file AI actions that prepare titled reference-only drafts without submitting them."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -28,6 +28,7 @@ description: "Runtime/model/effort/role presets, agent sets, and project tabs. C
 
 - Provide agent set creation, editing, and selection, along with per-project tab and tab name management.
 - Switching with `Ctrl/Cmd+1…9` or the previous/next tab shortcuts also moves keyboard focus to the selected tab. Pressing `Ctrl/Cmd+W` afterward closes the active tab in the same agent group. Closing uses the same last pointerdown/focusin target as new-tab creation and restoration, so selecting an empty agent area does not close an editor tab even if actual focus remains in the editor or moves to body. Do not close tabs for hidden, inert, or removed targets, or during a modal, IME composition, or repeated input.
+- When the agent or terminal tab bar itself has visible focus, draw its focus border above the panel handle and tabs without intercepting pointer input.
 - Pressing `Ctrl/Cmd+N`, `Ctrl/Cmd+T`, or `Alt+N` in an agent panel, including a new-file shortcut reassigned in settings, opens the same runtime/agent set selection screen as that group's `+`. This also works in conversation input, the tab bar, detached panels, and CLI TUIs; in the editor and file explorer, it opens the existing new-file name input. Do not open a new tab during a modal, IME composition, or key repeat. Fullscreen conditions for browser-reserved keys follow the [Common Shortcut Contract](../../development/ui-editor-input.md#focus-based-tab-shortcuts).
 - `Ctrl/Cmd+Shift+T` reopens tabs in the current root's agent panel, starting with the most recently closed. It preserves the name, runtime, working directory, agent set, tab order, and ACP conversation ID, and continues a saved conversation through the existing restoration flow if one exists. A TUI opens a new process with the same settings. This also works in empty panels, detached panels, conversation input, and the tab bar.
 - Do not restore if there is no closed-tab history or during a modal, IME composition, or key repeat. Do not record entries when closing an active task is canceled in the confirmation dialog or when only the panel is hidden. Keep up to 50 entries in memory for the current screen, selecting recent entries separately from terminal history. Clear the history on refresh or root/account switching.
