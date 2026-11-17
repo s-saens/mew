@@ -38,7 +38,7 @@ export function githubProvider(request: typeof fetch = fetch, clientId = () => p
     configured: () => !!clientId().trim(),
     async begin() {
       if (!clientId().trim()) throw new GitConnectionError('서버에 MEW_GITHUB_CLIENT_ID를 설정하고 앱의 Device flow를 활성화하세요.', 503, 'git-provider-unconfigured')
-      const data = await post('device/code', { scope: 'repo read:user' })
+      const data = await post('device/code', { scope: 'repo read:user workflow' })
       if (typeof data.device_code !== 'string' || typeof data.user_code !== 'string' || !/^[A-Z0-9-]{4,32}$/.test(data.user_code) || data.verification_uri !== 'https://github.com/login/device') throw new Error('GitHub 승인 코드를 받지 못했습니다. 앱의 Device flow 설정을 확인하세요.')
       return { deviceCode: data.device_code, code: data.user_code, verificationUrl: data.verification_uri, expiresIn: Math.min(Number(data.expires_in) || 900, 900), interval: Math.max(Number(data.interval) || 5, 5) }
     },

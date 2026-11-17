@@ -2,7 +2,7 @@
 title: "Per-account Git connections and execution"
 created: 2026-09-29
 updated: "2026-11-17"
-description: "Per-account GitHub authorization, encrypted storage, and Git command boundaries across the Git panel, terminals, and agents. Covers scoped credentials, author identity, incidental commits, managed cloning, and local-ref attribution."
+description: "Per-account GitHub authorization and OAuth workflow scope, encrypted storage, and Git command boundaries across the Git panel, terminals, and agents. Covers credentials, author identity, incidental commits, managed cloning, and local-ref attribution."
 상위파일: "MOC.md"
 ---
 
@@ -21,6 +21,7 @@ description: "Per-account GitHub authorization, encrypted storage, and Git comma
 
 - `GET /api/git-connections/github`: Returns configuration availability, the user’s own connected account, and the user’s own login operation.
 - `POST` on the same path: Starts the OAuth device flow or resumes the user’s own in-progress operation. Different accounts can proceed concurrently. Uses the built-in public Client ID by default, replacing it if `MEW_GITHUB_CLIENT_ID` contains a non-whitespace value. Token requests follow the provider’s interval, slow_down, and expiration rules.
+- GitHub device authorization requests `repo`, `read:user`, and `workflow`; the last permits workflow file changes within the account's existing repository access. Connections authorized before this scope was requested need a fresh authorization to gain it. Users may decline requested scopes. See [Decision 0186](../decisions/0186-github-workflow-scope.md).
 - `DELETE` on the same path: Removes the connection and in-progress operation. Tokens arriving late are not stored, even if cancellation occurs just before completion.
 - `POST /:id/stop`: Cancels the user’s own operation. `POST /:id/browser`: Opens the fixed GitHub authorization URL in the [login virtual screen](login-desktop.md). Uses the same git or filesWrite permission as connection operations.
 - The connection API requires login and the git or filesWrite capability. As a personal integration setting, it does not require access to all repository files. Existing project and capability permission checks for actual Git APIs remain in place. The old `/api/git/github-auth` path is a compatibility path that retains the existing Git capability and full-project access checks.
@@ -45,6 +46,7 @@ description: "Per-account GitHub authorization, encrypted storage, and Git comma
 
 - `POST /api/git/remote` with `Accept: application/x-ndjson` streams `progress`, `complete`, and `error` only once Git runs. Authentication/workspace/remote validation retains HTTP errors before streaming, including 428 for login.
 - Run Git with `--progress` and `LC_ALL=C`; extract only phase, percentage, and object counters from stderr, never raw logs, URLs, or credentials. Send `complete` only on successful exit: 100% transfer is not remote success. Client disconnects neither rerun nor forcibly stop Git. Preserve regular JSON responses.
+- Recognize GitHub's OAuth workflow-scope rejection and instruct the user to reconnect; other Git errors retain the generic failure message. Never return raw Git stderr.
 - Pass credentials only through a temporary Unix socket/helper accepting the exact HTTPS host/repository path. Exclude OS helpers, global/system configuration, extra authentication headers, cookies, interactive prompts, and HTTP redirects. Remove the socket on exit. This route supports Linux, macOS, and WSL.
 ### Managed project cloning and repository listing
 

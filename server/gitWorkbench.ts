@@ -1,6 +1,7 @@
 import { changedFromIp } from './change-ip.ts'
 import { gitOriginLink } from './git-origin-link.ts'
 import { gitProgressParser, type GitRemoteProgress } from '../shared/git-remote-progress.ts'
+import { remoteGitFailure } from './git-remote-error.ts'
 import { currentGitEnv, gitRequestContext, gitWriteEnvironment, providerRemote, requireGitConnection, withGitCredential } from './git-execution.ts'
 import { GitConnectionError, gitConnections, gitIdentityEnv } from './git-connections.ts'
 import fs from 'node:fs'
@@ -446,7 +447,7 @@ export async function runRemoteAction(project: string, relPath: string, action: 
   remoteOperations.add(key)
   const execute = (args: string[], env: NodeJS.ProcessEnv) => new Promise<void>((resolve, reject) => {
     onProgress?.({ phase: 'connecting' })
-    const child = execFile('git', args, { cwd: abs, env: { ...env, LC_ALL: 'C' }, encoding: 'utf8', timeout: 120_000, maxBuffer: 2_000_000 }, error => error ? reject(error) : resolve())
+    const child = execFile('git', args, { cwd: abs, env: { ...env, LC_ALL: 'C' }, encoding: 'utf8', timeout: 120_000, maxBuffer: 2_000_000 }, (error, _stdout, stderr) => error ? reject(Object.assign(error, { stderr })) : resolve())
     if (onProgress) child.stderr?.on('data', gitProgressParser(onProgress))
   })
   try {
@@ -472,7 +473,7 @@ export async function runRemoteAction(project: string, relPath: string, action: 
           ? ['pull', '--progress', '--ff-only', '--no-rebase', '--no-autostash', '--', target.url, ref]
           : ['push', '--progress', '--no-force', '--no-follow-tags', '--recurse-submodules=no', '--', target.url, `HEAD:${ref}`])]
         try { await execute(args, env) }
-        catch { throw new GitConnectionError('Git 원격 작업에 실패했습니다. 저장소 권한·SSO 승인·브랜치 상태와 연결을 확인하세요.', 409, 'git-remote-failed') }
+        catch (error) { throw remoteGitFailure(error) }
       }) } catch (error) {
         if (error instanceof GitConnectionError && error.status === 428 && context.owner && gitConnections.get(context.owner, connection.provider, connection.host)?.id === connection.id) gitConnections.remove(context.owner, connection.provider, connection.host)
         throw error

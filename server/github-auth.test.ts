@@ -90,6 +90,7 @@ test('GitHub device adapter sends documented OAuth fields and derives a private 
   const provider = githubProvider(request, () => 'client-id')
   const device = await provider.begin(); const token = await provider.poll(device.deviceCode)
   assert.equal(token.state, 'complete')
+  assert.equal(new URLSearchParams(String(calls[0].init!.body)).get('scope'), 'repo read:user workflow')
   assert.equal(new URLSearchParams(String(calls[1].init!.body)).get('grant_type'), 'urn:ietf:params:oauth:grant-type:device_code')
   const account = await provider.identify('secret')
   assert.equal(account.identity.email, '123+octocat@users.noreply.github.com')
