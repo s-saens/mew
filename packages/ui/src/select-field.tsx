@@ -14,19 +14,64 @@ type SelectFieldProps = {
 } & ({ multiple?: false; editable?: boolean; value: string; onChange: (value: string) => void }
   | { multiple: true; editable?: false; value: string[]; onChange: (value: string[]) => void })
 
+const SELECT_OPEN_DURATION = 160
+const SELECT_CLOSE_DURATION = 120
+const SELECT_OPEN_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)'
+const SELECT_CLOSE_EASING = 'cubic-bezier(0.4, 0, 1, 1)'
+const SELECT_CLOSED_FRAME = { opacity: 0, transform: 'scaleY(0.25)' }
+const SELECT_OPEN_FRAME = { opacity: 1, transform: 'scaleY(1)' }
+
 /** Themed selection. Focus stays on the trigger, including inside dialogs. */
 export function SelectField({ id: fieldId, label, value, options, disabled = false, editable = false, compact = false, className = 'w-full min-w-0', portalContainer, onChange, multiple, triggerContent, triggerClassName, popupWidth, popupClassName, placeholder }: SelectFieldProps) {
   const id = useId()
   const trigger = useRef<HTMLButtonElement>(null), menu = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null), field = useRef<HTMLDivElement>(null)
-  const [open, setOpen] = useState(false), [active, setActive] = useState(0)
+  const [open, setOpen] = useState(false), [closing, setClosing] = useState(false), [active, setActive] = useState(0)
   const [position, setPosition] = useState<CSSProperties | null>(null)
   const search = useRef({ text: '', at: 0 })
+  const animation = useRef<Animation | null>(null)
+  const snapshot = useRef<{ opacity: number; transform: string } | null>(null)
   const isSelected = (option: SelectOption) => multiple ? value.includes(option.value) : option.value === value
   const expanded = open && !disabled
-  const close = () => setOpen(false)
+  const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const readFrame = () => {
+    const view = menu.current?.ownerDocument.defaultView
+    if (!menu.current || !view) return null
+    const style = view.getComputedStyle(menu.current)
+    const opacity = Number.parseFloat(style.opacity)
+    return { opacity: Number.isFinite(opacity) ? opacity : 1, transform: !style.transform || style.transform === 'none' ? 'scaleY(1)' : style.transform }
+  }
+  const openMenu = () => {
+    if (closing && menu.current) snapshot.current = readFrame()
+    setClosing(false)
+    setOpen(true)
+  }
+  const close = () => {
+    if (!open) return
+    if (disabled || !menu.current?.animate || reducedMotion()) {
+      animation.current?.cancel(); animation.current = null; snapshot.current = null
+      setClosing(false); setOpen(false); setPosition(null)
+      return
+    }
+    snapshot.current = readFrame()
+    setClosing(true); setOpen(false)
+  }
   useOverlayDismiss(expanded && close)
-  useEffect(() => { if (disabled) setOpen(false) }, [disabled])
+  useEffect(() => {
+    if (!disabled) return
+    animation.current?.cancel(); animation.current = null; snapshot.current = null
+    setClosing(false); setOpen(false); setPosition(null)
+  }, [disabled])
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const stop = () => {
+      animation.current?.cancel(); animation.current = null; snapshot.current = null
+      setClosing(false)
+    }
+    const onChange = () => { if (media.matches) stop() }
+    media.addEventListener('change', onChange)
+    return () => { media.removeEventListener('change', onChange); animation.current?.cancel(); animation.current = null }
+  }, [])
   useLayoutEffect(() => {
     if (!expanded) return
     const place = () => {
@@ -55,7 +100,8 @@ export function SelectField({ id: fieldId, label, value, options, disabled = fal
       const position = { left: Math.max(left + 8, Math.min(rect.left, left + width - menuWidth - 8)),
         width: menuWidth, maxHeight: Math.max(0, Math.min(280, down ? below : above)),
         ...(down ? { top: rect.bottom + 4 } : { bottom: (local ? height : window.innerHeight) - rect.top + 4 }) }
-      setPosition(local ? { ...position, position: 'absolute' } : layout.toStyle(position))
+      const style = local ? { ...position, position: 'absolute' as const } : layout.toStyle(position)
+      setPosition({ ...style, transformOrigin: down ? 'top' : 'bottom' })
     }
     const outside = (event: PointerEvent) => {
       const target = event.target as Node
@@ -86,14 +132,55 @@ export function SelectField({ id: fieldId, label, value, options, disabled = fal
     }
   }, [expanded, options.length, portalContainer, popupWidth])
   const positioned = position !== null
-  useEffect(() => {
-    if (expanded) menu.current?.children[active]?.scrollIntoView({ block: 'nearest' })
+  useLayoutEffect(() => {
+    if (expanded && positioned) menu.current?.children[active]?.scrollIntoView({ block: 'nearest' })
   }, [expanded, active, positioned])
+  useLayoutEffect(() => {
+    if (!expanded && !closing) {
+      if (positioned) setPosition(null)
+      return
+    }
+    const element = menu.current
+    if (!element || !positioned) return
+    animation.current?.cancel(); animation.current = null
+    if (reducedMotion() || !element.animate) {
+      snapshot.current = null
+      if (closing) { setClosing(false); setPosition(null) }
+      return
+    }
+    if (expanded) {
+      const from = snapshot.current ?? SELECT_CLOSED_FRAME
+      snapshot.current = null
+      const current = element.animate([from, SELECT_OPEN_FRAME], {
+        duration: SELECT_OPEN_DURATION,
+        easing: SELECT_OPEN_EASING,
+      })
+      animation.current = current
+      current.onfinish = current.oncancel = () => {
+        if (animation.current === current) animation.current = null
+      }
+      return
+    }
+    const from = snapshot.current ?? SELECT_OPEN_FRAME
+    snapshot.current = null
+    const current = element.animate([from, SELECT_CLOSED_FRAME], {
+      duration: SELECT_CLOSE_DURATION,
+      easing: SELECT_CLOSE_EASING,
+      fill: 'forwards',
+    })
+    animation.current = current
+    current.onfinish = current.oncancel = () => {
+      if (animation.current !== current) return
+      animation.current = null
+      setClosing(false)
+      setPosition(null)
+    }
+  }, [expanded, closing, positioned])
   const show = () => {
     const selected = options.findIndex(option => isSelected(option) && !option.disabled)
     setActive(selected >= 0 ? selected : editable ? -1 : options.findIndex(option => !option.disabled))
     search.current = { text: '', at: 0 }
-    setOpen(true)
+    openMenu()
   }
   const pick = (index: number) => {
     const option = options[index]
@@ -163,7 +250,7 @@ export function SelectField({ id: fieldId, label, value, options, disabled = fal
         <input ref={input} {...accessibility} value={value} placeholder={placeholder} disabled={disabled} autoComplete="off" spellCheck={false}
           className="min-w-0 flex-1 rounded bg-transparent px-2.5 focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60"
           onClick={() => { if (!expanded) show() }} onKeyDown={onKeyDown}
-          onChange={event => { if (!multiple) { setActive(-1); setOpen(true); onChange(event.target.value) } }} />
+          onChange={event => { if (!multiple) { setActive(-1); openMenu(); onChange(event.target.value) } }} />
         <button type="button" tabIndex={-1} aria-label={label} aria-expanded={expanded} aria-controls={expanded ? id : undefined}
           disabled={disabled} className={`flex shrink-0 items-center justify-center rounded hover:bg-surface-hover disabled:opacity-60 ${compact ? 'w-8 pointer-coarse:w-11' : 'w-11'}`}
           onPointerDown={event => event.preventDefault()}
@@ -179,9 +266,13 @@ export function SelectField({ id: fieldId, label, value, options, disabled = fal
         {triggerContent ?? <><span className="min-w-0 flex-1 truncate">{multiple ? options.filter(isSelected).map(option => option.label).join(', ') || label : options.find(isSelected)?.label ?? value}</span>{chevron}</>}
       </button>}
     </div>
-    {expanded && position && createPortal(<div ref={menu} id={id} role="listbox" aria-label={label} aria-multiselectable={multiple || undefined} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget) && event.relatedTarget !== trigger.current && event.relatedTarget !== input.current) close() }} style={position}
-      className={`fixed z-[1201] overflow-y-auto overscroll-contain rounded border border-edge-bright bg-surface-raised py-1 text-sm shadow-xl ${popupClassName ?? ''}`}>
-      {options.map((option, index) => <div key={option.value} id={`${id}-${index}`} role="option" aria-label={option.label} aria-selected={isSelected(option)} aria-disabled={option.disabled || undefined}
+    {(expanded || closing) && position && createPortal(<div ref={menu} id={expanded ? id : undefined} role={expanded ? 'listbox' : undefined} aria-hidden={!expanded || undefined}
+      aria-label={expanded ? label : undefined} aria-multiselectable={expanded && multiple ? true : undefined}
+      onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget) && event.relatedTarget !== trigger.current && event.relatedTarget !== input.current) close() }}
+      data-state={expanded ? 'open' : 'closed'} data-placement={position.transformOrigin === 'bottom' ? 'top' : 'bottom'} style={position}
+      className={`mew-overlay-surface fixed z-[1201] overflow-y-auto overscroll-contain rounded border border-edge-bright bg-surface-raised py-1 text-sm shadow-xl ${expanded ? '' : 'pointer-events-none '} ${popupClassName ?? ''}`}>
+      {options.map((option, index) => <div key={option.value} id={expanded ? `${id}-${index}` : undefined} role={expanded ? 'option' : undefined}
+        aria-label={expanded ? option.label : undefined} aria-selected={expanded ? isSelected(option) : undefined} aria-disabled={expanded && option.disabled ? true : undefined}
         data-active={active === index || undefined}
         onPointerDown={event => event.preventDefault()} onClick={() => { setActive(index); pick(index) }}
         className={`flex items-center gap-2 px-2.5 ${multiple && compact ? 'min-h-8 text-xs pointer-coarse:min-h-11' : 'min-h-11'} ${option.disabled ? 'cursor-default text-ink-muted' : 'cursor-pointer text-ink hover:bg-surface-hover'} ${active === index ? 'bg-surface-hover' : ''}`}>
