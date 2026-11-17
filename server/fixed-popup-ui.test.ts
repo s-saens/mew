@@ -68,6 +68,7 @@ function Fixture(){
     <SelectField label="Folder order" value={value} options={options} onChange={setValue} portalContainer={nested?portal:host}/>
     <button id="actions" onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();setAction({x:rect.left,y:rect.bottom,trigger:event.currentTarget})}}>Actions</button>
     <HoverTipLayer placement="bottom" portalTarget={nested?portal:host}><button id="help" data-tip="Order options">Help</button></HoverTipLayer>
+    <HoverTipLayer><button id="outer-tip" data-tip="Outer">Outer</button><HoverTipLayer placement="bottom"><button id="inner-tip" data-tip="Project commands"><span>Commands</span></button></HoverTipLayer></HoverTipLayer>
    </div>
   </div>
   {action&&<ActionMenu {...action} portalContainer={nested?portal:host} label="File actions" onClose={()=>setAction(null)}>
@@ -101,6 +102,20 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         html:not(.dark) #dialog[data-effect="theme"]{backdrop-filter:blur(6px)}
         @media(max-width:767px){#dialog{left:16px;top:80px;width:calc(100vw - 32px)}}
       </style><div id="root"></div><script src="/app.js"></script></html>` }))
+    await page.goto('http://mew-fixed-popup.test/')
+    await page.locator('#outer-tip').hover()
+    assert.equal(await page.getByRole('tooltip').innerText(), 'Outer')
+    await page.locator('#inner-tip span').hover()
+    assert.equal(await page.getByRole('tooltip').count(), 1)
+    assert.equal(await page.getByRole('tooltip').innerText(), 'Project commands')
+    const inner = await page.locator('#inner-tip').boundingBox(), innerTip = await page.getByRole('tooltip').boundingBox()
+    assert.ok(inner && innerTip && innerTip.y >= inner.y + inner.height, 'inner placement controls the tooltip')
+    await page.locator('#inner-tip').click()
+    assert.equal(await page.getByRole('tooltip').count(), 0)
+    await page.locator('#outer-tip').hover()
+    assert.equal(await page.getByRole('tooltip').innerText(), 'Outer')
+    await page.mouse.move(1, 1)
+    assert.equal(await page.getByRole('tooltip').count(), 0)
     for (const effect of ['none', 'blur', 'filter', 'translate', 'scale']) {
       for (const bottom of [false, true]) {
         for (const nested of [false, true]) {

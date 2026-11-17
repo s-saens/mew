@@ -64,7 +64,7 @@ export function HoverTipLayer({ className, children, placement = 'top', portalTa
   function onPointerOver(e: React.PointerEvent) {
     if (e.pointerType !== 'mouse') return
     const el = closestTipEl(e.target)
-    if (!el || el === shownForRef.current) return
+    if (!el || el.closest('[data-hover-tip-layer]') !== e.currentTarget || el === shownForRef.current) return
     shownForRef.current = el
     const r = el.getBoundingClientRect()
     setTip({ label: el.getAttribute('data-tip')!, centerX: r.left + r.width / 2, top: placement === 'bottom' ? r.bottom + GAP_PX : r.top - GAP_PX, height: r.height })
@@ -86,7 +86,7 @@ export function HoverTipLayer({ className, children, placement = 'top', portalTa
   }
 
   return (
-    <div className={className} onPointerOver={onPointerOver} onPointerOut={onPointerOut} onPointerDownCapture={hide} onScrollCapture={hide}>
+    <div data-hover-tip-layer className={className} onPointerOver={onPointerOver} onPointerOut={onPointerOut} onPointerDownCapture={hide} onScrollCapture={hide}>
       {children}
       {tip &&
         createPortal(

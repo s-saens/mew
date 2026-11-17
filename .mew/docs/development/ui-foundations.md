@@ -1,6 +1,6 @@
 ---
 title: "UI foundations, themes, and copy"
-description: "Shared visual foundations for compact layouts, icons, scrollbars with batched geometry reads and deduplicated style writes, theme colors, UI copy, and translations with a canonical lightweight startup subset. Defines reusable presentation rules while feature documents retain their requirements."
+description: "Shared visual foundations for compact layouts, icons, nested tooltip ownership, scrollbars, theme colors, UI copy, and translations with a canonical lightweight startup subset. Defines reusable presentation rules while feature documents retain their requirements."
 created: "2026-11-03"
 updated: "2026-11-16"
 상위파일: "ui-contracts.md"
@@ -46,7 +46,7 @@ Even when using design skills such as `impeccable`, prioritize this project's ta
 
 Prefer existing icons for familiar actions: close, refresh, copy, cancel, and disconnect. Use X to close popups. Supply translated `aria-label` and `data-tip` names through the shared `HoverTipLayer`; mark the icon `aria-hidden`. Preserve keyboard focus and disabled, in-progress, and completed states. Retain short labels when an icon cannot clearly convey the primary action, target, or result, such as login or authorization. Do not convert every button mechanically or shrink interaction areas excessively.
 
-`HoverTipLayer` handles all `data-tip` attributes assigned to HTML elements and SVG lines and points. It immediately displays names on mouse hover, shows no tooltips for touch input, and hides them on pointer press, scrolling within the layer, or pointer exit. Tooltips use `--layer-tooltip` (1900 fallback), flip above or below when needed, and clamp to the portal host's visible bounds. Callers inside menus pass the menu's portal container so the tooltip remains in the same dialog or fullscreen host. SVG interaction targets also provide separate accessible names and keyboard behavior.
+`HoverTipLayer` handles all `data-tip` attributes assigned to HTML elements and SVG lines and points. When layers are nested, the closest layer to the target owns its tooltip and placement, so the target produces one tooltip. It immediately displays names on mouse hover, shows no tooltips for touch input, and hides them on pointer press, scrolling within the layer, or pointer exit. Tooltips use `--layer-tooltip` (1900 fallback), flip above or below when needed, and clamp to the portal host's visible bounds. Callers inside menus pass the menu's portal container so the tooltip remains in the same dialog or fullscreen host. SVG interaction targets also provide separate accessible names and keyboard behavior.
 
 Panel and file explorer close buttons follow the task header: a 24×24px interaction area, a 14×14px `Xmark`, vertical centering in a 36px-high header, and a 4px right margin. They share icons, sizing, focus, and common tooltips through `PanelCloseButton`, without adding duplicate right padding to the header.
 
