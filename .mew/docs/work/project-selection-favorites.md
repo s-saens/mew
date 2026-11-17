@@ -1,6 +1,6 @@
 ---
 title: "Project selection favorites transition"
-description: "Records the incomplete transition from My/All project selection to a single account-starred catalog, local checks, default-collapsed nested project selection, and remaining regressions."
+description: "Records the incomplete transition to a single account-starred catalog, default-collapsed nested projects, sibling reordering and hierarchy guides, local checks, and remaining regressions."
 created: "2026-11-16"
 updated: "2026-11-17"
 ---
@@ -16,3 +16,9 @@ Local verification: `node --test src/utils/project-workspace-view.test.ts` passe
 The project selection catalog starts nested projects collapsed beneath their nearest registered parent, including projects with different favorite status. Search temporarily reveals matching descendants and ancestors, then restores expansion choices when cleared. Visible sibling reordering remains available while branches are collapsed. See the [project selection contract](../features/projects-files-search/opening-projects-tabs-and-groups.md).
 
 Local verification passed the new desktop/mobile browser regression, catalog snapshot tests, hierarchy tests, the project build, and lint with warnings. The separate project-add browser test failed at its existing catalog request count assertion (four requests versus two expected); the prior catalog already issues snapshot and discovery requests separately. The documentation check reported 39 existing link errors. No deployment or server restart was performed.
+
+## Nested project reordering and guides — 2026-11-17
+
+The selector keeps hierarchy based on actual paths. Reordering is limited to siblings with the same favorite status, and the drag preview reflects valid drop positions. Handles align along the left edge, vertical guides show ancestor levels, and rows without children reserve the expansion-control space. The current behavior is defined in the [project selection contract](../features/projects-files-search/opening-projects-tabs-and-groups.md).
+
+Local Chromium tests covered mouse and touch dragging, keyboard movement, expanded subtrees, invalid destinations, and guides at 320, 390, and 1100 pixels. The shared tab drag test and build passed; lint completed with warnings. Documentation descriptions passed, while the link check reported 39 existing errors. No deployment or server restart was performed. Physical-device verification remains outstanding.

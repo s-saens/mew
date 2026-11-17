@@ -115,17 +115,31 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
     }
     return true
   })
-  function reorder(from: number, to: number) {
-    if (!selection || search || from === to || to < 0 || to >= renderedRows.length) return
+  function canReorder(from: number, to: number) {
     const source = renderedRows[from], target = renderedRows[to]
-    if (favoriteSet.has(source.path) !== favoriteSet.has(target.path) || source.parentPath !== target.parentPath) return
+    return !!(selection && !search && source && target && from !== to
+      && (!favoriteSet.has(source.path) || onFavoritesChange)
+      && favoriteSet.has(source.path) === favoriteSet.has(target.path) && source.parentPath === target.parentPath)
+  }
+  function reorder(from: number, to: number) {
+    if (!canReorder(from, to)) return
+    const source = renderedRows[from], target = renderedRows[to]
     const list = favoriteSet.has(source.path) ? rows.filter(row => favoriteSet.has(row.path)).map(row => row.path) : rows.filter(row => !favoriteSet.has(row.path)).map(row => row.path)
     const sourceIndex = list.indexOf(source.path), targetIndex = list.indexOf(target.path)
     list.splice(targetIndex, 0, list.splice(sourceIndex, 1)[0])
+    const orderedPaths = favoriteSet.has(source.path) ? [...list, ...otherPaths] : [...paths.filter(path => allPaths.includes(path)), ...list]
+    const renderedPaths = new Set(renderedRows.map(row => row.path))
+    const movedIndex = projectHierarchy(orderedPaths).filter(row => renderedPaths.has(row.path)).findIndex(row => row.path === source.path)
     if (favoriteSet.has(source.path)) onFavoritesChange?.(list)
     else setOtherOrder(list)
+    return movedIndex
   }
-  const drag = useDragReorder({ axis: 'y', handleOnly: true, onReorder: reorder })
+  function moveSibling(from: number, direction: -1 | 1) {
+    for (let to = from + direction; to >= 0 && to < renderedRows.length; to += direction) {
+      if (canReorder(from, to)) { reorder(from, to); return }
+    }
+  }
+  const drag = useDragReorder({ axis: 'y', handleOnly: true, canReorder, onReorder: reorder })
   const duplicates = new Set(projects?.filter((project, index, all) => all.some((other, otherIndex) => index !== otherIndex && other.name === project.name)).map(project => project.name))
 
   return <HoverTipLayer className="mew-project-catalog">
@@ -141,9 +155,14 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
           const project = byPath.get(row.path)!
           const mine = paths.includes(row.path) || imported.has(row.path)
           const showPath = !project.inManagedRoot || duplicates.has(project.name)
-          return <div key={row.path} ref={selection ? ref : undefined} data-catalog-project={row.path} data-project-depth={row.depth} data-active={row.path === activePath || undefined} className="mew-project-catalog-row" style={{ paddingLeft: Math.min(row.depth, 5) * 12 }}>
-            {selection && <MenuReorderHandle {...handleProps} aria-label={`${project.name} · ${t('project.reorder')}`} onMove={direction => reorder(visualIndex, visualIndex + direction)} />}
+          const indent = Math.min(row.depth, 5)
+          return <div key={row.path} ref={selection ? ref : undefined} data-catalog-project={row.path} data-project-depth={row.depth} data-active={row.path === activePath || undefined} className="mew-project-catalog-row">
+            {selection && <MenuReorderHandle {...handleProps} aria-label={`${project.name} · ${t('project.reorder')}`} onMove={direction => moveSibling(visualIndex, direction)} />}
+            {indent > 0 && <span aria-hidden="true" className="mew-project-catalog-indent" style={{ width: indent * 14 }}>
+              {Array.from({ length: indent }, (_, index) => <span key={index} data-project-tree-guide className="mew-project-catalog-guide" style={{ left: index * 14 + 7 }} />)}
+            </span>}
             {selection && hasChildren && <button type="button" className="mew-project-catalog-pin" aria-label={`${project.name} · ${search || expanded.has(row.path) ? '−' : '+'}`} aria-expanded={!!search || expanded.has(row.path)} disabled={!!search} onClick={() => setExpanded(previous => { const next = new Set(previous); if (next.has(row.path)) next.delete(row.path); else next.add(row.path); return next })}>{search || expanded.has(row.path) ? <NavArrowDown width={14} /> : <NavArrowRight width={14} />}</button>}
+            {selection && !hasChildren && <span aria-hidden="true" className="mew-project-catalog-expander-space" />}
             <button type="button" disabled={busy} title={project.path} onClick={() => { discoveryRequest.current?.abort(); setLoading(false); if (selection) void onOpen(project.path); else void importProject(project) }} onContextMenu={event => onContextMenu?.(project.path, event)} className="mew-project-catalog-open"
               aria-label={`${project.name}${showPath ? ` (${project.path})` : ''} · ${t(mine ? 'project.inMine' : 'project.addToMine')}`}>
               <ProjectIcon icon={project.icon ?? 'i:folder'} size={16} />

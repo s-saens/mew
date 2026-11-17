@@ -71,16 +71,19 @@ export function useDragReorder({
   immediateMouseDrag = false,
   axis = 'x',
   handleOnly = false,
+  canReorder,
   onLongPress,
   onDragStart,
   onDragMove,
   onDrop,
 }: {
-  onReorder: (from: number, to: number) => void
+  onReorder: (from: number, to: number) => number | void
   immediateMouseDrag?: boolean
   axis?: 'x' | 'y'
   /** Dedicated handles can drag immediately on touch; their CSS must use touch-action: none. */
   handleOnly?: boolean
+  /** Restrict live reorder targets before moving or animating any items. */
+  canReorder?: (from: number, to: number) => boolean
   /** 터치 길게누르기 시점(이동 전) — 컨텍스트 메뉴 열기 등에 쓴다 */
   onLongPress?: (index: number, x: number, y: number) => void
   /** 실제 드래그 이동이 시작될 때 — 길게누르기로 연 메뉴 닫기 등에 쓴다 */
@@ -168,7 +171,7 @@ export function useDragReorder({
   function targetIndexFor(clientX: number, cur: number): number {
     let target = cur
     for (const [idx, el] of itemsRef.current) {
-      if (idx === cur) continue
+      if (idx === cur || canReorder && !canReorder(cur, idx)) continue
       const r = reorderLayoutRect(el)
       const mid = axis === 'x' ? r.left + r.width / 2 : r.top + r.height / 2
       if (idx < cur && clientX < mid) target = Math.min(target, idx)
@@ -184,9 +187,9 @@ export function useDragReorder({
     const target = targetIndexFor(clientX, state.index)
     if (target === state.index) return
     captureReorder()
-    onReorder(state.index, target)
-    state.index = target
-    setDragIndex(target)
+    const movedIndex = onReorder(state.index, target) ?? target
+    state.index = movedIndex
+    setDragIndex(movedIndex)
   }
 
   // rAF 콜백은 루프를 시작한 렌더의 클로저에 갇힌다 — 항상 최신 onReorder를 타도록 ref로 건너 잡는다
