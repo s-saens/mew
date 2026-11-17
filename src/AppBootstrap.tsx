@@ -11,9 +11,11 @@ import { StartupScreen } from './components/startup-screen'
 import { getAppRuntime } from './runtime/app-runtime'
 import { WorkspaceErrorScreen } from './components/app-error-boundary'
 import { FirstOwnerSetup } from './components/FirstOwnerSetup'
+import { deferredDialog } from './components/deferred-dialog'
 
 type WorkspaceComponent = typeof import('./App.tsx')['default']
 const startupScreen = <StartupScreen />
+const FirstRunRemoteAccess = deferredDialog(async () => ({ default: (await import('./components/remote-access-settings')).RemoteAccessModal }), { title: () => 'Mewlink', className: 'flex max-h-[90dvh] max-w-2xl flex-col' })
 /** Consume launcher credentials before any workspace or account UI can use the URL. */
 function consumeFirstOwnerSetupToken(): string | null {
   const fragment = new URLSearchParams(window.location.hash.slice(1))
@@ -35,6 +37,7 @@ export default function AppBootstrap({ initialAuth }: { initialAuth?: AuthStatus
   const [loginOpen, setLoginOpen] = useState(false)
   const [setupToken, setSetupToken] = useState(capturedSetupToken)
   const [setupLoginRequired, setSetupLoginRequired] = useState(false)
+  const [remoteWelcomeOpen, setRemoteWelcomeOpen] = useState(false)
   const [Workspace, setWorkspace] = useState<WorkspaceComponent | null>(null)
   const [workspaceFailure, setWorkspaceFailure] = useState<string | null>(null)
   const workspaceAllowed = !!auth && !auth.setupRequired && !setupLoginRequired && (!isRemoteMode() || auth.authenticated && !auth.mustChangePassword)
@@ -86,7 +89,7 @@ export default function AppBootstrap({ initialAuth }: { initialAuth?: AuthStatus
   }, [workspaceAllowed, workspaceIdentity, Workspace])
 
   if (!auth) return startupScreen
-  if (auth.setupRequired) return <FirstOwnerSetup token={setupToken} onSuccess={applyAuth} onInitialized={status => { applyAuth(status); setSetupLoginRequired(!status.authenticated) }} />
+  if (auth.setupRequired) return <FirstOwnerSetup token={setupToken} onSuccess={status => { setRemoteWelcomeOpen(status.authenticated && status.role === 'owner'); applyAuth(status) }} onInitialized={status => { applyAuth(status); setSetupLoginRequired(!status.authenticated) }} />
   if ((isRemoteMode() || setupLoginRequired) && (!auth.authenticated || auth.mustChangePassword)) {
     return <LoginPage dismissible={false} initialMustChangePassword={auth.mustChangePassword} onClose={() => {}} onSuccess={status => { setSetupLoginRequired(false); applyAuth(status) }} />
   }
@@ -100,6 +103,7 @@ export default function AppBootstrap({ initialAuth }: { initialAuth?: AuthStatus
       auth={auth}
       refreshing={refreshing}
       onLoggedOut={() => {
+        setRemoteWelcomeOpen(false)
         const onLoggedOut = getAppRuntime().onLoggedOut
         if (onLoggedOut) onLoggedOut()
         else applyAuth(GUEST_AUTH)
@@ -107,6 +111,7 @@ export default function AppBootstrap({ initialAuth }: { initialAuth?: AuthStatus
       onRequestLogin={() => setLoginOpen(true)}
       onProfileChanged={(profile) => setAuth((current) => current ? { ...current, ...profile } : current)}
     />
+    {remoteWelcomeOpen && auth.authenticated && auth.role === 'owner' && <FirstRunRemoteAccess onClose={() => setRemoteWelcomeOpen(false)} />}
     {loginOpen && <LoginPage onClose={() => setLoginOpen(false)} onSuccess={(status) => { applyAuth(status); setLoginOpen(false) }} />}
   </>
 }

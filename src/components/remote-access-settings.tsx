@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Check, Copy, Link, LogOut, OpenNewWindow, RefreshDouble, Xmark } from 'iconoir-react'
 import { DialogFrame, HoverTipLayer } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import type { RemoteStatus } from '../../shared/remote-access.ts'
 import { mewFetch, isRemoteMode } from '../utils/remote-transport.ts'
+import { useI18n } from '../i18n'
+import { remoteAccessMethodsCopy } from './remote-access-methods-copy'
 export function RemoteAccessSettings() {
   const [status, setStatus] = useState<RemoteStatus | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [copied, setCopied] = useState(false), [confirm, setConfirm] = useState(false)
   async function request(method = 'GET', suffix = '') {
@@ -64,13 +66,56 @@ export function RemoteAccessSettings() {
 }
 
 export function RemoteAccessModal({ onClose }: { onClose: () => void }) {
-  return <DialogFrame labelledBy="mewlink-title" onClose={onClose} className="max-w-lg max-h-[90dvh] overflow-y-auto">
-    <HoverTipLayer>
+  const { locale } = useI18n()
+  const copy = remoteAccessMethodsCopy[locale]
+  const id = useId()
+  const methods = ['mewlink', 'tailscale', 'cloudflare'] as const
+  const names = { mewlink: 'Mewlink', tailscale: 'Tailscale', cloudflare: 'Cloudflare Tunnel' }
+  const [method, setMethod] = useState<(typeof methods)[number]>('mewlink')
+  const local = !isRemoteMode() && ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)
+  const target = `http://127.0.0.1:${local ? window.location.port || '5000' : '5000'}`
+  const externalLink = 'inline-flex items-center gap-1 rounded py-1 text-sm text-link underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-accent'
+  return <DialogFrame labelledBy={`${id}-title`} onClose={onClose} className="flex max-w-2xl max-h-[90dvh] flex-col">
+    <HoverTipLayer className="flex min-h-0 flex-col">
       <header className="flex items-center justify-between gap-2 border-b border-edge px-3 py-2">
-        <h2 id="mewlink-title" className="text-sm font-semibold">Mewlink</h2>
+        <h2 id={`${id}-title`} className="text-sm font-semibold">{copy.title}</h2>
         <span data-tip={uiText('닫기')}><button type="button" aria-label={uiText('닫기')} className="rounded p-1 text-ink-secondary hover:bg-surface-raised hover:text-ink" onClick={onClose}><Xmark width={18} height={18} /></button></span>
       </header>
-      <div className="p-3"><RemoteAccessSettings /></div>
+      <div className="min-h-0 space-y-3 overflow-y-auto p-3">
+        <p className="text-sm text-ink-secondary">{copy.introduction}</p>
+        <div role="tablist" aria-label={copy.title} className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {methods.map((item, index) => <button key={item} type="button" role="tab" id={`${id}-${item}`} aria-selected={method === item} aria-controls={`${id}-panel`} tabIndex={method === item ? 0 : -1}
+            className={`rounded-md border p-2 text-left focus-visible:outline-2 focus-visible:outline-accent ${method === item ? 'border-accent bg-surface-raised' : 'border-edge hover:bg-surface-hover'}`}
+            onClick={() => setMethod(item)} onKeyDown={event => {
+              const next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (index + 1) % methods.length : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (index + methods.length - 1) % methods.length : event.key === 'Home' ? 0 : event.key === 'End' ? methods.length - 1 : null
+              if (next === null) return
+              event.preventDefault(); setMethod(methods[next]); event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
+            }}>
+            <span className="block text-sm font-medium">{names[item]}</span>
+            <span className="mt-1 block text-xs leading-relaxed text-ink-secondary">{copy[item]}</span>
+          </button>)}
+        </div>
+        <section id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-${method}`} tabIndex={0} className="rounded-md border border-edge p-3 text-sm leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-accent">
+          {method === 'mewlink' ? <RemoteAccessSettings /> : method === 'tailscale' ? <div className="space-y-3">
+            <p>{copy.tailscaleInstall}</p>
+            <a href="https://tailscale.com/download" target="_blank" rel="noopener noreferrer" className={externalLink}>{copy.installTailscale}<OpenNewWindow aria-hidden="true" width={14} height={14} /></a>
+            <p>{copy.tailscaleServe}</p>
+            <pre className="overflow-x-auto rounded bg-surface-deep p-2 text-xs select-text"><code>{`tailscale serve --bg ${target}`}</code></pre>
+            <p className="text-ink-secondary">{copy.tailscaleApproval}</p>
+            <p className="text-ink-secondary">{copy.tailscaleWindows}</p>
+            <a href="https://tailscale.com/docs/features/tailscale-serve" target="_blank" rel="noopener noreferrer" className={externalLink}>{copy.tailscaleGuide}<OpenNewWindow aria-hidden="true" width={14} height={14} /></a>
+          </div> : <div className="space-y-3">
+            <p>{copy.cloudflareDomain}</p>
+            <p>{copy.cloudflareRoute}</p>
+            <pre className="overflow-x-auto rounded bg-surface-deep p-2 text-xs select-text"><code>{target}</code></pre>
+            <p className="text-ink-secondary">{copy.cloudflareWindows}</p>
+            <p>{copy.cloudflareOpen}</p>
+            <a href="https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/" target="_blank" rel="noopener noreferrer" className={externalLink}>{copy.cloudflareGuide}<OpenNewWindow aria-hidden="true" width={14} height={14} /></a>
+          </div>}
+        </section>
+        <p className="text-xs text-ink-secondary">{copy.signIn}</p>
+        <p className="text-xs text-ink-secondary">{copy.keepRunning}</p>
+      </div>
     </HoverTipLayer>
   </DialogFrame>
 }

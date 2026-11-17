@@ -59,6 +59,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
         requests.push({ url: request.url(), body: request.postDataJSON() })
         if (url.pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: code })
         if (url.pathname === '/api/auth/me') return route.fulfill({ json: created ? owner : { ...guest, setupRequired: true } })
+        if (url.pathname === '/api/remote-access') return route.fulfill({ json: { enabled: false, state: 'disabled' } })
         if (url.pathname === '/api/auth/setup') {
           assert.deepEqual(request.postDataJSON(), { token, email: 'owner@example.test', password: 'a long password' })
           created = true
@@ -98,6 +99,14 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       await confirmation.fill('a long password')
       await confirmation.press('Enter')
       await page.locator('[data-test-workspace]').filter({ hasText: owner.email }).waitFor()
+      const remoteWelcome = page.getByRole('dialog', { name: 'Connect from another device', exact: true })
+      await remoteWelcome.waitFor()
+      for (const method of ['Mewlink', 'Tailscale', 'Cloudflare Tunnel']) assert.equal(await remoteWelcome.getByRole('tab', { name: new RegExp(`^${method}`) }).count(), 1)
+      await page.keyboard.press('Escape')
+      await remoteWelcome.waitFor({ state: 'detached' })
+      await page.locator('#root').evaluate(el => el.ownerDocument.defaultView!.dispatchEvent(new Event('mew:permissions-changed')))
+      await page.waitForTimeout(100)
+      assert.equal(await remoteWelcome.count(), 0, 'ordinary auth refresh does not reopen onboarding')
       assert.equal(await page.getByRole('heading', { name: 'Create your administrator account' }).count(), 0)
       assert.equal(requests.filter(request => request.url.endsWith('/api/auth/setup')).length, 1)
       assert.ok(requests.every(request => !request.url.includes(token)), 'launch token never enters request URLs')
@@ -127,6 +136,7 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       await page.goto(`http://first-owner.test/${scenario === 'missing-token' ? '' : `#setup=${scenario === 'invalid-token' ? 'invalid' : token}`}`)
       if (scenario === 'existing-install') {
         await page.locator('[data-test-workspace]').waitFor()
+        assert.equal(await page.getByRole('dialog', { name: 'Connect from another device', exact: true }).count(), 0)
         await page.getByRole('button', { name: 'Sign in' }).click()
         await page.getByRole('dialog', { name: 'Log in' }).waitFor()
         assert.equal(await page.getByRole('heading', { name: 'Create your administrator account' }).count(), 0)

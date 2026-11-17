@@ -1,7 +1,7 @@
 ---
 title: "First administrator setup"
-description: "Defines locally armed, one-time browser creation of the first owner, fresh-install detection, durable closure, account locking, and installer IPC. Covers token privacy, recovery, and existing-account preservation."
-updated: "2026-11-05"
+description: "Defines locally armed, one-time browser creation of the first owner, fresh-install detection, durable closure, account locking, and installer IPC. Covers token privacy, recovery, existing-account preservation, and the remote-access welcome popup after successful creation."
+updated: "2026-11-17"
 ---
 
 # First administrator setup
@@ -38,6 +38,8 @@ Both responses use `Cache-Control: no-store`. Existing request-origin checks app
 The trusted launcher opens `<local-base-url>#setup=<token>`. The fragment is consumed and removed with `history.replaceState` before account or workspace UI loads. It stays only in page memory, never browser storage, query strings, or API response bodies. Submission carries it in the JSON request body. Application and installer logs must not contain the private setup URL.
 
 While setup is pending, the workspace is not imported. The compact setup form asks for email, password, and confirmation and uses the existing login theme and localized UI. A successful claim enters the workspace without a temporary-password step. Missing, rejected, or expired links show local reopen guidance. An already completed setup refreshes status and uses the ordinary login screen when a session is absent. Existing local guest behavior is unchanged outside pending setup.
+
+After a successful first-owner claim, `AppBootstrap` opens the shared remote-access popup once the authenticated workspace is ready. It offers **Mewlink**, **Tailscale**, and **Cloudflare Tunnel**. This page-memory welcome state is set only by successful account creation; existing installations, ordinary login, a competing claim, authentication refresh, and later reloads do not trigger it. Dismissing it preserves the new account and workspace. Owners can open the same popup again from **Menu → Mewlink**. Provider setup follows the [remote-access contract](remote-access.md#opening-device-connection-settings); no provider is registered merely by showing the welcome popup.
 
 ## CLI and installer transport
 

@@ -1,8 +1,8 @@
 ---
 title: "Mewlink device registration and locally authenticated P2P access contract"
-description: "Defines the link.mew.run entry, apex homepage separation, legacy origin compatibility, Mewlink registration, launcher behavior, authentication, browser trust, UI resources, notification and microphone delegation, signaling proofs, and transport limits, including the bounded speech-transcription response wait. Links native iOS storage, recovery, central billing, and separate host/central verification boundaries."
+description: "Defines the link.mew.run entry, Mewlink registration, authentication, browser trust, UI resources, signaling, and transport limits. Covers the shared Mewlink, Tailscale, and Cloudflare Tunnel popup shown after first-owner creation and from the owner menu, with separate host/central verification boundaries."
 created: 2026-10-07
-updated: "2026-11-11"
+updated: "2026-11-17"
 ---
 
 [Work and release criteria](<../work/remote-access.md>) · [Central service installation](../operations/remote-central.md) · [ADR 0195](../history/decisions/0195-mew-account-based-p2p-remote-access.md) · [Follow-up ADR 0203](../history/decisions/0203-mewlink-workers-p2p-ui.md) · [Local authentication ADR 0207](../history/decisions/0207-mewlink-device-access-local-auth.md) · [Permissions](access-control.md)
@@ -94,7 +94,19 @@ A atomically stores version 1, server key, pinned central key, and account mappi
 
 ## Opening device connection settings
 
-Owners use header **Mewlink** for registration, status, URL copy, and deregistration. `RemoteAccessModal` uses shared `DialogFrame` Esc/back/outside-dismiss and focus restoration. Account management contains identity approval/revocation only. Remote-access sessions hide registration/deregistration controls.
+Owners open **Menu → Mewlink** to choose among three methods in one `RemoteAccessModal`. The same popup appears after [successful first-owner creation](first-owner-setup.md#browser-entry). All three choices remain visible, with Mewlink selected initially:
+
+| Method | Setup shown in the popup |
+| --- | --- |
+| Mewlink | Existing device registration, pending/online status, URL copy, network preparation, account/device management, and deregistration controls. No domain is required. |
+| Tailscale | Install Tailscale on the host and connecting devices, join the same tailnet, and run `tailscale serve --bg http://127.0.0.1:5000`. The popup links the official installation and Serve guides. For WSL, run Tailscale on Windows after verifying Windows localhost access. |
+| Cloudflare Tunnel | Add a domain to Cloudflare, create a tunnel, run `cloudflared` beside Mew, and configure a Published application route to `http://127.0.0.1:5000` with an empty path. For WSL, run the connector inside the same environment. |
+
+When opened on a local loopback address, the Tailscale command and Cloudflare service URL use the current page's port; other origins show the default 5000. Provider tabs do not install software, register accounts, or claim connectivity. Tailscale and Cloudflare setup remains with those providers; Mewlink's existing actions keep their original behavior. Every method retains Mew's local account and permission checks, and requires the host to remain awake, online, and running Mew. The public [remote-access guide](../../../docs/guides/getting-started-en.md#remote-access) owns the full operator walkthrough.
+
+`RemoteAccessModal` uses shared `DialogFrame` Esc/back/outside-dismiss and focus restoration. The method choices support arrow keys and Home/End, and the body scrolls within narrow and short viewports. Account management contains identity approval/revocation only. Remote-access sessions hide Mewlink registration/deregistration controls.
+
+`server/remote-access-methods-ui.test.ts` checks all three methods, local-port examples, keyboard selection, retained device registration, dismissal, reopening, and viewport bounds on desktop and mobile. `server/first-owner-setup-ui.test.ts` checks the creation-only welcome and its absence on existing installations and later authentication refresh. These isolated browser fixtures do not install providers or verify live remote connections.
 
 ## Keeping browser login and revoking access
 
