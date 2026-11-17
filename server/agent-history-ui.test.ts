@@ -76,8 +76,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       await page.getByText('Question 44', { exact: true }).waitFor()
       assert.equal(await page.getByText('Question 24', { exact: true }).count(), 0)
       const savedHeader = page.locator('[data-agent-turn-header]').filter({ has: page.getByText('Saved final answer', { exact: true }) })
+      const savedTurn = page.locator('[data-agent-turn]').filter({ hasText: 'Saved final answer' })
       await savedHeader.locator('button[aria-expanded]').click()
-      const savedTurn = savedHeader.locator('..')
       const savedDetails = savedTurn.locator('[data-agent-work-details]')
       const savedToggle = savedDetails.getByRole('button', { name: '작업 상세', exact: true })
       assert.equal(await savedDetails.count(), 1, 'thoughts between tool groups share one disclosure')
@@ -94,17 +94,23 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       const detailBounds = await savedDetails.evaluate(el => ({ client: el.clientWidth, scroll: el.scrollWidth }))
       assert.ok(detailBounds.scroll <= detailBounds.client, 'details fit desktop and mobile widths')
       await savedTurn.screenshot({ path: `/tmp/mew-work-details-${width}-${dark ? 'dark' : 'light'}.png` })
-      await savedHeader.getByRole('button', { name: '이 답변 복사', exact: true }).click()
+      await savedTurn.getByRole('button', { name: '이 답변 복사', exact: true }).click()
       assert.equal(await page.evaluate('window.copied'), 'Answer 44 short\n\nSaved final answer', 'copy excludes thoughts and tools')
+      const composer = page.locator('[data-keep-keyboard] [contenteditable="true"]')
+      await composer.fill('Existing draft')
+      await savedTurn.getByRole('button', { name: '답글 달기', exact: true }).click()
+      assert.match(await composer.innerText(), /^> Answer 44 short\n> \n> Saved final answer\n{2,}Existing draft/, 'reply quotes the answer and preserves the draft')
+      await composer.fill('')
       await savedToggle.press('Space')
       assert.equal(await savedToggle.getAttribute('aria-expanded'), 'false')
-      await savedHeader.locator('button[aria-expanded]').click()
+      await savedTurn.getByRole('button', { name: '접기', exact: true }).click()
 
       const scroll = page.locator('[data-agent-conversation] > div').first()
       await scroll.evaluate(el => { el.scrollTop = 0; el.dispatchEvent(new Event('scroll')) })
       await page.getByText('Question 5', { exact: true }).waitFor({ state: 'attached' })
       assert.ok(await scroll.evaluate(el => el.scrollTop > 100), 'prepend preserves the previous viewport')
       const timedHeader = page.locator('[data-agent-turn-header]').filter({ has: page.getByText(/^Answer 40 /) })
+      const timedTurn = page.locator('[data-agent-turn]').filter({ hasText: 'Answer 40' })
       await timedHeader.scrollIntoViewIfNeeded()
       await timedHeader.screenshot({ path: `/tmp/mew-answer-header-${width}-${dark ? 'dark' : 'light'}.png` })
       const lineAlignment = await timedHeader.evaluate(el => {
@@ -144,7 +150,6 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       }
       await questionButton.click()
       await timedHeader.locator('button[aria-expanded]').press('Enter')
-      const composer = page.locator('[data-keep-keyboard] [contenteditable="true"]')
       await composer.focus()
       if (width < 768) {
         const cdp = await page.context().newCDPSession(page)
@@ -161,7 +166,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
           }
         } finally { await cdp.detach() }
       }
-      const answerBody = timedHeader.locator('..').locator('.mew-agent-markdown')
+      const answerBody = timedTurn.locator('.mew-agent-markdown')
       await answerBody.click({ position: { x: 12, y: 12 } })
       assert.equal(await scroll.evaluate(el => el === el.ownerDocument.activeElement), true, 'answer clicks focus the conversation for question navigation')
       assert.equal(await scroll.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).outlineStyle), 'none', 'clicking answer text after composing does not outline the chat')
@@ -172,20 +177,23 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       await composer.focus()
       await scroll.focus()
       assert.equal(await scroll.evaluate(el => el.ownerDocument.defaultView!.getComputedStyle(el).outlineWidth), '2px', 'returning focus from the composer restores the keyboard indicator')
-      await timedHeader.getByRole('button', { name: '이 답변 복사', exact: true }).click()
+      await timedTurn.getByRole('button', { name: '이 답변 복사', exact: true }).click()
       assert.equal(await page.evaluate('window.copied'), 'Answer 40 ' + 'long readable answer '.repeat(100), 'copy retains the full answer')
-      assert.equal(await timedHeader.locator('button[aria-expanded]').getAttribute('aria-expanded'), 'true', 'copy leaves the answer expanded')
-      await timedHeader.locator('button[aria-expanded]').press('Space')
+      assert.equal(await timedTurn.locator('[data-agent-turn-footer]').count(), 1, 'copy leaves the answer expanded')
+      await timedTurn.getByRole('button', { name: '접기', exact: true }).press('Space')
       assert.equal(await timedHeader.locator('button[aria-expanded]').getAttribute('aria-expanded'), 'false')
       assert.equal(await timedHeader.getByRole('button', { name: '이 답변 복사', exact: true }).count(), 0, 'folding removes copy from the focus order')
-      const assertHeaderAlignment = async (header: typeof timedHeader) => {
-        const centers = await header.evaluate(el => {
-          const center = (element: Pick<typeof el, 'getBoundingClientRect'>) => { const rect = element.getBoundingClientRect(); return rect.top + rect.height / 2 }
-          const dot = el.querySelector('button[aria-expanded] > span[aria-label]')!
-          const elements = [dot, ...el.querySelectorAll('[data-agent-duration], button:not([aria-expanded]), button:not([aria-expanded]) svg, button:not([aria-expanded]) > span')]
-          return elements.map(element => ({ name: element.getAttribute('aria-label') ?? element.textContent, y: center(element) }))
+      const assertFooterAlignment = async (footer: typeof timedHeader) => {
+        const positions = await footer.evaluate(el => {
+          const rect = el.getBoundingClientRect()
+          const dot = el.querySelector('[aria-label]:not(button)')!.getBoundingClientRect()
+          const time = el.querySelector('[data-agent-duration]')!.getBoundingClientRect()
+          const collapse = el.querySelector('button[aria-label]')!.getBoundingClientRect()
+          return { left: rect.left, right: rect.right, dot: dot.left, dotRight: dot.right, time: time.left,
+            collapse: collapse.left + collapse.width / 2, center: rect.left + rect.width / 2 }
         })
-        assert.ok(Math.max(...centers.map(item => item.y)) - Math.min(...centers.map(item => item.y)) <= 0.5, `expanded header shares one vertical center: ${JSON.stringify(centers)}`)
+        assert.ok(positions.dot >= positions.left && positions.dotRight <= positions.time, 'status dot precedes elapsed time on the left')
+        assert.ok(Math.abs(positions.collapse - positions.center) <= 1, 'collapse button is centered in the footer')
       }
       const shortHeader = page.locator('[data-agent-turn-header]').filter({ has: page.locator('[data-agent-summary]').filter({ hasText: 'Saved final answer' }) })
       assert.equal(await shortHeader.locator('..').locator('[data-agent-duration]').count(), 0, 'short collapsed answers hide duration')
@@ -193,7 +201,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       assert.equal(await oldHeader.locator('[data-agent-duration]').count(), 0, 'older transcripts without duration have no time placeholder')
       const questionTop = (number: number) => page.getByText(`Question ${number}`, { exact: true }).evaluate(el => {
         const question = el.closest('[data-agent-question]')!
-        const scroller = question.parentElement!
+        const scroller = question.closest('[data-agent-conversation]')!.firstElementChild!
         return question.getBoundingClientRect().top - scroller.getBoundingClientRect().top - scroller.clientTop
           - parseFloat(el.ownerDocument.defaultView!.getComputedStyle(scroller).paddingTop) + scroller.scrollTop
       })
@@ -203,68 +211,46 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
         const max = await scroll.evaluate(el => el.scrollHeight - el.clientHeight)
         assert.ok(Math.abs(actual - Math.min(desired, max)) <= 1, `viewport aligns to Question ${number}`)
       }
-      await page.getByText(/^Answer 42 /).first().locator('..').click()
+      const answer42Header = page.locator('[data-agent-turn-header]').filter({ has: page.getByText(/^Answer 42 /) })
+      const answer42 = page.locator('[data-agent-turn]').filter({ hasText: 'Answer 42' })
+      await answer42Header.locator('button[aria-expanded]').click()
       const middle = await questionTop(42) + 500
       await scroll.evaluate((el, top) => { el.scrollTop = top; el.dispatchEvent(new Event('scroll')) }, middle)
-      const expandedHeader = page.locator('[data-agent-turn-header]').filter({ has: page.getByText(/^Answer 42 /) })
-      const stickyBounds = await expandedHeader.evaluate(el => {
-        const scroller = el.parentElement!.parentElement!
-        return { header: el.getBoundingClientRect().top, viewport: scroller.getBoundingClientRect().top + scroller.clientTop }
-      })
-      assert.ok(Math.abs(stickyBounds.header - stickyBounds.viewport) <= 1, `expanded header sticks to the conversation top: ${JSON.stringify(stickyBounds)}`)
-      assert.equal(await expandedHeader.locator('[data-agent-duration]').count(), 0, 'expanded headers hide duration')
-      await assertHeaderAlignment(expandedHeader)
-      const footer = expandedHeader.locator('..').locator('[data-agent-turn-footer]')
+      const footer = answer42.locator('[data-agent-turn-footer]')
+      assert.equal(await answer42.locator('[data-agent-turn-header]').count(), 0, 'expanded answer has no top bar')
       assert.equal(await footer.locator('[data-agent-duration]').textContent(), '2분 5초')
-      const timeBounds = await footer.evaluate(el => {
-        const time = el.querySelector('[data-agent-duration]')!.getBoundingClientRect()
-        const button = el.querySelector('button')!.getBoundingClientRect()
-        return { right: time.right, left: button.left, timeCenter: time.top + time.height / 2, buttonCenter: button.top + button.height / 2 }
+      await assertFooterAlignment(footer)
+      const actions = answer42.locator('[data-agent-turn-actions]')
+      const actionBounds = await actions.evaluate(el => {
+        const buttons = [...el.querySelectorAll('button')].map(button => button.getBoundingClientRect())
+        const bubble = el.parentElement!.querySelector('[data-agent-turn-footer]')!.getBoundingClientRect()
+        return { buttons: buttons.map(r => ({ x: r.x, y: r.y, left: r.left })), bubbleRight: bubble.right }
       })
-      assert.ok(timeBounds.right <= timeBounds.left && Math.abs(timeBounds.timeCenter - timeBounds.buttonCenter) <= 0.5, 'duration sits beside collapse on the same vertical center')
+      assert.equal(actionBounds.buttons.length, 2, 'expanded answer exposes copy and reply')
+      assert.ok(actionBounds.buttons[0].left >= actionBounds.bubbleRight && Math.abs(actionBounds.buttons[0].x - actionBounds.buttons[1].x) < 1 && actionBounds.buttons[0].y < actionBounds.buttons[1].y, 'copy and reply are stacked outside the bubble')
       const footerBounds = await footer.evaluate(el => {
-        const scroller = el.parentElement!.parentElement!
+        const scroller = el.closest('[data-agent-conversation]')!.firstElementChild!
         return { bottom: el.getBoundingClientRect().bottom, viewportBottom: scroller.getBoundingClientRect().bottom - scroller.clientTop, top: el.getBoundingClientRect().top, bubbleTop: el.parentElement!.getBoundingClientRect().top }
       })
       assert.ok(Math.abs(footerBounds.bottom - footerBounds.viewportBottom) <= 1, `collapse footer sticks to the conversation bottom: ${JSON.stringify(footerBounds)}`)
       assert.ok(footerBounds.top >= footerBounds.bubbleTop, 'footer stays inside its answer bubble')
-      await expandedHeader.getByRole('button', { name: '이 답변 복사', exact: true }).click()
-      assert.equal(await expandedHeader.locator('button[aria-expanded]').getAttribute('aria-expanded'), 'true', 'sticky copy leaves the answer expanded')
+      await answer42.getByRole('button', { name: '이 답변 복사', exact: true }).click()
+      assert.equal(await footer.count(), 1, 'copy leaves the answer expanded')
       assert.equal(await page.evaluate('window.copied'), 'Answer 42 ' + 'long readable answer\n\n'.repeat(65))
-      await scroll.screenshot({ path: `/tmp/mew-sticky-answer-${width}-${dark ? 'dark' : 'light'}.png` })
       await footer.getByRole('button', { name: '접기', exact: true }).click()
-      assert.equal(await expandedHeader.locator('button[aria-expanded]').getAttribute('aria-expanded'), 'false', 'sticky footer collapses its answer')
       assert.equal(await footer.count(), 0, 'collapsed answers remove the footer')
-      assert.equal(await expandedHeader.locator('..').locator('[data-agent-duration]').count(), 0, 'folding hides duration')
-      await expandedHeader.locator('button[aria-expanded]').press('Enter')
-      await scroll.evaluate((el, top) => { el.scrollTop = top; el.dispatchEvent(new Event('scroll')) }, middle)
+      assert.equal(await answer42.locator('[data-agent-turn-header] button[aria-expanded]').getAttribute('aria-expanded'), 'false')
+      await answer42.locator('[data-agent-turn-header] button[aria-expanded]').press('Enter')
       await footer.getByRole('button', { name: '접기', exact: true }).press('Space')
-      assert.equal(await expandedHeader.locator('button[aria-expanded]').getAttribute('aria-expanded'), 'false', 'keyboard activation collapses the answer')
-      await expandedHeader.locator('button[aria-expanded]').press('Enter')
-      assert.equal(await expandedHeader.getByRole('button', { name: '질문으로', exact: true }).count(), 0, 'expanded headers omit the question jump button')
+      assert.equal(await footer.count(), 0, 'keyboard activation collapses the answer')
+      await answer42.locator('[data-agent-turn-header] button[aria-expanded]').press('Enter')
       await scroll.evaluate((el, top) => { el.scrollTop = top; el.dispatchEvent(new Event('scroll')) }, middle)
       await scroll.focus()
       await scroll.press('ArrowUp')
       await assertAtQuestion(42)
-      assert.equal(await expandedHeader.locator('button[aria-expanded]').getAttribute('aria-expanded'), 'true', 'keyboard question navigation leaves the answer expanded')
+      assert.equal(await footer.count(), 1, 'keyboard question navigation leaves the answer expanded')
       await scroll.press('ArrowUp')
       await assertAtQuestion(41)
-      // A following expanded answer supplies enough scroll range to pass this bubble's end.
-      await oldHeader.locator('button[aria-expanded]').evaluate(el => el.dispatchEvent(new el.ownerDocument.defaultView!.MouseEvent('click', { bubbles: true })))
-      const boundaryTop = await expandedHeader.evaluate(el => {
-        const scroller = el.parentElement!.parentElement!
-        return el.parentElement!.getBoundingClientRect().bottom - scroller.getBoundingClientRect().top
-          - scroller.clientTop + scroller.scrollTop - el.getBoundingClientRect().height / 2
-      })
-      await scroll.evaluate((el, top) => { el.scrollTop = top; el.dispatchEvent(new Event('scroll')) }, boundaryTop)
-      const boundary = await expandedHeader.evaluate(el => ({
-        top: el.getBoundingClientRect().top,
-        bottom: el.getBoundingClientRect().bottom,
-        bubbleBottom: el.parentElement!.getBoundingClientRect().bottom,
-        viewportTop: el.parentElement!.parentElement!.getBoundingClientRect().top,
-      }))
-      assert.ok(boundary.top < boundary.viewportTop && boundary.bottom <= boundary.bubbleBottom + 1, 'sticky header yields at its own bubble bottom')
-      await oldHeader.locator('button[aria-expanded]').evaluate(el => el.dispatchEvent(new el.ownerDocument.defaultView!.MouseEvent('click', { bubbles: true })))
       await scroll.evaluate((el, top) => { el.scrollTop = top; el.dispatchEvent(new Event('scroll')) }, middle)
       await scroll.focus()
       await scroll.press('ArrowUp')
@@ -402,11 +388,12 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
         window.socket.emit({type:'meta',meta:{sessionId:'conversation',busy:true,turns:45,queued:[]}});
       `)
       const runningHeader = page.locator('[data-agent-turn-header]').last()
+      const runningTurn = page.locator('[data-agent-turn]').filter({ hasText: 'Running answer' })
       await runningHeader.getByRole('button', { name: '중단', exact: true }).waitFor()
       assert.equal(await runningHeader.getByRole('button', { name: '이 답변 복사', exact: true }).count(), 0, 'collapsed running answers hide copy')
       assert.equal(await runningHeader.getByRole('button', { name: '중단', exact: true }).isVisible(), true, 'collapsed running answers retain stop')
       await runningHeader.locator('button[aria-expanded]').click()
-      const liveDetails = runningHeader.locator('..').locator('[data-agent-work-details]')
+      const liveDetails = runningTurn.locator('[data-agent-work-details]')
       const liveToggle = liveDetails.getByRole('button', { name: '작업 상세', exact: true })
       assert.equal(await liveToggle.getAttribute('aria-expanded'), 'false')
       await liveToggle.click()
@@ -424,16 +411,14 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       await liveToggle.click()
 
       await scroll.evaluate((el, top) => { el.scrollTop = top; el.dispatchEvent(new Event('scroll')) }, await questionTop(45) + 500)
-      const runningBounds = await runningHeader.evaluate(el => ({ top: el.getBoundingClientRect().top, viewport: el.parentElement!.parentElement!.getBoundingClientRect().top }))
-      assert.ok(Math.abs(runningBounds.top - runningBounds.viewport) <= 1, 'running header sticks with all controls')
-      await assertHeaderAlignment(runningHeader)
-      assert.equal(await runningHeader.locator('[data-agent-duration]').count(), 0, 'running headers hide duration')
-      assert.equal(await runningHeader.locator('..').locator('[data-agent-turn-footer] [data-agent-duration]').isVisible(), true, 'running duration appears in the sticky footer')
+      const runningFooter = runningTurn.locator('[data-agent-turn-footer]')
+      assert.equal(await runningTurn.locator('[data-agent-turn-header]').count(), 0, 'expanded running answers have no top bar')
+      assert.equal(await runningFooter.locator('[data-agent-duration]').isVisible(), true, 'running duration appears in the sticky footer')
+      await assertFooterAlignment(runningFooter)
       await scroll.screenshot({ path: `/tmp/mew-running-answer-${width}-${dark ? 'dark' : 'light'}.png` })
-      await runningHeader.getByRole('button', { name: '중단', exact: true }).click()
-      assert.equal(await page.evaluate('window.requests.at(-1).type'), 'cancel', 'sticky stop cancels the active turn')
-      assert.equal(await runningHeader.locator('button[aria-expanded]').getAttribute('aria-expanded'), 'true', 'stop does not fold the answer')
-      assert.equal(await runningHeader.getByRole('button', { name: '질문으로', exact: true }).count(), 0, 'running headers omit the question jump button')
+      await runningFooter.getByRole('button', { name: '중단', exact: true }).click()
+      assert.equal(await page.evaluate('window.requests.at(-1).type'), 'cancel', 'footer stop cancels the active turn')
+      assert.equal(await runningFooter.count(), 1, 'stop does not fold the answer')
       await scroll.focus()
       await scroll.press('ArrowUp')
       await assertAtQuestion(45)
@@ -446,7 +431,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
         socket.emit({ type: 'history_event', position: { generation: index.generation, seq: index.length - 1 },
           event: { type: 'update', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'DUPLICATED' } } } })
       })
-      await runningHeader.locator('..').locator('.mew-agent-markdown').filter({ hasText: 'chunk-199' }).waitFor()
+      await runningTurn.locator('.mew-agent-markdown').filter({ hasText: 'chunk-199' }).waitFor()
       assert.equal(await page.getByText('DUPLICATED', { exact: false }).count(), 0)
       assert.equal(await page.getByText('Question 45', { exact: true }).count(), 1)
       await page.waitForFunction(`window.cache.readHistoryCache(${queueKey}).then(value=>value?.events.at(-1)?.update?.content?.text===' chunk-199')`)

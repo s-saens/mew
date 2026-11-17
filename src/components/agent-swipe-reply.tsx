@@ -6,7 +6,7 @@ export function quoteAgentReply(text: string, draft: string): string {
   return `${quote}\n\n${draft}`
 }
 
-export function AgentSwipeReply({ text, label, onReply, children }: { text: string; label: string; onReply: (text: string) => void; children: ReactNode }) {
+export function AgentSwipeReply({ text, label, onReply, children, showButton = true }: { text: string; label: string; onReply: (text: string) => void; children: ReactNode; showButton?: boolean }) {
   const gesture = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null)
   const suppressClick = useRef(false)
   const [offset, setOffset] = useState(0)
@@ -41,7 +41,7 @@ export function AgentSwipeReply({ text, label, onReply, children }: { text: stri
     }}>
     <span aria-hidden="true" className="pointer-events-none absolute right-2 top-2 text-ink-secondary" style={{ opacity: Math.min(1, -offset / 48) }}><Undo width={16} height={16} /></span>
     <div style={{ transform: `translateX(${offset}px)`, transition: offset ? 'none' : 'transform 160ms ease-out' }}>{children}</div>
-    <button data-agent-reply-button type="button" onClick={() => onReply(text)} aria-label={label} data-tip={label}
-      className="absolute right-1 bottom-1 rounded bg-surface p-1 text-ink-secondary opacity-0 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-accent [@media(hover:hover)]:group-hover:opacity-100"><Undo width={16} height={16} aria-hidden="true" /></button>
+    {showButton && <button data-agent-reply-button type="button" onClick={() => onReply(text)} aria-label={label} data-tip={label}
+      className="absolute right-1 bottom-1 rounded bg-surface p-1 text-ink-secondary opacity-0 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-accent [@media(hover:hover)]:group-hover:opacity-100"><Undo width={16} height={16} aria-hidden="true" /></button>}
   </div>
 }

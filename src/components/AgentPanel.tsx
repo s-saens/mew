@@ -67,7 +67,7 @@ import {
   type ReactNode,
 } from 'react'
 import { flushSync } from 'react-dom'
-import { EditPencil, NavArrowRight, RefreshDouble, Send as SendIcon, Terminal as TerminalIcon, Xmark } from 'iconoir-react'
+import { EditPencil, NavArrowRight, NavArrowUp, RefreshDouble, Send as SendIcon, Terminal as TerminalIcon, Undo, Xmark } from 'iconoir-react'
 import { AgentCommandBubble, AgentCommandPopup } from './agent-command-bubble'
 import { AgentLoadingBubbles, AgentReplyPending } from './agent-loading-bubbles'
 import { AgentSwipeReply, quoteAgentReply } from './agent-swipe-reply'
@@ -4303,13 +4303,16 @@ function AgentSessionView({
           ? <AgentCommandBubble key={item.key} command={item.command} onOpen={() => setCommandPopupId(item.command.id)} />
           : (() => {
             const replyText = item.kind === 'user' ? withoutAttachmentTokens(item.text).trim() : item.kind === 'turn' ? item.children.filter(child => child.kind === 'agent').map(child => child.kind === 'agent' ? child.text : '').join('\n\n').trim() : ''
+            const reply = replyText && !historyPreview && !editingQueued && !cliMode
+              ? () => { setDraft(current => quoteAgentReply(replyText, current)); requestAnimationFrame(() => agentInputRef.current?.focus()) }
+              : undefined
             const content = <AgentConversationItem item={item} expanded={expanded} showSettings={settingsChanges.has(item.key)}
             workError={workErrors[item.key]} onLoadWork={loadWorkDetails}
             project={project} readOnly={!!historyPreview} loadingActive={visible} busy={item.key === pendingReplyKey ? null : !historyPreview && item.kind === 'turn' && !item.done ? meta?.activeTask === 'cli' ? false : meta?.busy ?? null : false}
             now={item.kind === 'turn' && !item.done ? now : 0} toggle={toggle} send={send} onOpenFile={onOpenFile} onOpenError={setErrorDetail}
-            onRunCommand={allowTerminal ? runCodeCommand : undefined} codeRunDisabled={codeRunDisabled || (item.kind === 'turn' && !item.done)} />
-            return replyText && !historyPreview && !editingQueued && !cliMode
-              ? <div key={item.key} className="group"><AgentSwipeReply text={replyText} label={t('comment.reply')} onReply={text => { setDraft(current => quoteAgentReply(text, current)); requestAnimationFrame(() => agentInputRef.current?.focus()) }}>{content}</AgentSwipeReply></div>
+            onRunCommand={allowTerminal ? runCodeCommand : undefined} codeRunDisabled={codeRunDisabled || (item.kind === 'turn' && !item.done)} onReply={reply} />
+            return reply
+              ? <div key={item.key} className="group"><AgentSwipeReply text={replyText} label={t('comment.reply')} onReply={reply} showButton={item.kind !== 'turn'}>{content}</AgentSwipeReply></div>
               : <div key={item.key}>{content}</div>
           })())}
       </div>
@@ -5116,7 +5119,7 @@ const AgentMarkdownText = memo(function AgentMarkdownText({ text, onOpenFile, on
 })
 
 const AgentConversationItem = memo(function AgentConversationItem({ item, expanded, showSettings, project, busy, now, loadingActive,
-  toggle, send, onOpenFile, onOpenError, readOnly, onRunCommand, codeRunDisabled, workError, onLoadWork }: {
+  toggle, send, onOpenFile, onOpenError, readOnly, onRunCommand, codeRunDisabled, workError, onLoadWork, onReply }: {
   item: Item
   expanded: Set<string>
   showSettings: boolean
@@ -5133,6 +5136,7 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
   codeRunDisabled: boolean
   workError?: string
   onLoadWork: (turn: Extract<Item, { kind: 'turn' }>) => void
+  onReply?: () => void
 }) {
   const { rawUrl } = useWorkspaceApi()
   useUiLocale()
@@ -5229,54 +5233,24 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
     const canStop = busy === true && !item.done
     const actionSpace = canStop ? 30 : 0
     return (
-      <div key={item.key} className="rounded-lg rounded-tl-none border border-edge bg-surface">
-        <div data-agent-turn-header className={open ? 'sticky -top-3 z-20 flex h-6.5 items-center rounded-tr-lg border-b border-edge bg-surface' : 'relative min-h-9'}>
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={() => {
-              if (hasSelection()) return
-              toggle(item.key)
-            }}
-            className={`flex min-w-0 text-left text-xs text-ink-secondary hover:text-ink ${open ? 'flex-1 self-stretch items-center gap-1.5 px-2.5' : 'w-full items-start gap-2 px-3 py-2'}`}
-          >
-            {open && <span
-              className={`shrink-0 rounded-full size-1.25 ${BUBBLE_DOT[state]}`}
-              title={BUBBLE_LABEL[state]}
-              aria-label={BUBBLE_LABEL[state]}
-            />}
-            {open ? <>
-              <span className="sr-only">{summary}</span>
-            </> : (
+      <div data-agent-turn className="flex min-w-0 items-start gap-1">
+      <div className="min-w-0 flex-1 rounded-lg rounded-tl-none border border-edge bg-surface">
+        {!open && <div data-agent-turn-header className="relative min-h-9">
+          <button type="button" aria-expanded={false} onClick={() => { if (!hasSelection()) toggle(item.key) }}
+            className="flex w-full min-w-0 items-start px-3 py-2 text-left text-xs text-ink-secondary hover:text-ink">
               <span className="min-w-0 flex-1 line-clamp-2 break-words [overflow-wrap:anywhere] text-ink">
                 <span aria-hidden="true" className="float-right h-[1lh]" style={{ width: actionSpace }} />
                 <span className={`mr-2 inline-block h-1.5 w-1.5 rounded-full align-middle ${BUBBLE_DOT[state]}`} title={BUBBLE_LABEL[state]} aria-label={BUBBLE_LABEL[state]} />
                 <span data-agent-summary className="select-text">{waitingForReply
                   ? <AgentReplyPending label={t('common.loading')} active={loadingActive} /> : summary}</span>
               </span>
-            )}
           </button>
-          <div className={`flex shrink-0 items-center ${open ? '' : 'absolute right-0 top-0'}`}>
-          {/* 답변만 모아 복사한다 — 생각·도구 기록은 빼고 사람이 읽으라고 쓴 글만 */}
-          {open && answerText && <CopyButton
-            text={answerText}
-            compact
-            label={uiText("이 답변 복사")}
-          />}
-          {/* 돌고 있는 턴만 중단할 수 있다 — 지난 턴에는 버튼이 없다 */}
-          {canStop && (
-            <button
-              type="button"
-              onClick={() => send({ type: 'cancel' })}
-              className={`flex shrink-0 items-center justify-center rounded text-ink-secondary hover:bg-surface-raised hover:text-ink ${open ? 'm-0.5 size-5' : 'm-1.5 h-6 w-6'}`}
-              aria-label={uiText("중단")}
-              title={uiText("중단")}
-            >
-              <span className={`rounded-[1px] bg-current ${open ? 'size-2' : 'h-2.5 w-2.5'}`} />
-            </button>
-          )}
-          </div>
-        </div>
+          {canStop && <button type="button" onClick={() => send({ type: 'cancel' })}
+            className="absolute right-0 top-0 m-1.5 flex h-6 w-6 items-center justify-center rounded text-ink-secondary hover:bg-surface-raised hover:text-ink"
+            aria-label={uiText("중단")} title={uiText("중단")} data-tip={uiText("중단")}>
+            <span className="h-2.5 w-2.5 rounded-[1px] bg-current" />
+          </button>}
+        </div>}
         {open && (
           <div className="space-y-2 px-3 py-2">
             {waitingForReply && <AgentReplyPending label={t('common.loading')} active={loadingActive} />}
@@ -5347,18 +5321,30 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
           </div>
         )}
         {open && (
-          <div data-agent-turn-footer className="sticky -bottom-3 z-10 flex h-6.5 items-center justify-end gap-1 rounded-b-lg border-t border-edge bg-surface px-1">
-            {durationMs != null && <span data-agent-duration className="min-w-0 truncate pl-1.5 text-[11px] leading-4 tabular-nums text-ink-muted">{formatDuration(durationMs)}</span>}
-            <button
-              type="button"
-              aria-expanded={open}
-              onClick={() => toggle(item.key)}
-              className="flex h-5 items-center justify-center rounded px-2 text-[11px] leading-4 text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
-            >
-              {uiText("접기")}
+          <div data-agent-turn-footer className="sticky -bottom-3 z-10 grid h-6.5 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center rounded-b-lg border-t border-edge bg-surface px-1">
+            <div className="flex min-w-0 items-center gap-1.5 pl-1.5">
+              <span className={`size-1.25 shrink-0 rounded-full ${BUBBLE_DOT[state]}`} title={BUBBLE_LABEL[state]} aria-label={BUBBLE_LABEL[state]} />
+              {durationMs != null && <span data-agent-duration className="min-w-0 truncate text-[11px] leading-4 tabular-nums text-ink-muted">{formatDuration(durationMs)}</span>}
+            </div>
+            <button type="button" aria-expanded={true} aria-label={uiText("접기")} data-tip={uiText("접기")} onClick={() => toggle(item.key)}
+              className="flex size-6 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-ink">
+              <NavArrowUp width={16} height={16} aria-hidden="true" />
             </button>
+            {canStop && <button type="button" onClick={() => send({ type: 'cancel' })}
+              className="mr-0.5 flex size-5 justify-self-end items-center justify-center rounded text-ink-secondary hover:bg-surface-raised hover:text-ink"
+              aria-label={uiText("중단")} title={uiText("중단")} data-tip={uiText("중단")}>
+              <span className="size-2 rounded-[1px] bg-current" />
+            </button>}
           </div>
         )}
+      </div>
+      {open && <div data-agent-turn-actions className="flex w-8 shrink-0 flex-col items-center gap-1">
+        {answerText && <CopyButton text={answerText} label={uiText("이 답변 복사")} rail />}
+        {onReply && <button type="button" data-agent-reply-button onClick={onReply} aria-label={t('comment.reply')} data-tip={t('comment.reply')}
+          className="flex size-8 items-center justify-center rounded text-ink-muted hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-ink">
+          <Undo width={16} height={16} aria-hidden="true" />
+        </button>}
+      </div>}
       </div>
     )
   }
@@ -5416,7 +5402,7 @@ function AgentErrorDialog({ title, detail, onClose }: { title: string; detail: s
 }
 
 /** 버블 텍스트를 통째로 클립보드에 넣는다 — 끌어 고르지 않고 한 번에 가져가는 길 */
-function CopyButton({ text, label, compact = false }: { text: string; label: string; compact?: boolean }) {
+function CopyButton({ text, label, rail = false }: { text: string; label: string; rail?: boolean }) {
   useUiLocale()
   const [done, setDone] = useState(false)
   useEffect(() => {
@@ -5429,9 +5415,10 @@ function CopyButton({ text, label, compact = false }: { text: string; label: str
     <button
       type="button"
       onClick={() => void copyText(text).then((ok) => ok && setDone(true))}
-      className={`flex shrink-0 items-center justify-center rounded text-ink-muted hover:bg-surface-hover hover:text-ink ${compact ? 'm-0.5 size-5 [&_svg]:size-2.5' : 'm-1.5 h-6 w-6'}`}
+      className={`flex shrink-0 items-center justify-center rounded text-ink-muted hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-ink ${rail ? 'size-8' : 'm-1.5 h-6 w-6'}`}
       aria-label={label}
       title={label}
+      data-tip={label}
     >
       {done ? <CheckGlyph /> : <CopyGlyph />}
     </button>
