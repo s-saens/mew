@@ -18,6 +18,7 @@ import { useOverlayDismiss } from '@mew/ui'
 import { type CmdButtonState } from '../api/client'
 import { ApiResponseError } from '../api/response'
 import { SessionTerminalPopup } from './SessionTerminalPopup'
+import { CommandButtonResultPopup } from './CommandButtonResultPopup'
 import { WORKSPACE_PROJECT } from '../utils/active-project'
 import { captureCommandMenuShortcut, focusFirstCommand, navigateCommandMenu } from '../utils/command-menu-keyboard'
 import { AUTOMATIC_RETRY_LIMIT } from '../utils/recovery-policy'
@@ -72,7 +73,7 @@ function ScopedCommandButtonMenu({
   alwaysOpen = false,
   triggerRef,
 }: CommandButtonMenuProps) {
-  const { fetchCmdButtons, runCmdButton, killTmuxSession, saveCmdButtons } = useWorkspaceApi()
+  const { fetchCmdButtons, fetchCmdButtonResult, cmdButtonArchiveUrl, runCmdButton, killTmuxSession, saveCmdButtons } = useWorkspaceApi()
   const browser = useWorkspaceBrowser()
   const locale = useUiLocale(), actionCopy = projectActionsCopy(locale), releaseCopy = projectReleaseCopy(locale)
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
@@ -90,6 +91,9 @@ function ScopedCommandButtonMenu({
   // 실행·종료 요청이 날아가 있는 동안의 명령 이름 — 그 줄의 버튼을 잠근다(button.running과 다르다)
   const [busyName, setBusyName] = useState<string | null>(null)
   const [popup, setPopup] = useState<CmdButtonState | null>(null)
+  const popupName = popup?.name
+  const fetchPopupResult = useCallback(() => fetchCmdButtonResult(project, popupName ?? '', directory, workspacePath), [fetchCmdButtonResult, project, popupName, directory, workspacePath])
+  const runPopup = useCallback(() => runCmdButton(project, popupName ?? '', directory, workspacePath), [runCmdButton, project, popupName, directory, workspacePath])
   const [editing, setEditing] = useState<Editing | null>(null)
   const [panel, setPanel] = useState<ProjectActionPanel>(null)
   const [anchor, setAnchor] = useState<CSSProperties | null>(null)
@@ -436,7 +440,16 @@ function ScopedCommandButtonMenu({
         />
       )}
 
-      {popup && (
+      {popup?.oneShot ? (
+        <CommandButtonResultPopup
+          button={popup}
+          fetchResult={fetchPopupResult}
+          archiveUrl={cmdButtonArchiveUrl(project, popup.name, directory, workspacePath)}
+          onRun={runPopup}
+          onClose={() => setPopup(null)}
+          onChanged={refresh}
+        />
+      ) : popup && (
         <SessionTerminalPopup
           title={popup.name}
           subtitle={popup.command}

@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import http from 'node:http'
+import { gzipSync } from 'node:zlib'
 import express from 'express'
 import { createApiApp, tmuxManager } from './api.ts'
 import { DATA_DIR } from './dataDir.ts'
@@ -91,6 +92,23 @@ test('project command scopes read, save and run their own root without changing 
   assert.equal((await inFlight)[0].command, 'echo updated-b', 'asynchronous work keeps the requested root after an active switch')
   list.mock.mockImplementation(async () => [])
 
+  const oneShot = [{ name: 'Run', command: 'printf result', oneShot: true }]
+  t.mock.method(tmuxManager, 'startCommand', async () => {})
+  assert.equal((await request(roots[1], 'PUT', { buttons: oneShot })).status, 200)
+  assert.equal((await request(roots[1], 'POST', { name: 'Run' })).status, 200)
+  const resultDir = path.join(DATA_DIR, 'command-button-results', other[0].session, 'current')
+  const stored = JSON.parse(fs.readFileSync(path.join(resultDir, 'record.json'), 'utf8'))
+  Object.assign(stored, { state: 'failed', exitCode: 7, finishedAt: Date.now(), archived: true })
+  fs.writeFileSync(path.join(resultDir, 'record.json'), JSON.stringify(stored))
+  fs.writeFileSync(path.join(resultDir, 'preview.txt'), 'failure in project b')
+  fs.writeFileSync(path.join(resultDir, 'output.gz'), gzipSync('full output in project b'))
+  const resultUrl = (root: string, suffix = 'result', name = 'Run') => `${base}/${suffix}?project=${WORKSPACE_PROJECT}&workspacePath=${encodeURIComponent(root)}&name=${encodeURIComponent(name)}`
+  assert.equal((await (await fetch(resultUrl(roots[1]))).json() as { result: { text: string } }).result.text, 'failure in project b')
+  assert.equal((await (await fetch(resultUrl(roots[0]))).json() as { result: null }).result, null)
+  assert.equal((await fetch(resultUrl(roots[1], 'result', 'Missing'))).status, 404)
+  assert.equal((await fetch(resultUrl(roots[1], 'archive'))).status, 200)
+  assert.equal((await fetch(resultUrl(roots[0], 'archive'))).status, 404)
+
   for (const invalid of ['', 'relative/path', path.join(temporary, 'missing'), path.join(roots[1], '.mew/cmd-button.json'), DATA_DIR]) {
     assert.equal((await request(invalid)).status, 400, `invalid root: ${invalid}`)
   }
@@ -100,9 +118,12 @@ test('project command scopes read, save and run their own root without changing 
   assert.equal((await request(roots[1], 'PUT', { buttons: [{ name: '', command: 'echo no' }] })).status, 400)
   setFeature(email, 'terminal', false)
   for (const method of ['GET', 'PUT', 'POST']) assert.equal((await request(roots[1], method, { buttons: updated, name: 'Run' })).status, 403)
+  assert.equal((await fetch(resultUrl(roots[1]))).status, 403)
+  assert.equal((await fetch(resultUrl(roots[1], 'archive'))).status, 403)
   setFeature(email, 'terminal', true)
   role = 'member'
   assert.equal((await request(roots[1])).status, 403, 'explicit root access stays limited to owner and manager')
+  assert.equal((await fetch(resultUrl(roots[1]))).status, 403)
   assert.equal((await request(undefined)).status, 200, 'unscoped requests retain existing capability behavior')
   role = 'guest'
   assert.equal((await request(roots[1])).status, 403)

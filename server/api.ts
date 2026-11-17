@@ -70,6 +70,7 @@ import { ASSET_DIR, isLocalAssetPath, isTemporaryAssetPath, moveAssetIntoProject
 import { DATA_DIR } from './dataDir.ts'
 import { createTmuxManager, createTmuxRouter } from '@mew/tmux-term/server'
 import { CmdButtonError, commandSessionName, normalizeCmdButtons, oneShotCommand, readCmdButtons, writeCmdButtons } from './cmdButtons.ts'
+import { CommandButtonResultStore, CommandButtonRunningError } from './command-button-results.ts'
 import { addCommandPreviewUrls } from './command-preview-urls.ts'
 import { commandWithGitIdentity } from './command-git-identity.ts'
 import { createProjectActionsRouter } from './project-actions-routes.ts'
@@ -172,6 +173,7 @@ import {
 
 /** tmux 세션은 워크스페이스 루트에서 시작한다 */
 export const tmuxManager = createTmuxManager({ cwd: workspacePaths.root })
+const commandButtonResults = new CommandButtonResultStore(tmuxManager)
 let defaultTerminalCwd = tmuxManager.cwd
 Object.defineProperty(tmuxManager, 'cwd', {
   get: () => workspaceContext.getStore() ? workspacePaths.root : defaultTerminalCwd,
@@ -2806,6 +2808,34 @@ export function createApiApp() {
     }
   })
 
+  function requestedCommandSession(req: express.Request): string | null {
+    const project = projectOf(req)
+    const directory = req.query.path ?? ''
+    projectDirectory(project, directory)
+    const name = req.query.name
+    if (typeof name !== 'string' || !readCmdButtons(project, directory as string).some(button => button.name === name)) return null
+    return commandSessionName(project, name, directory as string)
+  }
+
+  app.get('/cmd-buttons/result', requireFeature('terminal'), async (req, res) => {
+    try {
+      const session = requestedCommandSession(req)
+      if (!session) { res.status(404).json({ error: '해당 명령어 버튼을 찾을 수 없습니다' }); return }
+      res.setHeader('Cache-Control', 'no-store')
+      res.json({ result: await commandButtonResults.result(session) })
+    } catch (err) { handleError(res, err) }
+  })
+
+  app.get('/cmd-buttons/archive', requireFeature('terminal'), (req, res) => {
+    try {
+      const session = requestedCommandSession(req)
+      const file = session && commandButtonResults.archive(session)
+      if (!file) { res.status(404).json({ error: '저장된 출력이 없습니다' }); return }
+      res.setHeader('Cache-Control', 'no-store')
+      res.download(file, 'command-output.log.gz')
+    } catch (err) { handleError(res, err) }
+  })
+
   // 목록 전체를 통째로 저장한다(추가·수정·삭제 공통). 파일을 직접 고치는 것과 같은 자리에 쓰므로
   // 손편집과 UI 편집이 한 파일을 공유한다. 이름을 바꾸면 세션 이름 해시도 바뀌어 옛 실행 세션과의
   // 연결이 끊긴다(그 세션은 살아 있되 이 버튼에서는 더 이상 보이지 않는다).
@@ -2845,12 +2875,11 @@ export function createApiApp() {
         return
       }
       const session = commandSessionName(project, button.name, directory as string)
-      // 일회성 명령은 끝나자마자 자기 세션을 스스로 닫는다 — 세션 이름은 SESSION_NAME_RE로 검증된
-      // 값이라 셸에 그대로 이어 붙여도 안전하다
-      const command = button.oneShot ? oneShotCommand(button.command, session) : button.command
-      await tmuxManager.runCommand(session, commandWithGitIdentity(command, authOf(req).email!), root)
+      if (button.oneShot) await commandButtonResults.start(session, button.command, root, authOf(req).email!)
+      else await tmuxManager.runCommand(session, commandWithGitIdentity(button.command, authOf(req).email!), root)
       res.json({ ok: true, session })
     } catch (err) {
+      if (err instanceof CommandButtonRunningError) { res.status(409).json({ error: err.message }); return }
       handleError(res, err)
     }
   })

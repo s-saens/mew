@@ -30,6 +30,7 @@ import { createDbSubscriptions } from './dbSocket'
 import { compressImage } from '../utils/compressImage'
 import { detectInitialProject } from '../utils/active-project'
 import type { WorkspaceUiSnapshot } from '../../shared/workspace-ui-snapshot.ts'
+import type { CommandButtonResult } from '../../shared/command-button-result.ts'
 
 export type { TreeNode } from '@mew/editor'
 export type { TmuxSession } from '@mew/tmux-term'
@@ -1794,6 +1795,19 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     return mewFetch(`/api/cmd-buttons?${projectQs(project)}&path=${encodeURIComponent(path)}${workspace}`).then(json<{ buttons: CmdButtonState[] }>)
   }
 
+  function cmdButtonResultQuery(project: string, name: string, path = '', workspacePath?: string): string {
+    const workspace = workspacePath === undefined ? '' : `&workspacePath=${encodeURIComponent(workspacePath)}`
+    return `${projectQs(project)}&name=${encodeURIComponent(name)}&path=${encodeURIComponent(path)}${workspace}`
+  }
+
+  function fetchCmdButtonResult(project: string, name: string, path = '', workspacePath?: string): Promise<{ result: CommandButtonResult | null }> {
+    return mewFetch(`/api/cmd-buttons/result?${cmdButtonResultQuery(project, name, path, workspacePath)}`, { cache: 'no-store' }).then(json<{ result: CommandButtonResult | null }>)
+  }
+
+  function cmdButtonArchiveUrl(project: string, name: string, path = '', workspacePath?: string): string {
+    return appResourceUrl(`/api/cmd-buttons/archive?${cmdButtonResultQuery(project, name, path, workspacePath)}`)
+  }
+
   function runCmdButton(project: string, name: string, path = '', workspacePath?: string): Promise<{ ok: true; session: string }> {
     return mewFetch('/api/cmd-buttons/run', {
       method: 'POST',
@@ -2296,6 +2310,8 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     saveSchedules,
     runSchedule,
     fetchCmdButtons,
+    fetchCmdButtonResult,
+    cmdButtonArchiveUrl,
     runCmdButton,
     saveCmdButtons,
     fetchProjectActions,
@@ -2505,6 +2521,8 @@ export const {
   saveSchedules,
   runSchedule,
   fetchCmdButtons,
+  fetchCmdButtonResult,
+  cmdButtonArchiveUrl,
   runCmdButton,
   saveCmdButtons,
   fetchTermButtons,

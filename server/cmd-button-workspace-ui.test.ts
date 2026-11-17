@@ -49,7 +49,7 @@ createRoot(document.getElementById('root')).render(<BrowserContext.Provider valu
   const requests: Array<{ method: string; workspacePath: string; name?: string }> = []
   const deliveryRoots: string[] = []
   let previewActive = true
-  let entries = [{ name: 'Build', command: 'echo build' }, { name: 'Test', command: 'echo test' }]
+  let entries = [{ name: 'Build', command: 'echo build' }, { name: 'Test', command: 'echo test', oneShot: true }]
   let releaseBottom!: () => void
   const bottomResponse = new Promise<void>(resolve => { releaseBottom = resolve })
   await page.route('http://mew-command-scopes.test/**', async route => {
@@ -58,7 +58,9 @@ createRoot(document.getElementById('root')).render(<BrowserContext.Provider valu
       const body = method === 'GET' ? undefined : request.postDataJSON()
       const workspacePath = method === 'GET' ? url.searchParams.get('workspacePath')! : body.workspacePath
       assert.equal(method === 'GET' ? url.searchParams.get('project') : body.project, '.workspace')
-      requests.push({ method, workspacePath, ...(body?.name ? { name: body.name } : {}) })
+      const name = method === 'GET' ? url.searchParams.get('name') : body?.name
+      requests.push({ method, workspacePath, ...(name ? { name } : {}) })
+      if (url.pathname.endsWith('/result')) return route.fulfill({ json: { result: { command: 'echo test', state: 'failed', exitCode: 7, text: 'workspace b failure', archived: true } } })
       if (workspacePath === '/workspace/c') {
         await bottomResponse
         return route.fulfill({ json: { buttons: Array.from({ length: 20 }, (_, index) => ({ name: `Bottom ${index}`, command: 'echo bottom', session: `bottom-${index}`, running: false })) } })
@@ -157,6 +159,17 @@ createRoot(document.getElementById('root')).render(<BrowserContext.Provider valu
   await popup.getByText('Terminal fixture', { exact: true }).waitFor()
   assert.deepEqual(requests.filter(request => request.method === 'POST').at(-1), { method: 'POST', workspacePath: '/workspace/b', name: 'Preview' })
   await popup.getByRole('button', { name: '닫기', exact: true }).click()
+  await inactive.click()
+  await menu.getByRole('button', { name: 'Test 터미널 세션', exact: true }).click()
+  const saved = page.getByRole('dialog', { name: 'Test', exact: true })
+  await saved.getByText('workspace b failure').waitFor()
+  assert.match(await saved.textContent() ?? '', /실패 · 종료 코드 7/)
+  assert.deepEqual(requests.filter(request => request.name === 'Test').at(-1), { method: 'GET', workspacePath: '/workspace/b', name: 'Test' })
+  const archive = new URL((await saved.getByRole('link', { name: '전체 출력 다운로드' }).getAttribute('href'))!, page.url())
+  assert.equal(archive.pathname, '/api/cmd-buttons/archive')
+  assert.equal(archive.searchParams.get('workspacePath'), '/workspace/b')
+  assert.equal(archive.searchParams.get('name'), 'Test')
+  await saved.getByRole('button', { name: '닫기', exact: true }).click()
   await page.keyboard.press('Control+e')
   await menu.getByRole('button', { name: 'Preview', exact: true }).waitFor()
   assert.equal(await active.getAttribute('aria-expanded'), 'true')

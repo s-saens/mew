@@ -1,7 +1,7 @@
 ---
 title: "Command Buttons and Scheduled Tasks"
-description: "Explains the project command menu, results and publishing, Build/Deploy actions, recurring agent schedules, Git identity, and the system resources popup."
-updated: "2026-11-11"
+description: "Explains project command buttons and saved one-shot output, results and publishing, Build/Deploy actions, recurring schedules, Git identity, and system resources."
+updated: "2026-11-17"
 상위파일:
   - "../../.mew/docs/_docs.md"
   - "MOC.md"
@@ -56,7 +56,7 @@ These have similar names but are separate features. The top bar's ▶ is for **p
 | Configuration file | `<프로젝트>/.mew/cmd-button.json` | `.data/term-button.json` (**global** — shared across all projects and tabs) |
 | How to edit | Use `＋ 명령 추가` in the UI, long-press (right-click) a row, or edit the file directly | Use `+` in the UI or long-press (right-click) a button |
 | Execution location | Dedicated hidden session `mewcmd-<해시>` | Currently open tmux session |
-| Executed by | Server (`tmux send-keys`) | Client (types directly into the terminal WebSocket) |
+| Executed by | Server (dedicated tmux session) | Client (types directly into the terminal WebSocket) |
 
 ## Top Bar Project ▶ Button (.mew/cmd-button.json)
 
@@ -64,7 +64,7 @@ Click ▶ in the top bar to open a dropdown of the current project's commands. O
 
 If a running command prints a supported local web address, it appears under **Found servers** in the command menu. Select it to open the address in Mew's Browser; Browser permission is required. A reported address can remain in terminal output after the server stops, so opening it does not guarantee a connection. Mew's own reserved ports remain blocked by the Browser.
 
-Use **Alt+R** to open the current project's command menu (the existing **Ctrl+E** shortcut remains available). If the sidebar is open, it uses ▶ in the current project's row. Focus moves to the first command. Within the menu, press **1–9** to run the command at that displayed position immediately. The numeric keypad is also supported. A running command is rerun just as when clicking its name; use ■ to stop it. Use arrow keys to move between rows and buttons, and Enter to select. Closing with **Esc** returns focus to the ▶ button and keeps the project sidebar open. **Alt+1–9** for switching projects continues to work as before.
+Use **Alt+R** to open the current project's command menu (the existing **Ctrl+E** shortcut remains available). If the sidebar is open, it uses ▶ in the current project's row. Focus moves to the first command. Within the menu, press **1–9** to run the command at that displayed position immediately. The numeric keypad is also supported. Use ■ to stop a running command. A one-shot command must finish or stop before it can be started again. Use arrow keys to move between rows and buttons, and Enter to select. Closing with **Esc** returns focus to the ▶ button and keeps the project sidebar open. **Alt+1–9** for switching projects continues to work as before.
 
 As in the project list, a reorder handle is on the left and a number is at the far right. Drag the handle with a mouse or touch, press **↑/↓** on the handle, or press **Shift+↑/↓** on an item to reorder it. The order is saved in the project's command file, and the numbers change with it. Running commands are indicated by the background of the entire item.
 
@@ -84,14 +84,14 @@ File format:
 }
 ```
 
-- Clicking ▶ runs the command in a tmux session with **the project folder as its cwd**. The same button always connects to the same session (`mewcmd-<해시>`), so clicking it again reruns the command in that session.
+- Clicking ▶ runs the command in a tmux session with **the project folder as its cwd**. Each button uses its own session (`mewcmd-<해시>`); a non-one-shot command can be sent again to its existing session.
 - Root project commands also include the actual folder path in the session identifier, so commands with the same name in different projects run separately. Root commands started before this change are not automatically terminated, and their running status may not appear in the new menu. Check their output or terminate them in the existing terminal. Subdirectory command identifiers remain unchanged.
 - **▶ in a running row becomes ■ (Stop)** — clicking it kills only that command's session (`DELETE /api/tmux/sessions/:name`). Running status is determined by the server-provided `running` value, so if the session is killed elsewhere, the button returns to ▶ on the next refresh.
-- Command sessions **do not appear in the regular terminal tab list**. View a session with the terminal icon in its row. In the popup, **Terminate** ends the session, while **Close** closes only the popup and keeps it running. Commands saved with `oneShot: true` terminate their sessions immediately after completion; disable this option to keep the session available for checking output.
+- Command sessions **do not appear in the regular terminal tab list**. View a session with the terminal icon in its row. In the popup, **Terminate** ends the session, while **Close** closes only the popup and keeps it running. With `oneShot: true`, the session closes after completion, but its latest output and exit code remain available through the terminal icon, including after reopening Mew. The popup shows recent output and offers the full compressed log for download. A later completed run replaces the saved result.
 - **The server always reads the command string to execute from the file** — it does not trust commands in the execution request body. (Editing uses a separate path: saving the entire list with `PUT` makes the next execution read the new file contents.)
 - Editing: use `＋ 명령 추가` at the bottom of the dropdown; **long-press or right-click** an existing row to edit or delete it. Saving writes the entire list, overwriting the same file you may have edited manually (it is normalized to `{ "commands": [...] }`, and other top-level keys are not preserved). **Renaming changes the session name hash** — previously started sessions remain alive but are no longer visible through this button.
 - Names must be unique within a project (duplicates return 400 because the two commands would share one session).
-- Server: `server/cmdButtons.ts` (file parsing, normalization, writing, and session names) + `GET/PUT/POST /api/cmd-buttons*` (owner/manager). Client: `src/components/CommandButtonMenu.tsx` and `SessionTerminalPopup.tsx` (the session popup uses **the same component** as scheduled tasks, passing only a different session name, title, and execution function). The command menu is **portaled to body and displayed with fixed positioning** so the header's overflow does not clip it.
+- Server: `server/cmdButtons.ts` manages configuration and session names; `server/command-button-results.ts` retains one-shot results. The `/api/cmd-buttons*` routes enforce terminal access and project scope. Client: `src/components/CommandButtonMenu.tsx` opens the shared terminal popup and its one-shot result view. The command menu is **portaled to body and displayed with fixed positioning** so the header's overflow does not clip it.
 
 ## Terminal buttons (.data/term-button.json)
 
