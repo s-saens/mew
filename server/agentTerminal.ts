@@ -5,6 +5,7 @@ import { spawnSpecCommand } from './spawnSpecCommand.ts'
 import { agentGitEnv } from './agent-git-identity.ts'
 import { workspaceContext } from './paths.ts'
 import { terminalGitBootstrap } from './terminal-git-bootstrap.ts'
+import { closeTerminalBrowserBridge, terminalBrowserBridge } from './terminal-browser-bridge.ts'
 import type { WorkspaceScope } from '../shared/workspace-scope.ts'
 
 export { AGENT_TERMINAL_SESSION_PREFIX }
@@ -57,7 +58,8 @@ export async function startAgentTerminal(
     const session = !names.has(qualified) && options.allowLegacy && names.has(legacy) ? legacy : qualified
     const account = identity?.account ?? workspaceContext.getStore()?.account
     const env = !names.has(session) && account ? agentGitEnv(process.env, account) : process.env
-    createDirectTerminal(session, runtime, cwd, env)
+    const browser = !names.has(session) && account ? await terminalBrowserBridge(session, account) : {}
+    try { createDirectTerminal(session, runtime, cwd, { ...env, ...browser }, () => closeTerminalBrowserBridge(session)) } catch (error) { closeTerminalBrowserBridge(session); throw error }
     return { session }
   }
   const entry = RUNTIMES[runtime]
@@ -69,8 +71,14 @@ export async function startAgentTerminal(
   if (!running) {
     const account = identity?.account ?? workspaceContext.getStore()?.account
     if (entry.terminalLaunch === 'shell' && account) {
-      const bootstrap = terminalGitBootstrap(agentGitEnv(process.env, account))
-      try { await manager.startCommand(session, bootstrap.command, cwd) } catch (error) { bootstrap.cleanup(); throw error }
+      const bootstrap = terminalGitBootstrap({ ...agentGitEnv(process.env, account), ...await terminalBrowserBridge(session, account) })
+      try { await manager.startCommand(session, bootstrap.command, cwd) } catch (error) {
+        bootstrap.cleanup()
+        // Another concurrent request may already have created this session and be using its bridge.
+        const active = await manager.list().catch(() => null)
+        if (active && !active.some(item => item.name === session)) closeTerminalBrowserBridge(session)
+        throw error
+      }
     }
     else if (entry.terminalLaunch === 'shell') await manager.create(session, cwd)
     else await manager.runCommand(session, spawnSpecCommand(spec), cwd)
@@ -85,12 +93,14 @@ export async function stopAgentTerminal(manager: TmuxManager, runtime: string, t
     const legacy = directSessionName(runtime, tab)
     const session = !names.has(qualified) && options.allowLegacy && names.has(legacy) ? legacy : qualified
     await stopDirectTerminal(session, runtime)
+    closeTerminalBrowserBridge(session)
     return
   }
   if (RUNTIMES[runtime]?.surface !== 'terminal') throw new AgentTerminalError('터미널형 에이전트 런타임이 아닙니다')
   const names = new Set((await manager.list()).map(item => item.name))
   const session = selectedSession(names, runtime, tab, identity, options)
   if (names.has(session)) await manager.kill(session)
+  closeTerminalBrowserBridge(session)
 }
 
 function directSessionName(runtime: DirectTerminalKind, tab: string, identity?: AgentTerminalIdentity): string {

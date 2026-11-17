@@ -12,6 +12,7 @@ import { getBinding, matchesShortcut } from '@mew/shortcuts'
 import { readInputDraft, readInputHistory, recordInputHistory, writeInputDraft } from './inputDrafts'
 import { readKeyboardLock, writeKeyboardLock } from './keyboardLock'
 import { activateTerminalHyperlink, createLocalBrowserLinkProvider } from './localBrowserLinks'
+import { createTerminalSocketDecoder } from './browserOpenMessage'
 
 function arrowSequence(dir: 'up' | 'down' | 'left' | 'right' | 'home' | 'end', ctrl: boolean, shift: boolean): string {
   const letter = { up: 'A', down: 'B', right: 'C', left: 'D', home: 'H', end: 'F' }[dir]
@@ -137,6 +138,7 @@ export function TmuxTerminal({
   inputPlaceholder = uiText("텍스트 입력"),
   wsPath = '/api/tmux/ws',
   socketFactory = defaultSocketFactory,
+  onBrowserOpen,
 }: {
   sessionName: string
   activeFilePath?: string | null
@@ -154,6 +156,7 @@ export function TmuxTerminal({
   inputPlaceholder?: string
   socketFactory?: (url: string) => WebSocket
   wsPath?: string
+  onBrowserOpen?: (url: string) => void
 }) {
   useUiLocale()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -161,6 +164,8 @@ export function TmuxTerminal({
   const getSelectedTextRef = useRef(getSelectedText)
   const insertRefTargetRef = useRef(insertRefTarget)
   const wsRef = useRef<WebSocket | null>(null)
+  const browserOpenRef = useRef(onBrowserOpen)
+  useEffect(() => { browserOpenRef.current = onBrowserOpen }, [onBrowserOpen])
   const termRef = useRef<Terminal | null>(null)
   const ctrlActiveRef = useRef(false)
   const [ctrlActive, setCtrlActive] = useState(false)
@@ -533,6 +538,8 @@ export function TmuxTerminal({
       const ws = socketFactory(
         `${protocol}//${location.host}${wsPath}?session=${encodeURIComponent(sessionName)}&cols=${term.cols}&rows=${term.rows}`,
       )
+      ws.binaryType = 'arraybuffer'
+      const decodeMessage = createTerminalSocketDecoder()
       wsRef.current = ws
       ws.onopen = () => {
         attempts = 0
@@ -541,7 +548,9 @@ export function TmuxTerminal({
         sendRaw({ type: 'resize', cols: term.cols, rows: term.rows })
       }
       ws.onmessage = (event) => {
-        if (typeof event.data === 'string') term.write(event.data)
+        const message = decodeMessage(event.data)
+        if (message.output) term.write(message.output)
+        if (message.browserUrl) browserOpenRef.current?.(message.browserUrl)
       }
       ws.onclose = (event) => {
         if (disposed) return

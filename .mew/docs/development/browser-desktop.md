@@ -1,6 +1,6 @@
 ---
 title: "Native Chrome browser desktop"
-description: "Defines the single Chrome H.264/WebRTC component and runtime used by login and the internal Browser, with one account browser profile and nativeBrowser permission. Covers virtual X11 isolation, native input, login bindings, session takeover, Mew Port removal, and host/central application limits."
+description: "Defines the single Chrome H.264/WebRTC component and runtime used by login and the internal Browser, with one account browser profile and nativeBrowser permission. Covers virtual X11 isolation, native input, login bindings, terminal browser requests, session takeover, Mew Port removal, and host/central application limits."
 created: "2026-11-05"
 updated: "2026-11-06"
 ---
@@ -51,6 +51,10 @@ Mew-submitted navigation accepts credential-free HTTP(S) URLs and the exact init
 A login binding routes through `/api/browser-desktop/ws?login=<id>`. Its account-owned URL overrides the initial `open.url`; a new binding selects its URL in the existing Chrome window, while reconnecting that binding preserves the current page. Opening the general dock at `about:blank` takes over the current window without resetting it. One active viewer per account prevents duplicate runtime/profile owners. Ending a job closes its browser only while that job still owns the active viewer; a later general viewer or other login job is retained.
 
 Programmatic navigation launches ordinary Chrome with the same private display and browser profile. Chrome forwards the validated URL through its SingleInstance IPC and opens a native tab in the existing browser process. Requests are serialized and bound to the current viewer; this avoids address-bar focus, clipboard, keyboard layout, and Caps Lock races. User clipboard input still uses the shared native clipboard path.
+
+## Terminal requests
+
+New Linux/WSL terminal sessions can forward `BROWSER` requests to the account's connected terminal viewer and open this Browser. The [terminal contract](../features/terminals-agents-automation/tmux-shell-terminals.md) defines the bridge, permission checks, and session limits. Chrome and the terminal share the host network for localhost callbacks; a separate remote or container network needs its own forwarding.
 
 ## Runtime and connection prerequisites
 

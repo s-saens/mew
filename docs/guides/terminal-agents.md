@@ -1,6 +1,6 @@
 ---
 title: "Terminal and Agent Tabs"
-description: "Covers shell and multiplexer selection, terminal session lifetimes, AI tabs, runtime preparation, tab arrangement, prompt drafts, swipe-to-reply quoting, speech input, queues, history, and agent tools."
+description: "Covers shell and multiplexer selection, terminal session lifetimes and browser requests, AI tabs, runtime preparation, tab arrangement, prompt drafts, swipe-to-reply quoting, speech input, queues, history, and agent tools."
 updated: "2026-11-12"
 상위파일:
   - "../../.mew/docs/MOC.md"
@@ -14,6 +14,8 @@ In the dock, open a shell with **Terminal** or an AI conversation with **Agents*
 | Start a new AI conversation | **Agents** → select a runtime from `+` | The runtime must be installed and logged in on the server |
 | Reuse models and roles | **Agent Sets** in the `+` selector | Select saved sets for new tabs and scheduled tasks |
 | Configure skills, MCP, and default instructions | Book, plug, and gear buttons at the top of the agent panel | [Skills·MCP](../configuration/agent-harness.md) · [Default instructions](project-setup.md#edit-the-shared-guidance-file) |
+
+On Linux/WSL, a newly created terminal can open browser requests from programs that honor `BROWSER`, such as `npm login`, in Mew's Browser. Keep the terminal connected and allow the account's **Browser** permission. The host browser can reach a localhost callback started in the same host network; commands inside a container or over SSH may need port forwarding. An existing shell, or a multiplexer shell retained across a server restart, needs a new terminal session to receive the current browser bridge. If a program prints a URL instead, copy it into the Browser manually. See [Browser prerequisites](browser.md).
 
 The terminal and tools run by AI operate with the OS account permissions of the Mew server. They do not run shells or files on the browser device. Permission defaults and changes follow [Security and Roles](../operations/security.md).
 

@@ -4,7 +4,7 @@ import path from 'node:path'
 
 const posixQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
 const powershellQuote = (value: string) => `'${value.replaceAll("'", "''")}'`
-const managedKey = (key: string) => /^(?:GIT_CONFIG_.*|GIT_AUTHOR_.*|GIT_COMMITTER_.*|GIT_TERMINAL_PROMPT|GIT_ASKPASS|SSH_ASKPASS|GCM_INTERACTIVE|GH_TOKEN|GITHUB_TOKEN|MEW_GIT_.*|MEW_DATA_DIR)$/.test(key)
+const managedKey = (key: string) => /^(?:BROWSER|MEW_TERMINAL_BROWSER_SOCKET|GIT_CONFIG_.*|GIT_AUTHOR_.*|GIT_COMMITTER_.*|GIT_TERMINAL_PROMPT|GIT_ASKPASS|SSH_ASKPASS|GCM_INTERACTIVE|GH_TOKEN|GITHUB_TOKEN|MEW_GIT_.*|MEW_DATA_DIR)$/.test(key)
 
 /** Supply session-specific Git settings to a multiplexer without exposing them in argv. */
 export function terminalGitBootstrap(env: NodeJS.ProcessEnv): { command: string; cleanup: () => void } {

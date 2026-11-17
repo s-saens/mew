@@ -22,13 +22,15 @@ test('a closed agent terminal avoids xterm and a canceled download cannot attach
           import React from ${JSON.stringify(import.meta.resolve('react'))};
           import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
           import {DeferredAgentTerminal} from ${JSON.stringify(terminal)};
+          import {BrowserContext,useWorkspaceBrowser} from ${JSON.stringify(new URL('../workspace/workspace-browser-context.ts', import.meta.url).pathname)};
           const root=createRoot(document.getElementById('root'));
-          window.sockets=[];
+          window.sockets=[];window.browserUrls=[];
           const socketFactory=url=>{
             const socket={url,readyState:1,sent:[],send(raw){this.sent.push(JSON.parse(raw))},close(){this.readyState=3;this.onclose?.()}};
             window.sockets.push(socket);queueMicrotask(()=>socket.onopen?.());return socket;
           };
-          window.show=session=>root.render(<div style={{width:700,height:400}}>{session && <DeferredAgentTerminal key={session} sessionName={session} socketFactory={socketFactory}/>}</div>);
+          function Fixture({session}){const browser=useWorkspaceBrowser();return <div style={{width:700,height:400}}>{session && <DeferredAgentTerminal key={session} sessionName={session} socketFactory={socketFactory} onBrowserOpen={browser}/>}</div>}
+          window.show=session=>root.render(<BrowserContext.Provider value={url=>window.browserUrls.push(url)}><Fixture session={session}/></BrowserContext.Provider>);
           window.show(null);`
       },
     }],
@@ -75,6 +77,20 @@ test('a closed agent terminal avoids xterm and a canceled download cannot attach
   await page.waitForFunction(() => (window as any).sockets.length === 1)
   assert.match(await page.evaluate(() => (window as any).sockets[0].url), /session=current-session/)
   assert.equal(reads, 1, 'reopening reuses the completed module')
+  await page.evaluate(() => {
+    const socket = (window as any).sockets[0]
+    const frame = '\0' + JSON.stringify({ type: 'browser-open', url: 'http://localhost:4321/callback?code=fixture' })
+    socket.onmessage({ data: frame })
+    socket.onmessage({ data: new TextEncoder().encode('mew-terminal-v2').buffer })
+    socket.onmessage({ data: new TextEncoder().encode(frame).buffer })
+  })
+  assert.deepEqual(await page.evaluate(() => (window as any).browserUrls), [], 'legacy and binary terminal output cannot open the browser')
+  await page.evaluate(() => {
+    const socket = (window as any).sockets[0]
+    socket.onmessage({ data: '\0' + JSON.stringify({ type: 'browser-open', url: 'http://localhost:4321/callback?code=fixture' }) })
+    socket.onmessage({ data: '\0' + JSON.stringify({ type: 'browser-open', url: 'file:///etc/passwd' }) })
+  })
+  assert.deepEqual(await page.evaluate(() => (window as any).browserUrls), ['http://localhost:4321/callback?code=fixture'])
   const composer = page.locator('textarea:not(.xterm-helper-textarea)')
   await composer.fill('echo current')
   await composer.press('Control+Enter')

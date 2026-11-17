@@ -1,4 +1,5 @@
 import { useWorkspaceApi } from '../api/workspace-api-context'
+import { useWorkspaceBrowser } from '../workspace/workspace-browser-context'
 import { useWorkspaceDesktop, useWorkspaceView } from '../workspace/workspace-view-context'
 import { useAgentControlSelection } from '../hooks/use-agent-control-selection'
 import { useAgentPromptFeedback } from '../hooks/use-agent-prompt-feedback'
@@ -2276,6 +2277,7 @@ function AgentTerminalView({
   renderCommandButtons?: (run: (command: string) => void) => ReactNode
 }) {
   const { startAgentTerminal, openSocket } = useWorkspaceApi()
+  const openBrowser = useWorkspaceBrowser()
   useUiLocale()
   const { t } = useI18n()
   const [session, setSession] = useState<string | null>(null)
@@ -2292,7 +2294,7 @@ function AgentTerminalView({
     return () => { alive = false }
   }, [cwd, retry, runtime, tabId, startAgentTerminal])
 
-  if (session) return <TmuxTerminal socketFactory={openSocket} sessionName={session} inputPlaceholder={t('common.textInput')} activeFilePath={activeFilePath} getSelectedText={getSelectedText} renderCommandButtons={renderCommandButtons} insertRefTarget={active ? isTerminalRuntime(runtime) ? 'terminal' : 'agent' : null} />
+  if (session) return <TmuxTerminal socketFactory={openSocket} sessionName={session} inputPlaceholder={t('common.textInput')} activeFilePath={activeFilePath} getSelectedText={getSelectedText} renderCommandButtons={renderCommandButtons} insertRefTarget={active ? isTerminalRuntime(runtime) ? 'terminal' : 'agent' : null} onBrowserOpen={openBrowser ?? undefined} />
   return (
     <div className="relative flex h-full items-center justify-center bg-surface-deep text-center">
       {error ? (

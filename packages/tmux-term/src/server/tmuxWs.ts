@@ -9,6 +9,7 @@ import { preparePtyHelper } from './pty-helper.ts'
 import { terminalBackend } from './backends/index.ts'
 import { sameWebSocketOrigin } from './websocket-origin.ts'
 import { connectDirectTerminal } from './direct-terminal.ts'
+import { registerTerminalBrowserViewer } from './browser-requests.ts'
 
 const DEFAULT_WS_PATH = '/api/tmux/ws'
 const MIN_COLS = 10
@@ -31,6 +32,7 @@ export function attachTmuxWebSocket(
     /** pty(tmux attach)가 시작할 작업 디렉터리 */
     cwd: string
     authorize?: (req: IncomingMessage) => boolean
+    browserAccount?: (req: IncomingMessage) => string | null
     originAllowed?: (req: IncomingMessage) => boolean
     onConnection?: (ws: WebSocket, req: IncomingMessage) => void
     wsPath?: string
@@ -67,6 +69,8 @@ export function attachTmuxWebSocket(
     wss.handleUpgrade(req, socket, head, (ws) => {
       opts.onConnection?.(ws, req)
       const authorized = () => opts.authorize?.(req) ?? true
+      registerTerminalBrowserViewer(session, ws, () => authorized() ? opts.browserAccount?.(req) ?? null : null)
+      ws.send(Buffer.from('mew-terminal-v2'))
       if (session.startsWith('mewdirect-')) connectDirectTerminal(session, ws, cols, rows, authorized)
       else handleConnection(ws, session, cols, rows, opts.cwd, authorized)
     })
@@ -90,7 +94,7 @@ function handleConnection(ws: WebSocket, session: string, cols: number, rows: nu
     })
   } catch (err) {
     console.error('[mew:tmux] PTY startup failed:', err)
-    ws.send('\r\n[mew] Terminal failed to start. Check the server log for node-pty/tmux errors.\r\n')
+    ws.send(Buffer.from('\r\n[mew] Terminal failed to start. Check the server log for node-pty/tmux errors.\r\n'))
     ws.close(1011, 'PTY startup failed')
     return
   }
@@ -112,7 +116,7 @@ function handleConnection(ws: WebSocket, session: string, cols: number, rows: nu
 
   ptyProcess.onData((data) => {
     if (!authorized()) { ws.terminate(); return }
-    if (ws.readyState === WebSocket.OPEN) ws.send(data)
+    if (ws.readyState === WebSocket.OPEN) ws.send(Buffer.from(data))
   })
 
   ptyProcess.onExit(() => {

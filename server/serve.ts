@@ -112,7 +112,7 @@ app.use('/api/remote-access', attachAuthContext, remoteAgent.router)
 app.use('/api', attachAuthContext, createApiApp())
 addStaticAndSpaFallback(app)
 
-attachTmuxWebSocket(server, { cwd: WORKSPACE_ROOT, authorize: authorizeTmux, originAllowed: webSocketOriginAllowed, onConnection: (ws, req) => watchSocketAccess(ws, req, authorizeTmux) })
+attachTmuxWebSocket(server, { cwd: WORKSPACE_ROOT, authorize: authorizeTmux, browserAccount: req => authorizeFeature('nativeBrowser')(req) ? resolveAuth(req).email : null, originAllowed: webSocketOriginAllowed, onConnection: (ws, req) => watchSocketAccess(ws, req, authorizeTmux) })
 attachPresenceWebSocket(server, { getAuth: resolveAuth })
 attachLiveWebSocket(server, createLiveSource)
 attachCollabWebSocket(server, { authorize: authorizeCollab })

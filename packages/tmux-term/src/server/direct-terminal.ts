@@ -16,7 +16,7 @@ export function directTerminalSpec(kind: DirectTerminalKind, name: string): { co
     : { command: process.env.SHELL || '/bin/sh', args: ['-l'] }
 }
 
-export function createDirectTerminal(name: string, kind: DirectTerminalKind, cwd: string, env: NodeJS.ProcessEnv = process.env): void {
+export function createDirectTerminal(name: string, kind: DirectTerminalKind, cwd: string, env: NodeJS.ProcessEnv = process.env, onExit?: () => void): void {
   if (sessions.has(name)) return
   const spec = directTerminalSpec(kind, name)
   preparePtyHelper()
@@ -27,11 +27,11 @@ export function createDirectTerminal(name: string, kind: DirectTerminalKind, cwd
     session.output = (session.output + data).slice(-OUTPUT_LIMIT)
     for (const [client, authorized] of session.clients) {
       if (!authorized()) client.terminate()
-      else if (client.readyState === WebSocket.OPEN) client.send(data)
+      else if (client.readyState === WebSocket.OPEN) client.send(Buffer.from(data))
     }
   })
   terminal.onExit(() => {
-    if (sessions.get(name) === session) sessions.delete(name)
+    if (sessions.get(name) === session) { sessions.delete(name); onExit?.() }
     for (const client of session.clients.keys()) if (client.readyState === WebSocket.OPEN) client.close(4001, 'Terminal exited')
     session.clients.clear()
   })
@@ -46,8 +46,8 @@ export function connectDirectTerminal(name: string, ws: WebSocket, cols: number,
   if (!session) { ws.close(4001, 'Terminal exited'); return }
   session.clients.set(ws, authorized)
   // A reconnect retains the browser's xterm buffer; clear it before replaying our snapshot.
-  ws.send('\x1bc')
-  if (session.output) ws.send(session.output)
+  ws.send(Buffer.from('\x1bc'))
+  if (session.output) ws.send(Buffer.from(session.output))
   try { session.process.resize(cols, rows) } catch { ws.close(4001, 'Terminal exited'); return }
   ws.on('message', raw => {
     if (!authorized()) { ws.terminate(); return }

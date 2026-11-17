@@ -35,7 +35,7 @@ export function configureDocsServer(server: ViteDevServer): void {
   // httpServer는 미들웨어 모드(server.middlewares만 쓰는 임베딩)에선 null일 수 있음.
   // destroyUnknownUpgrades는 쓰지 않는다 — vite 자신의 HMR 업그레이드까지 끊어버리기 때문.
   if (server.httpServer) {
-    attachTmuxWebSocket(server.httpServer, { cwd: WORKSPACE_ROOT, authorize: authorizeTmux, originAllowed: webSocketOriginAllowed, onConnection: (ws, req) => watchSocketAccess(ws, req, authorizeTmux) })
+    attachTmuxWebSocket(server.httpServer, { cwd: WORKSPACE_ROOT, authorize: authorizeTmux, browserAccount: req => authorizeFeature('nativeBrowser')(req) ? resolveAuth(req).email : null, originAllowed: webSocketOriginAllowed, onConnection: (ws, req) => watchSocketAccess(ws, req, authorizeTmux) })
     attachPresenceWebSocket(server.httpServer, { getAuth: resolveAuth })
     attachLiveWebSocket(server.httpServer, createLiveSource)
     attachCollabWebSocket(server.httpServer, { authorize: authorizeCollab })
