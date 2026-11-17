@@ -1,3 +1,7 @@
+---
+description: "Mew introduction, current workspace screenshots, and installation entry points. Covers documents, code, agents across eight projects, mobile access, security, and development."
+---
+
 # mew : my easy workspace
 
 **A browser workspace for your documents, code, and AI agents.**
@@ -6,11 +10,9 @@ Open a folder on your computer or server and work with it in your browser. Write
 
 [Get started](#get-started) · [Screenshot tour](docs/guides/overview.md) · [User guides](docs/guides/MOC.md) · [Documentation](docs/README.md)
 
-**Installation guide:** [Get started](docs/guides/getting-started-en.md)
+![Mew in Midnight: the Atlas Web project explorer, launch plan, and an AI agent conversation, with the capybara Mewpet](docs/assets/screenshots/desktop.png)
 
-![mew in the dark theme, with a Markdown note and TypeScript code side by side and the capybara Mewpet at the bottom](docs/assets/screenshots/split.png)
-
-*The mew interface in the dark theme with Mewpet enabled, captured with example files. [Explore the screens and capture details](docs/guides/overview.md).*
+*Your project files, a working document, and an agent conversation in one workspace. All screenshots use English example data. [Take the full screenshot tour](docs/guides/overview.md).*
 
 ## What you can do
 
@@ -28,17 +30,32 @@ Open a project terminal or an AI conversation from the dock. Configure your runt
 
 Mew includes documentation skills for Korean, English, Japanese, and Simplified Chinese, plus a shared commit skill. Open **Skills management → Mew** in the agent panel to inspect them. [Skills and MCP](docs/configuration/agent-harness.md).
 
+### Keep eight projects in view
+
+Switch **Layout → Multi-project mode** to arrange independent project panels on one screen. Each project keeps its own files, tools, working directory, and conversations. Give every project an agent panel, or mix agents with documents and Git.
+
+![Eight projects arranged in four columns and two rows, each showing its own English agent conversation in Mew's multi-project mode](docs/assets/screenshots/multi-project.png)
+
+*Atlas Web, Orbit API, Studio UI, Beacon Docs, Pulse Analytics, Horizon Mobile, Nimbus Infra, and Meadow Notes, each with a separate agent conversation.*
+
+[Multi-project controls](docs/guides/projects.md#desktop-workspace-modes)
+
 ### Review the work in Git
 
 See changed files and commit history without leaving the workspace. Open a diff, check what an agent changed, and choose the files to commit. Autosave and Git commits are separate, so you decide when to record a change.
-
-![mew showing a project document alongside Git commit history and changed files](docs/assets/screenshots/git.png)
 
 [Git workflow](docs/guides/projects.md#git-operations-panel)
 
 ### Work together, or connect from your phone
 
 Edit documents together, leave comments, chat, and share documents with guests. Account roles and file permissions control access. On a phone, switch between the editor and tools with the bottom dock.
+
+<p>
+  <img src="docs/assets/screenshots/mobile.png" width="300" alt="Mew on a phone showing the Atlas Web launch plan and bottom dock">
+  <img src="docs/assets/screenshots/mobile-agent.png" width="300" alt="Mew on a phone showing an English agent conversation about the Atlas Web launch checklist">
+</p>
+
+*Read the plan, then switch to the agent conversation from the same phone. Browser captures at a mobile viewport; see [capture details](docs/guides/overview.md#capture-details).*
 
 [Collaboration and sharing](docs/guides/collaboration.md) · [Mobile controls](docs/guides/editor.md#mobile-and-fullscreen)
 

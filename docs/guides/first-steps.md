@@ -1,8 +1,8 @@
 ---
 title: "Open your first project and document"
-description: "Walks through the horizontal four-choice plus-button popup for an empty My Projects list, project creation, optional Git cloning or workspace/path import, the Projects My/All selector, then editing notes.md with autosave and reviewing Git changes."
+description: "Walks through creating or importing a first project, the Projects My/All selector, editing notes.md with autosave, and reviewing Git changes. Includes the current workspace with English example data."
 created: "2026-10-14"
-updated: "2026-11-07"
+updated: "2026-11-17"
 상위파일: "MOC.md"
 ---
 # Open your first project and document
@@ -33,17 +33,19 @@ If you have no Markdown files, click **New File** in the **Files** view. Enter a
 
 ## 3. Edit Markdown
 
-![Editing example project notes in Hotview](../assets/screenshots/desktop.png)
+![The Atlas Web launch plan open in Hotview, with project files and an agent conversation beside it](../assets/screenshots/desktop.png)
+
+The example above shows an established project. Your first document can start with just a heading and a checklist. See the [screenshot tour](overview.md) for more layouts and capture details.
 
 Try writing a heading and checklist as follows.
 
 ```markdown
-# 프로젝트 노트
+# Project notes
 
-## 할 일
+## To do
 
-- [ ] 요구사항 정리
-- [ ] 첫 변경 검토
+- [ ] Outline the requirements
+- [ ] Review the first change
 ```
 
 Edit the rendered content in **Hotview** and use the **Plain** button to view the Markdown source. Once saving is complete, open another file, then return to `notes.md` to confirm the content remains. Content is saved automatically; `Ctrl+S` commits the current file to Git. Before recording change history or reverting a file, review [save and restore behavior](editor.md#autosave-commits-and-file-history).

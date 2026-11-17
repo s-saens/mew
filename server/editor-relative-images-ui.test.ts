@@ -11,6 +11,9 @@ const repo = path.resolve(import.meta.dirname, '..')
 test('Hotview loads README and Documents images without rewriting Markdown, updates identical images on document switch, and resizes images with their gutter', { timeout: 40_000 }, async () => {
   const readme = fs.readFileSync(path.join(repo, 'README.md'), 'utf8')
   const overview = fs.readFileSync(path.join(repo, 'docs/guides/overview.md'), 'utf8')
+  const imagePaths = (content: string) => [...content.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)|<img\b[^>]*\bsrc="([^"]+)"/g)].map(match => match[1] ?? match[2])
+  const readmeImages = imagePaths(readme), overviewImages = imagePaths(overview)
+  assert.ok(readmeImages.length > 0 && overviewImages.length > 0)
   const source = `import React,{useState,useMemo} from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
 import {Editor} from ${JSON.stringify(path.join(repo, 'packages/editor/src/Editor.tsx'))};
@@ -68,9 +71,9 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       await page.goto('http://mew-relative-images.test/')
       await page.waitForTimeout(250)
       assert.deepEqual(errors, [])
-      await loaded(2)
+      await loaded(readmeImages.length)
       await setDoc({ path: 'guides/overview.md', project: 'docs', content: overview })
-      await loaded(4)
+      await loaded(overviewImages.length)
       const shared = '![Scope](./photo.png)\n\nExample'
       await setDoc({ path: 'a/note.md', project: 'docs', content: shared })
       await loaded(1)
@@ -120,8 +123,11 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       assert.ok(Math.abs(measurements[2].height - measurements[0].height) < 1, 'expanding restores image height')
       assert.equal(await page.locator('#root').evaluate(el => (el.ownerDocument.defaultView as unknown as { saved: string | null }).saved), null, 'resizing does not rewrite Markdown')
     }
-    assert.ok(requests.some(item => item.project === '.workspace' && item.path === 'docs/assets/screenshots/split.png'))
-    for (const name of ['split', 'desktop', 'git', 'mobile']) assert.ok(requests.some(item => item.project === 'docs' && item.path === `assets/screenshots/${name}.png`))
+    for (const image of readmeImages) assert.ok(requests.some(item => item.project === '.workspace' && item.path === image), `README image loaded: ${image}`)
+    for (const image of overviewImages) {
+      const relative = path.posix.normalize(path.posix.join('guides', image))
+      assert.ok(requests.some(item => item.project === 'docs' && item.path === relative), `Tour image loaded: ${image}`)
+    }
     assert.deepEqual(errors, [])
   } finally { await browser.close() }
 })
