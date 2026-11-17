@@ -64,8 +64,25 @@ createRoot(document.getElementById('root')).render(<React.StrictMode><I18nProvid
       return route.fulfill(script ? { contentType: 'text/javascript', body: script } : { contentType: 'text/html', body: `<!doctype html><html><meta charset="utf-8"><style>${css}[data-dock-workspace]{position:relative;height:650px}</style><div id="root"></div><script type="module" src="/app.js"></script></html>` })
     })
     await page.goto('http://mew-unified.test/')
+    const editorPanel = page.locator('[data-dock-panel="editor:main"]')
+    const grip = editorPanel.locator('[data-dock-grip]')
+    const tabBar = editorPanel.locator('[data-dock-tab-bar] > div').first()
+    for (const theme of ['dark', 'light']) {
+      await page.locator('html').evaluate((element, value) => { element.className = value }, theme)
+      const border = (element: typeof grip) => element.evaluate(node => {
+        const style = node.ownerDocument.defaultView!.getComputedStyle(node)
+        const rect = node.getBoundingClientRect()
+        return { bottom: rect.bottom, width: style.borderBottomWidth, color: style.borderBottomColor, kind: style.borderBottomStyle }
+      })
+      assert.deepEqual(await border(grip), await border(tabBar), `${theme}: the grip and tab bar share a continuous bottom border`)
+      assert.equal((await border(grip)).width, '1px')
+    }
     await page.getByRole('button', { name: 'Open Documents', exact: true }).click().catch(error => { if (errors.length) throw new Error(errors.join('\n')); throw error })
     await page.locator('.cm-content').filter({ hasText: 'Documents original' }).waitFor()
+    await grip.dblclick()
+    await page.waitForFunction("document.querySelector('[data-dock-workspace]')?.getAttribute('data-dock-maximized') === 'editor:main'")
+    await grip.dblclick()
+    await page.waitForFunction("!document.querySelector('[data-dock-workspace]')?.hasAttribute('data-dock-maximized')")
     await page.getByRole('button', { name: 'Open task document', exact: true }).click()
     assert.equal(await page.getByRole('tab').count(), 1, 'Docs then task reuses the document tab')
     await page.evaluate('window.tabs.closeTab("mew:file:docs/README.md")')

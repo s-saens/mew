@@ -333,9 +333,9 @@ export function DockBody({ group, active, offset = 'calc(var(--spacing) * 9)', c
   // Their rectangles already exclude headers and separators; mobile still needs panel layering.
   return createPortal(<div data-dock-body={group} data-workspace-panel={kind} className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface-deep" onPointerDownCapture={onFocus} onFocusCapture={onFocus} style={{ ...style, zIndex: expanded ? 20 : dock.desktop ? undefined : 11, display: visible ? 'flex' : 'none' }}><DockBodyVisibleContext.Provider value={visible}>{children}</DockBodyVisibleContext.Provider></div>, dock.host)
 }
-export function DockGrip({ group }: { group: string }) {
+export function DockGrip({ group, className = '' }: { group: string; className?: string }) {
   const dock = useDock()
   const { t } = useI18n()
   if (!dock?.desktop) return null
-  return <span data-dock-grip {...dock.dragProps(group)} onDoubleClick={() => dock.toggleMaximize(group)} title={t('panel.move')} aria-label={t('panel.move')} className="flex h-9 w-5 shrink-0 cursor-grab items-center justify-center text-ink-muted active:cursor-grabbing"><svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor" aria-hidden="true">{[4, 8, 12].map((y) => <g key={y}><circle cx="4" cy={y} r="1" /><circle cx="8" cy={y} r="1" /></g>)}</svg></span>
+  return <span data-dock-grip {...dock.dragProps(group)} onDoubleClick={() => dock.toggleMaximize(group)} title={t('panel.move')} aria-label={t('panel.move')} className={`flex h-9 w-5 shrink-0 cursor-grab items-center justify-center text-ink-muted active:cursor-grabbing ${className}`}><svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor" aria-hidden="true">{[4, 8, 12].map((y) => <g key={y}><circle cx="4" cy={y} r="1" /><circle cx="8" cy={y} r="1" /></g>)}</svg></span>
 }
