@@ -69,6 +69,7 @@ import { flushSync } from 'react-dom'
 import { EditPencil, NavArrowRight, RefreshDouble, Send as SendIcon, Terminal as TerminalIcon, Xmark } from 'iconoir-react'
 import { AgentCommandBubble, AgentCommandPopup } from './agent-command-bubble'
 import { AgentLoadingBubbles, AgentReplyPending } from './agent-loading-bubbles'
+import { AgentSwipeReply, quoteAgentReply } from './agent-swipe-reply'
 import { useAgentCommands } from '../hooks/use-agent-commands'
 import { useAgentClearFeedback } from '../hooks/use-agent-clear-feedback'
 import { useAgentEventState } from '../hooks/use-agent-event-state'
@@ -4298,11 +4299,17 @@ function AgentSessionView({
         )}
         {timeline.map(item => item.kind === 'command'
           ? <AgentCommandBubble key={item.key} command={item.command} onOpen={() => setCommandPopupId(item.command.id)} />
-          : <AgentConversationItem key={item.key} item={item} expanded={expanded} showSettings={settingsChanges.has(item.key)}
+          : (() => {
+            const replyText = item.kind === 'user' ? withoutAttachmentTokens(item.text).trim() : item.kind === 'turn' ? item.children.filter(child => child.kind === 'agent').map(child => child.kind === 'agent' ? child.text : '').join('\n\n').trim() : ''
+            const content = <AgentConversationItem item={item} expanded={expanded} showSettings={settingsChanges.has(item.key)}
             workError={workErrors[item.key]} onLoadWork={loadWorkDetails}
             project={project} readOnly={!!historyPreview} loadingActive={visible} busy={item.key === pendingReplyKey ? null : !historyPreview && item.kind === 'turn' && !item.done ? meta?.activeTask === 'cli' ? false : meta?.busy ?? null : false}
             now={item.kind === 'turn' && !item.done ? now : 0} toggle={toggle} send={send} onOpenFile={onOpenFile} onOpenError={setErrorDetail}
-            onRunCommand={allowTerminal ? runCodeCommand : undefined} codeRunDisabled={codeRunDisabled || (item.kind === 'turn' && !item.done)} />)}
+            onRunCommand={allowTerminal ? runCodeCommand : undefined} codeRunDisabled={codeRunDisabled || (item.kind === 'turn' && !item.done)} />
+            return replyText && !historyPreview && !editingQueued && !cliMode
+              ? <div key={item.key} className="group"><AgentSwipeReply text={replyText} label={t('comment.reply')} onReply={text => { setDraft(current => quoteAgentReply(text, current)); requestAnimationFrame(() => agentInputRef.current?.focus()) }}>{content}</AgentSwipeReply></div>
+              : <div key={item.key}>{content}</div>
+          })())}
       </div>
       {!conversationLoading && timeline.length > 0 && (
         <HoverTipLayer className="pointer-events-none absolute bottom-2 right-2 z-30">

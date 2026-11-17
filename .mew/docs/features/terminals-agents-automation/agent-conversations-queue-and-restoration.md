@@ -8,7 +8,7 @@ updated: "2026-11-11"
 status_hash: "b325d279cf16e291b2bcddda7cc0d70268647e336403acba780cb1081da44668"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-startup-queue.tsx", "src/utils/agent-startup-queue.ts", "src/hooks/use-agent-event-state.ts", "src/hooks/use-agent-work-history.ts", "src/utils/agent-work-loader.ts", "src/hooks/use-agent-tab-previews.ts", "src/hooks/use-agent-session-previews.ts", "src/utils/agent-tab-previews.ts", "src/utils/agentFold.ts", "src/hooks/useGridDrag.ts", "server/agentHost.ts", "server/agentWs.ts", "server/agentTranscript.ts", "server/agent-history-preview.ts", "server/agent-tab-preview.ts", "server/user-ui-routes.ts", "server/agent-session-search-service.ts", "server/agent-transcript-search.ts", "server/agent-runtime-history-search.ts"]
 commits: []
-description: "Agent conversation feedback, recovery indicator placement, history search and attachment and document labels, queues, drafts, session conflicts, and restoration, including early recent-history lists and on-demand saved transcript previews for history selection and first visits to tabs after reopening Mew. Defines navigation, quiet recovery, relay liveness, permanent failures, Mewpet recovery, and model-capacity retries."
+description: "Agent conversation feedback, swipe-to-reply quoting, recovery indicator placement, history search, queues, drafts, session conflicts, and restoration. Covers saved transcript previews, navigation, quiet recovery, relay liveness, permanent failures, and model-capacity retries."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -53,6 +53,10 @@ description: "Agent conversation feedback, recovery indicator placement, history
 - [Terminal and agent usage](../../../../docs/guides/terminal-agents.md) · [Supervision, queue, and restoration contract](../../development/agent-sessions.md)
 
 ## Detailed behavior
+
+### Reply to a message
+
+Swipe a user question or agent answer left with touch or a mouse, or use its Reply button, to insert the full text as a Markdown block quote at the start of the composer draft. Messages without text, such as attachment-only messages, cannot be quoted. The quote is editable and removable like other draft text and follows the normal sending and queue behavior. Reply is unavailable in CLI mode, while editing a queued message, and in history previews.
 
 ### Immediate message and reply feedback
 
