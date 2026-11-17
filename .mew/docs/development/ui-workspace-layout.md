@@ -1,6 +1,6 @@
 ---
 title: "UI workspace panels, Dock, and gestures"
-description: "Workspace geometry, zoom-aware viewport height, safe areas, Dock layout and F1–F12 selection, tab motion, and mobile gestures. Covers single-project and multi-project restoration, board arrangement, and panel-scoped project selection styling."
+description: "Workspace geometry, zoom-aware viewport height, safe areas, Dock layout and F1–F12 selection, tab motion, and mobile gestures. Covers layout restoration and removal of legacy task panel entries."
 created: "2026-11-03"
 updated: "2026-11-08"
 상위파일: "ui-contracts.md"
@@ -78,7 +78,7 @@ Account services and shared presence live above the views. Only the active view 
 
 Panel tab bars use the shared `h-9` height (`calc(var(--spacing) * 9)`, 36px at the default font size). `DockBody` in Git, agent, terminal, and browser panels uses the same spacing basis to calculate the body start position and remaining height. Changing the browser's default font size or maximizing a panel does not cause the body to overlap the tab bar's bottom or leave a gap between them. Mobile uses the same basis. `dock-maximize-ui.test.ts` validates tab bar/body boundaries and bottom hit tests at font sizes of 14, 16, and 20px, plus maximized and mobile layouts.
 
-When no saved docking tree exists, the desktop default places the editor above the terminal (69:31), with Git above the agent on the right (40:60). Workspace column widths are 2:1; when tasks open as a tab, they occupy the rightmost column, splitting the existing workspace at 74:26. Closed panels occupy no space. Terminal, Git, and task panels mounted after the first save are also placed beside their designated neighbors, preserving existing branch ratios. The browser is added as a separate full-height right column. Existing device/account layouts and splits within editor panes are preserved, and panels are not opened automatically. `defaultDockTree` and `addDockGroup` own the default layout; `DockWorkspace` owns restoration precedence and visible-area calculations.
+When no saved docking tree exists, the desktop default places the editor above the terminal (69:31), with Git above the agent on the right (40:60). Workspace column widths are 2:1. Closed panels occupy no space. Terminal and Git panels mounted after the first save are placed beside their designated neighbors, preserving existing branch ratios. The browser is added as a separate full-height right column. Existing device/account layouts and splits within editor panes are preserved, and panels are not opened automatically. `defaultDockTree` and `addDockGroup` own the default layout; `DockWorkspace` owns restoration precedence and visible-area calculations.
 
 The desktop workspace places the open project sidebar, file explorer, and docked workspace panels in that order. The project sidebar and file explorer are independent fixed panes that return their space when closed. A 20×36px collapse/expand button is centered on the 4px resize boundary to the right of the file explorer, and the left-edge button remains when collapsed. It provides a keyboard-accessible name, tooltip, and `aria-expanded`; mobile retains existing dock/close controls.
 
@@ -92,7 +92,7 @@ The last focused editor slot also belongs to the account's desktop geometry. Sav
 
 Desktop memo/task popup coordinates also belong to the account on that browser device. When an account coordinate record is absent, the active project's legacy coordinates initialize it once; later projects preserve the account record. Mobile does not overwrite desktop coordinates. `device-layout.test.ts` and `floating-panel-ui.test.ts` cover layout storage and popup behavior; current verification and remaining limits are recorded in the [implementation record](../work/account-desktop-layout.md).
 
-The `tasks` panel, separate from notes, uses the same docking, maximization, dock, and mobile stack and restores saved groups, tab assignments, and open state. For saved layouts without tasks, opening the panel adds it beside its default neighbor. Input, object storage, and permission contracts reside in [Task Panel](task-list.md).
+The task panel is removed. Saved task groups are discarded during layout normalization while surviving panels retain their placement. Existing task Markdown is preserved. See [ADR 0183](../decisions/0183-remove-task-panel.md).
 
 - Between the desktop file explorer and workspace panels, a 1px separator in the `edge` color matches shared panel boundaries. Horizontal and vertical docking boundaries are also standardized at 1px; hover and keyboard focus highlight only the line in the accent color. The resize handle's 4px interaction area retains the same `surface-deep` background as the body, and the file explorer handle is hidden on mobile.
 

@@ -7,11 +7,13 @@ created: "2026-10-03"
 updated: "2026-11-05"
 files: ["src/components/task-assignees.ts", "src/components/task-assignee-picker.tsx", "src/components/task-assignee-context.tsx", "shared/task-assignees.ts", "src/components/task-panel.tsx", "src/components/task-sort-picker.tsx", "src/utils/task-sort.ts", "src/components/task-swipe-row.tsx", "src/components/task-action-menu.tsx", "src/components/task-date-status.tsx", "src/components/task-panel.css", "src/components/task-text.tsx", "src/components/task-tag-picker.tsx", "server/task-markdown.ts", "src/components/task-tag-filter.tsx", "src/utils/task-tag-color.ts", "shared/task-tags.ts", "src/components/task-range-calendar.tsx", "src/components/task-calendar.tsx", "src/components/task-gantt.tsx", "src/utils/task-schedule.ts", "src/utils/task-timeline.ts", "src/hooks/use-task-list.ts", "src/hooks/use-task-drag.ts", "src/utils/task-list-session.ts", "shared/task-list.ts", "packages/ui/src/select-field.tsx", "packages/ui/src/date-field.tsx", "packages/ui/src/date-field.css", "server/task-list.ts", "server/task-list-routes.ts", "src/App.tsx"]
 commits: []
-description: "Feature requirements for the Markdown task panel, responsive calendar agenda, list/Gantt views, sorting, tags, assignees, document controls after row dates, and task documents using the shared file AI action with titled reference-only drafts. Links shared storage and lifecycle contracts and dated verification records."
+description: "Historical requirements and verification for the removed Markdown task panel, including list, calendar, and Gantt views. Existing task files are preserved; ADR 0183 records the removal."
 상위파일:
   - "MOC.md"
   - "_projects-files-search.md"
 ---
+
+> Historical feature: [ADR 0183](../../decisions/0183-remove-task-panel.md) removes the standalone panel. Existing task files remain accessible as documents; the description below records the former behavior.
 
 Provides both a standalone task panel and [editor DB Gantt](../../../../docs/guides/database.md#switching-views). Tasks read existing Markdown, and the DB uses existing rows and date columns; the two datasets are not automatically migrated or synchronized. Follows the [panel restoration decision](../../decisions/0052-restore-task-panel.md).
 

@@ -20,7 +20,7 @@ The desktop behavior below is **single-project mode**. The optional **multi-proj
 
 - Keep the installed app header, panels, Dock and full-screen dialogs inside device safe areas in portrait and landscape. Reserve each inset once without shrinking the existing header or touch controls; follow [Device safe areas](../../development/ui-workspace-layout.md#device-safe-areas).
 
-- Restore the task panel to the dock, docking layouts, mobile foreground, per-account layouts, and layout presets. Restore saved task groups, tab assignments, and open states; for saved layouts without tasks, add the panel next to its default neighbor when opened. Retain the DB Gantt; their data storage is independent. Follow [0052](../../decisions/0052-restore-task-panel.md).
+- Remove the task panel from the dock, mobile foreground, and layouts. Discard saved task groups while preserving other panels. Existing task Markdown remains accessible; database rows remain separate. Follow [ADR 0183](../../decisions/0183-remove-task-panel.md).
 - Switch notes and tasks between desktop popup and panel modes using the icon button in each tab header, and remove the selection from appearance settings. Preserve the mode, coordinates, and content, and switch each tool independently. On mobile, hide the button and display the panel.
 - Display settings in the topmost app layer above popups, other work windows, and Mewcat. Language and font dropdowns within settings must remain usable, and Esc must close their lists first. Verification covers high popup layers, desktop and mobile, preservation of reading and input content, and restoration after refresh.
 

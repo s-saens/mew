@@ -1,6 +1,6 @@
 ---
 title: "Projects and file navigation"
-description: "Explains project selection, single- and multi-project modes, files, tasks, Git operations, and per-account GitHub connections for the Git panel, terminals, and agents. Covers setup, personal shortcuts, project deletion, and the multi-project database limitation."
+description: "Explains project selection, single- and multi-project modes, files, preserved task documents, Git operations, and per-account GitHub connections. Covers setup, personal shortcuts, project deletion, and the multi-project database limitation."
 updated: "2026-11-17"
 상위파일:
   - "MOC.md"
@@ -331,38 +331,4 @@ A list of **names** to skip entirely in file listings, search, and tree watching
 
 ## Tasks
 
-Open or close the Tasks panel using the **Tasks** icon in the dock or the default shortcut `Alt+T`. List, calendar, and Gantt views of existing task Markdown are available. The editor's [Database Gantt View](database.md#switching-views) also remains available; task and DB data are not automatically migrated or synchronized.
-
-Click the person icon beside the tags to select **Assignees**. Search by name or email, assign multiple people, and click again to unassign them. Assigned people appear in the list as profile icons instead of names; if no photo is available, the first two characters of their name are used. Click an icon to change assignees, and hover to see their names in a tooltip. You can also assign people from calendar entries and Gantt edit cards.
-
-Completed items are hidden by default. Turn on **Show Completed Items** below the header to include them in the list, calendar, and Gantt views. This can be used together with tag filters.
-
-Switch views using the **List, Calendar, and Gantt** tabs in the title bar. Swipe left on the bottom dock to cycle to the next view, or right to cycle to the previous view. Each task can have a start and end date. If only one date is set, it is a one-day event on that date. If both dates are set, the period includes both endpoints.
-
-In **Calendar**, select a date at the top and view and edit that day's events below. Events spanning that date are shown, and completed events appear when **Show Completed Items** is enabled. New tasks entered below are added as events for the selected date.
-
-**Gantt** shows tasks on the left and duration bars on the right. Drag a bar to move it, or drag either end to change its duration. Enable the pencil button and draw horizontally across a row to set a period; drawing in the bottom dashed row creates a new task. Click a bar or the name on the left to change its content, completion status, start date, and end date in the edit card. Green means completed, blue means planned, and red means incomplete with an end date in the past.
-
-By default, Gantt shows from 5 days before today through 5 days after the last event's end date (at least today). Navigate with the scrollbar. Continuing to scroll horizontally at either end reveals 2 more weeks at a time after gentle resistance. The expanded range is not saved and resets when Gantt is reopened.
-
-Navigate the period using Gantt's Today, Fit All, and Zoom In/Out buttons. Drag the date scale left or right to pan, up to zoom out, or down to zoom in. Ctrl/Command+wheel and trackpad pinch also work. Drags are saved on release and canceled with Esc. With keyboard focus on a bar, use Left/Right to move it by one day, Shift+Left/Right to change the end date, or Alt+Left/Right to change the start date.
-
-Date fields use the `0000-00-00` format. Click the year, month, or day segment to enter each separately. Filling 4 digits for the year or 2 digits for the month or day moves to the next segment; arrow keys, Tab, and Enter also navigate between segments. Use the calendar button to pick a date or select Today or Tomorrow. Select and delete the entire date, or use the calendar's Clear button to unset it.
-
-Tasks are saved as `.mew/tasks/<태스크 제목>.md` files in the project, and completed documents are moved to `.mew/tasks/Done/`. Marking them incomplete returns them to the original folder. Existing completed documents are also organized when the panel is opened with write permission. The task title is the document's frontmatter `title`, and tags, assignees (an `assignees` email array), completion status, start date, and end date are also frontmatter properties. The `id` field is unnecessary, and existing instances are automatically removed. Use the document icon to the right of the dates to open the actual Markdown and write its body. Property edits in the file are reflected in the task. A new task creates a new file, and deleting a task deletes the entire document. To delete a list or calendar item, swipe left and click the delete icon that appears on the right. Swipe right, click outside, or press Esc to close the icon; with the keyboard, press Alt+Delete within an item to reveal it. Right-click an item to open a menu with icons for Open Document, Edit Schedule, Toggle Completion, and Delete. This is available in list, calendar, and Gantt views, and opens with Shift+F10 on the keyboard. Read-only mode shows only Open Document. Changing the title also renames the file while preserving its body and other properties. Files with the same title get `(2)`, `(3)` suffixes, and only characters invalid in filenames are adjusted. Existing lists and `tasks/` files are automatically migrated to the new location when the panel is opened with write permission.
-
-To ask an agent about a task, open its document and use the [editor's Agent brain button](editor.md#ask-an-agent-about-a-file). Choose a runtime or set to open a conversation named after the task, with only its titled file tag in the input. Add your instructions and send when ready. The same action supports all file views and read-only files. [Prepare the runtime](terminal-agents.md) before starting.
-
-Tasks form a flat list with no parent/child hierarchy. Click + in the tag area to the left of the title to search names, select multiple tags, or create a new name. The popup stays open after selection, and × on a chip removes the tag. Colors are assigned automatically by name. `@` and `#` entered in the title remain in the title as written.
-
-Use the small **Tag Filter** icon below the header to select multiple tags. Tasks with any selected tag appear in the list, calendar, and Gantt views. Click a colored chip beside the icon to remove that filter, or × on the right to clear all filters. New tasks created while filtering automatically receive the selected tags. Tag names are shared across input fields in the same root project and remain in autocomplete even after the last item using them is deleted.
-
-Use the calendar-shaped **Tasks** icon in the dock to open a Tasks panel separate from notes. Type directly into the final **New Task** field and press Enter to continue with the next item. Clicking elsewhere also adds the item you entered. Each item is automatically saved as an independent Markdown file, and its checkbox marks it complete.
-
-Place the cursor in existing content to edit it directly. Press Enter to split the current item, or paste multiple lines to create multiple items at once. Shift+Enter inserts a line break within an item. Pressing Backspace in an empty item deletes it and moves to the previous item. You can also delete it with the delete icon.
-
-Drag an item's checkbox to move the item. While dragging, surrounding items immediately shift positions with animations like tabs and the dock. Releasing automatically saves the order; canceling restores the original order. A short click marks completion as before, and moving an item does not change its completion status. Press Esc to cancel a move, or focus the checkbox and use Alt+Up/Down to reorder with the keyboard.
-
-Lists are shared within each current root project, and switching to a subproject uses the same list. There are no additional properties such as priority beyond hierarchy and dates. Panel docking, resizing, maximizing, and mobile switching work like other work panels. Input and the last draft persist across closing, reopening, and project switching.
-
-Changes from other windows are reflected periodically. Temporary communication or server save errors trigger two automatic retries while preserving input, with no warning if recovery succeeds. Persistent save failures or concurrent edits to the same content preserve input and display an error. Review the content and use Save Again to retry. If the same content conflicts, Save Again applies the currently entered content. Login and permission to view the entire project are required, and authoring features are unavailable to read-only accounts. This follows the [Storage and API Contract](../../.mew/docs/development/task-list.md).
+The standalone task panel has been removed. Existing `.mew/tasks/` Markdown files remain in the project and can be opened and edited as documents. They are not automatically imported into or synchronized with a database. To organize new work using table or Gantt views, create a [document database](database.md#switching-views) and add rows there.

@@ -1,11 +1,11 @@
 ---
 title: "0052 — Restore the task panel alongside database Gantt"
-description: "Restore the standalone Markdown task panel, dock, docking, mobile support, saved layouts, and new-item shortcuts while retaining editor database Gantt. Supersede the task panel removal in 0051 and assign Alt+T to tasks and Alt+F to the feature panel."
+description: "Historical decision restoring the standalone task panel alongside editor database Gantt; superseded by ADR 0183, which removes the panel while preserving task files."
 created: 2026-10-23
 updated: 2026-10-23
 ---
 
-Status: Approved
+Status: Superseded by [ADR 0183](0183-remove-task-panel.md). The historical decision and rationale remain below.
 
 ## Background
 

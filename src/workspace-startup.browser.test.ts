@@ -55,7 +55,7 @@ test('workspace chrome remains usable while editor and unopened tools download o
   const content = (await Promise.all(styleSources.map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
   const css = compiler.build([...new Set(content.match(/[A-Za-z0-9_@:/.[\]()%,-]+/g))]) + '\n' + await fs.readFile(path.join(root, 'src/components/project-board.css'), 'utf8')
-  const initialUi = { sidebar: { docsExpanded: false }, chrome: { sidebarOpen: true, sidebarView: 'files' }, tabs: { '.workspace': { panes: [{ id: 'main', tabs: [{ path: 'README.md', preview: false, viewMode: 'plain' }], activePath: 'README.md' }], layout: { kind: 'leaf', pane: 'main' }, focusedPaneId: 'main' } } }
+  const initialUi = { sidebar: { docsExpanded: false }, chrome: { sidebarOpen: true, sidebarView: 'files', tasksOpen: true }, tabs: { '.workspace': { panes: [{ id: 'main', tabs: [{ path: 'README.md', preview: false, viewMode: 'plain' }], activePath: 'README.md' }], layout: { kind: 'leaf', pane: 'main' }, focusedPaneId: 'main' } } }
   const browser = await chromium.launch({ executablePath: domBrowserExecutable(), chromiumSandbox: true })
   t.after(() => browser.close())
 
@@ -117,6 +117,10 @@ test('workspace chrome remains usable while editor and unopened tools download o
       const menu = page.getByRole('button', { name: '메뉴', exact: true })
       await menu.waitFor()
       await page.waitForFunction('window.restoredAgentWorkspace === "/alpha"')
+      assert.equal(await page.getByRole('button', { name: '태스크', exact: true }).count(), 0, 'the removed task panel is absent from the dock')
+      await page.keyboard.press('Alt+t')
+      assert.equal(await page.locator('[data-workspace-panel="tasks"]').count(), 0, 'saved open state and Alt+T cannot restore the panel')
+      assert.equal(requested.has('/api/task-list'), false, 'restoring the workspace does not load task data')
       const preparation = await page.evaluate(() => (window as any).startupPreparationOrder as string[])
       const agentDelay = await page.evaluate('window.startupAgentImportAt-window.startupAgentScheduledAt') as number
       assert.ok(width === 390 ? agentDelay < 80 : agentDelay >= 200, `visible agents start immediately; closed background code waits250ms: ${agentDelay}`)

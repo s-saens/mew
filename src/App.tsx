@@ -40,7 +40,6 @@ import { ProjectSwitcher } from './components/ProjectSwitcher'
 import { DeferredProjectCatalogPanel } from './components/deferred-project-catalog'
 import { ProjectLoadingOverlay } from './components/project-loading-overlay'
 import { projectDeleteCopy } from './components/project-delete-copy'
-import { useTaskList } from './hooks/use-task-list'
 import { useSharedMemo } from './hooks/use-shared-memo'
 import { HeaderMenu, type HeaderMenuItem } from './components/HeaderMenu'
 import { ActiveSessionsButton } from './components/active-sessions-button'
@@ -58,11 +57,7 @@ import { FileTree, type TreePersistenceState } from './components/FileTree'
 import { CommandButtonMenu } from './components/CommandButtonMenu'
 import type { SearchMatch } from './api/client'
 import type { RequestedAgentTab } from './utils/agentTabs'
-import { taskAgentFile } from './utils/task-agent'
 import { fileAgentDraft, fileAgentTitle } from './utils/file-agent'
-import { resolveTaskAgentLaunch } from './utils/task-agent-launch'
-import { syncTaskDocuments, withTaskDocumentSync } from './utils/task-document-sync'
-import { documentAbsolutePath } from './utils/document-title-preview'
 import { DockWorkspace, DockPanel, type DockHandle } from './components/DockWorkspace'
 import type { DockState } from './utils/dock-layout'
 import { getBinding, matchesShortcut } from '@mew/shortcuts'
@@ -93,7 +88,7 @@ import {
 } from './utils/mobile-panel-stack'
 import { pickRefTarget, type RefPanel } from './utils/refTarget'
 import { WORKSPACE_PROJECT } from './utils/active-project'
-import { editorFile, editorTabPath, workspaceDocumentFile } from './utils/editor-files'
+import { editorFile, editorTabPath } from './utils/editor-files'
 import { useWorkspacePanelDismissals } from './hooks/use-panel-dismissals'
 import { useI18n } from './i18n'
 import { normalizeFontPreferences } from './utils/fontPreferences'
@@ -117,7 +112,6 @@ function toggleFullscreen() {
 }
 
 const UpdatesModal = deferredDialog(async () => ({ default: (await import('./components/updates-modal')).UpdatesModal }), { title: () => uiText('업데이트'), className: 'flex max-h-[90dvh] max-w-3xl flex-col' })
-const TaskPanel = deferredComponent(async () => ({ default: (await import('./components/task-panel')).TaskPanel }))
 const SharedMemo = deferredComponent(async () => ({ default: (await import('./components/shared-memo')).SharedMemo }))
 const ProjectCreationAgentDialog = deferredDialog(async () => ({ default: (await import('./components/ProjectCreationAgentDialog')).ProjectCreationAgentDialog }), {
   title: t => t('project.createWithAgent'), className: 'flex h-[min(44rem,90dvh)] max-w-3xl flex-col workspace-compact:h-full workspace-compact:rounded-none',
@@ -154,6 +148,7 @@ function loadWorkspaceForegroundPanel(rootProjectPath: string, compactAccount?: 
   try {
     const value = scopedBrowserStorage().getItem(mobileForegroundPanelKey(rootProjectPath, compactAccount))
     if (value === 'editor') return value
+    if (value === 'tasks') return null
     return WORKSPACE_PANEL_IDS.includes(value as WorkspacePanelId) ? value as WorkspacePanelId : null
   } catch {
     return null
@@ -237,7 +232,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const active = view?.active ?? true
   const compact = view?.compact ?? false
   const api = useWorkspaceApi()
-  const { setProject, fetchWorkspaceUi, saveWorkspaceUi, fetchMewUpdateStatus, fetchUpdatesStatus, runMewAction, fetchRootProjectIcons, saveRootProjectIcon, fetchWorkspace, fetchAgentTabs, switchWorkspace, fetchRootProjectTabs, openSubproject, createEditorApi, revertFileToCommit, fetchFile, fetchTaskList, isArchivedPath, deleteRegisteredProject } = api
+  const { setProject, fetchWorkspaceUi, saveWorkspaceUi, fetchMewUpdateStatus, fetchUpdatesStatus, runMewAction, fetchRootProjectIcons, saveRootProjectIcon, fetchWorkspace, fetchAgentTabs, switchWorkspace, fetchRootProjectTabs, openSubproject, createEditorApi, revertFileToCommit, fetchFile, isArchivedPath, deleteRegisteredProject } = api
   const fetchTreeEntries = useCallback((project?: string, path = '') => api.fetchTreeV1(project, path).then(response => response.entries), [api])
   useUiLocale()
   const { pending: refreshingWorkspace, track: trackRefresh } = useRefreshTasks()
@@ -371,12 +366,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const gitMounted = useRef(false)
   const [gitOpen, setGitOpen] = useState(() => caps.git && scopedBrowserStorage().getItem(viewStorageKey(GIT_OPEN_KEY)) === '1')
   const [requestedAgentTab, setRequestedAgentTab] = useState<RequestedAgentTab | null>(null)
-  const [tasksOpen, setTasksOpen] = useState(false)
-  const tasksMounted = useRef(false)
-  if (tasksOpen) tasksMounted.current = true
-  const taskSession = useTaskList(rootProjectPath, caps.filesRead ? auth.email ?? '' : '', tasksOpen)
-  const flushTasks = taskSession.flush
-  useEffect(() => { setTasksOpen(false) }, [auth.email, caps.filesRead, api])
+  // Keep the legacy panel key closed while older layout state is read.
+  const tasksOpen = false
+  const setTasksOpen = (_open: boolean) => {}
   const [memoOpen, setMemoOpen] = useState(false)
   const memoMounted = useRef(false)
   if (memoOpen) memoMounted.current = true
@@ -1202,7 +1194,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     open: { ...workspacePanelOpen, editor: editorOpen }, sidebarWidth,
     tools: toolPresentation, popups: { memo: loadFloatingRect(popupKey('memo')), tasks: loadFloatingRect(popupKey('tasks')) },
   })
-  const permitted: Record<WorkspacePanelId, boolean> = { sidebar: caps.filesRead, chat: caps.chat, agent: caps.agent, terminal: canUseTerminal, git: caps.git, debugger: canDebug && !!auth.email && !!rootProjectPath, browser: canOpenBrowser, tasks: caps.filesRead && !!auth.email, memo: caps.collaboration && !!auth.email }
+  const permitted: Record<WorkspacePanelId, boolean> = { sidebar: caps.filesRead, chat: caps.chat, agent: caps.agent, terminal: canUseTerminal, git: caps.git, debugger: canDebug && !!auth.email && !!rootProjectPath, browser: canOpenBrowser, tasks: false, memo: caps.collaboration && !!auth.email }
   const layoutFactory = factoryLayout(captureLayout())
   for (const panel of WORKSPACE_PANEL_IDS) layoutFactory.open[panel] &&= permitted[panel]
   const applyLayoutPreset = (next: LayoutSnapshot) => {
@@ -1265,8 +1257,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   // 독 스와이프·탭 이동 단축키가 가리키는 마지막 탭형 창.
   // 독을 누르면 DOM 포커스가 옮겨가므로 포커스 대신 패널 사용 기록을 따로 둔다.
   const activeTabbedSurfaceRef = useRef<'editor' | 'agent' | 'terminal' | 'git' | 'sidebar' | 'tasks'>('editor')
-  const [taskNextTabSignal, setTaskNextTabSignal] = useState(0)
-  const [taskPreviousTabSignal, setTaskPreviousTabSignal] = useState(0)
   const [gitNextTabSignal, setGitNextTabSignal] = useState(0)
   const [gitPreviousTabSignal, setGitPreviousTabSignal] = useState(0)
   const [agentNextTabSignal, setAgentNextTabSignal] = useState(0)
@@ -1315,7 +1305,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   if (caps.git) mobileDockPanels.push('git')
   if (canOpenBrowser) mobileDockPanels.push('browser')
   if (canDebug && auth.email && rootProjectPath) mobileDockPanels.push('debugger')
-  if (caps.filesRead && auth.email && rootProjectPath) mobileDockPanels.push('tasks')
   if (caps.collaboration && auth.email) mobileDockPanels.push('memo')
   const selectDockPanel = (panel: MobileDockPanel, toggle = true) => {
     if (!mobileDockPanels.includes(panel)) return
@@ -1376,7 +1365,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     if (surface === 'tasks' && !tasksOpen) surface = 'editor'
     if (surface === 'sidebar' && !sidebarOpen) surface = agentOpen ? 'agent' : 'editor'
     activeTabbedSurfaceRef.current = surface
-    if (surface === 'tasks') { setTaskNextTabSignal(value => value + 1); return }
     if (surface === 'git') { setGitNextTabSignal((value) => value + 1); return }
     if (surface === 'agent' || surface === 'terminal') {
       setAgentNextTabSignal((value) => value + 1)
@@ -1397,7 +1385,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     if (surface === 'tasks' && !tasksOpen) surface = 'editor'
     if (surface === 'sidebar' && !sidebarOpen) surface = agentOpen ? 'agent' : 'editor'
     activeTabbedSurfaceRef.current = surface
-    if (surface === 'tasks') { setTaskPreviousTabSignal(value => value + 1); return }
     if (surface === 'git') { setGitPreviousTabSignal((value) => value + 1); return }
     if (surface === 'agent' || surface === 'terminal') {
       setAgentPreviousTabSignal((value) => value + 1)
@@ -1471,7 +1458,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     setSidebarOpen(restoredOpen.sidebar)
     setSidebarView(chrome.sidebarView === 'content-search' ? 'content-search' : 'files')
     if (isDesktop() || compact) {
-      restoredOpen.tasks = !!auth.email && caps.filesRead && chrome.tasksOpen === true
       restoredOpen.memo = !!auth.email && caps.collaboration && chrome.memoOpen === true
       restoredOpen.debugger = canDebug && !!auth.email && chrome.debuggerOpen === true
       restoredOpen.agent = caps.agent && (typeof chrome.agentOpen === 'boolean' ? chrome.agentOpen : defaults.agentOpen)
@@ -1721,10 +1707,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         e.preventDefault()
         if (matchesShortcut(e, getBinding('nextTab'))) switchCurrentWindowTabRight()
         else switchCurrentWindowTabLeft()
-      } else if (matchesShortcut(e, getBinding('toggleTasks'))) {
-        if (!caps.filesRead || !auth.email || !rootProjectPath) return
-        e.preventDefault()
-        toggleWorkspacePanel('tasks')
       } else if (matchesShortcut(e, getBinding('fullscreen'))) {
         e.preventDefault()
         toggleFullscreen()
@@ -1873,44 +1855,18 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const askFileAgent = async (path: string, content: string) => {
     if (!caps.agent) return
     const root = rootProjectPath
-    const workspace = workspaceInfoRef.current
     const file = editorFile(path, project)
     if (!root) return
     const isCurrent = () => rootProjectPathRef.current === root
-    const before = taskSession.tasks
-    try {
-      let target = file
-      let title = fileAgentTitle(content, file.path)
-      if (taskAgentFile(path, project, workspace, content)) {
-        const relative = documentAbsolutePath(root, workspace?.docsPath, file.project, file.path).slice(root.replace(/\/$/, '').length + 1)
-        const task = await resolveTaskAgentLaunch({
-          path: relative, tasks: before, isCurrent,
-          readBefore: () => withTaskDocumentSync(root, async () => {
-            const board = await fetchTaskList(root, auth.email ?? '')
-            if (isCurrent()) await syncTaskDocuments(root, before, board.tasks)
-            return board.tasks
-          }, 'read'),
-          prepare: () => prepareDocumentPageMutation(file.project),
-          readAfter: async () => (await fetchTaskList(root, auth.email ?? '')).tasks,
-          sync: (previous, next) => syncTaskDocuments(root, previous, next),
-        })
-        if (!task?.path || !isCurrent()) return
-        target = { project: WORKSPACE_PROJECT, path: task.path }
-        title = task.text || fileAgentTitle(content, task.path)
-      } else {
-        const release = await prepareDocumentPageMutation(file.project, isExternalTabPath(file.path))
-        release()
-      }
-      if (!isCurrent()) return
-      setRequestedAgentTab({
-        id: `file-${uuid()}`, label: title, renamed: true,
-        cwd: root, initialDraft: fileAgentDraft(target, title),
-      })
-      openWorkspacePanel('agent')
-    } catch (error) {
-      if (error instanceof Error && error.message === 'TASK_DOCUMENT_UNAVAILABLE') throw new Error(uiText('태스크 문서를 찾을 수 없습니다. 문서를 다시 열고 시도하세요.'))
-      throw error
-    }
+    const title = fileAgentTitle(content, file.path)
+    const release = await prepareDocumentPageMutation(file.project, isExternalTabPath(file.path))
+    release()
+    if (!isCurrent()) return
+    setRequestedAgentTab({
+      id: `file-${uuid()}`, label: title, renamed: true,
+      cwd: root, initialDraft: fileAgentDraft(file, title),
+    })
+    openWorkspacePanel('agent')
   }
 
   const renderEditorPane = (pane: (typeof panes)[number]) => {
@@ -2042,10 +1998,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       isReady: () => mewcatViewRef.current.tabsHydrated && mewcatViewRef.current.rootProjectPath !== null,
       prepareClose: async () => {
       const release = await prepareDocumentPageMutation('*', true, false)
-      try { await flushTasks(); return release } catch (error) { release(); throw error }
+      return release
     } })
     return () => target.register(null)
-  }, [host?.id, rootProjectPath, performMewcatAction, prepareDocumentPageMutation, flushTasks, api])
+  }, [host?.id, rootProjectPath, performMewcatAction, prepareDocumentPageMutation, api])
 
   const workspaceHeader = (<>      <div className="flex flex-col">
         <header className="flex h-9 items-stretch border-b border-edge pr-2 workspace-wide:h-11">
@@ -2305,12 +2261,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         </DockPanel>}
         {canOpenBrowser && !compact && <DockPanel id="browser" kind="browser" visible={browserOpen} tabs={['browser']} mobileSelected onFocus={() => bringWorkspacePanelToFront('browser')}>
           {browserOpen && <div data-workspace-panel="browser" data-dom-browser className="h-full min-h-0 min-w-0"><BrowserDesktopPanel key={auth.email} url={browserUrl} navigationRequest={browserNavigationRequest} nativeAllowed={caps.nativeBrowser} onClose={() => closeWorkspacePanel('browser')} /></div>}
-        </DockPanel>}
-        {rootProjectPath && caps.filesRead && auth.email && <DockPanel floating={toolPresentation.tasks === 'popup'} storageKey={popupKey('tasks')} legacyStorageKey={`mew:popup:${authEmail}:${projectUiPath}:tasks`} id="tasks" kind="tasks" visible={tasksOpen} tabs={['tasks']} mobileSelected onFocus={() => { activeTabbedSurfaceRef.current = 'tasks'; bringWorkspacePanelToFront('tasks') }}>
-          {tasksMounted.current && <TaskPanel workspace={rootProjectPath} onOpenFile={path => {
-            const file = workspaceDocumentFile(path, workspaceInfoRef.current)
-            openMentionedFile(file.project, file.path)
-          }} session={taskSession} nextTabSignal={taskNextTabSignal} previousTabSignal={taskPreviousTabSignal} onClose={() => closeWorkspacePanel('tasks')} />}
         </DockPanel>}
         {caps.collaboration && auth.email && <DockPanel floating={toolPresentation.memo === 'popup'} storageKey={popupKey('memo')} legacyStorageKey={projectUiPath ? `mew:popup:${authEmail}:${projectUiPath}:memo` : undefined} id="memo" kind="memo" visible={memoOpen} tabs={['memo']} mobileSelected onFocus={() => bringWorkspacePanelToFront('memo')}>
           {memoMounted.current && <SharedMemo session={memoSession} open={memoOpen} />}

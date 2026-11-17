@@ -21,7 +21,7 @@ description: "Defines the explorer toolbar and floating editor entry points, per
 ### Scope
 
 - Provides document DB insertion; table, card, board, calendar, and Gantt views; title, text/number/checkbox/date/single-select/multi-select/page columns; row and cell editing; and real-time updates.
-- Provided alongside the independent [Task Panel](../projects-files-search/task-panel-list-calendar-and-gantt.md). Task Markdown and DB rows are not automatically migrated or synchronized.
+- The former task panel is removed. Existing task Markdown and DB rows are not automatically migrated or synchronized; see [ADR 0183](../../decisions/0183-remove-task-panel.md).
 - Switching views of the same DB does not duplicate row or column data. Open item details from cards or events to use the existing property editor and navigate to the linked row page.
 - Boards group items by single-select or checkbox columns. Calendars use an end-date column and an optional start-date column to display single-date events and date-range events by month. If required columns are missing, editable DBs offer an option to add them.
 - View and edit DBs in the current project from the explorer toolbar button immediately right of the document/file creation controls beside the Documents/Files toggle, or the floating editor button immediately left of the AI action. The explorer button stays above the file list in both scopes and remains available when file creation is not permitted. These buttons open the same database-list popup and require database feature access. The catalog has no Dock entry or Dock visibility/order setting; stale saved Dock entries are ignored.

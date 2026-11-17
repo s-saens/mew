@@ -2,11 +2,13 @@
 title: "Task panel and Markdown storage contract"
 created: 2026-10-03
 updated: "2026-11-04"
-description: "Task panel contracts for input, tags, assignees, document controls after row dates, list/calendar/Gantt views, and sorting. Defines Markdown storage, migration, API permissions, concurrent saves, client recovery, and recorded verification."
+description: "Historical task panel and Markdown storage contract. ADR 0183 removes the panel; existing task files and the legacy API remain unchanged."
 상위파일: "MOC.md"
 ---
 
 [Features](../features/projects-files-search/task-panel-list-calendar-and-gantt.md) · [Usage](../../../docs/guides/projects.md#tasks)
+
+> Historical contract: the task panel was removed under [ADR 0183](../decisions/0183-remove-task-panel.md). The details below describe its previous behavior. Existing task Markdown and the legacy API remain available.
 
 The standalone task panel reads Markdown through list, calendar, and Gantt views. Toggle it from the dock or with the default `Alt+T` shortcut. The [editor DB Gantt view](../../../docs/guides/database.md#switching-views) remains a separate dataset, without automatic migration or synchronization. See the restoration decision [0052](../decisions/0052-restore-task-panel.md).
 

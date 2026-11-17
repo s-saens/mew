@@ -3,7 +3,7 @@ import test from 'node:test'
 import { addDockGroup, defaultDockTree, closeDockGroup, dockIds, dockRects, emptyDock, insertDock, normalizeDock, pruneDock, removeDock, type DockGroup, type DockNode } from './dock-layout.ts'
 const groups: DockGroup[] = [{ id: 'editor', kind: 'editor' }, { id: 'agent', kind: 'agent' }, { id: 'terminal', kind: 'terminal' }, { id: 'memo', kind: 'memo' }]
 const stacked: DockNode = { axis: 'col', ratio: .6, first: { id: 'editor' }, second: { id: 'agent' } }
-test('desktop defaults stack terminal below editor, git above agent, and tasks beside the tools', () => {
+test('desktop defaults stack terminal below editor, git above agent, without the removed task panel', () => {
   const all: DockGroup[] = [...groups, { id: 'git', kind: 'git' }, { id: 'tasks', kind: 'tasks' }]
   const tree = defaultDockTree({ id: 'editor' }, all)
   const rects = dockRects(tree, { x: 0, y: 0, width: 1568, height: 900 })
@@ -13,7 +13,7 @@ test('desktop defaults stack terminal below editor, git above agent, and tasks b
   assert.equal(rects.git.x, rects.agent.x)
   assert.equal(rects.git.width, rects.agent.width)
   assert.ok(rects.agent.y > rects.git.y)
-  assert.ok(rects.tasks.x > rects.git.x)
+  assert.equal(rects.tasks, undefined)
   assert.ok(rects.editor.width > rects.git.width * 1.9)
   const core = dockRects(pruneDock(tree, new Set(['editor', 'terminal', 'agent', 'git'])), { x: 0, y: 0, width: 1200, height: 900 })
   assert.ok(Math.abs(core.editor.width - (1200 - 4) * 2 / 3) < 1e-9)
@@ -106,10 +106,12 @@ test('closing the last panel preserves tabs for reopening without preserving an 
   assert.ok(!closed.groups.some((group) => group.id === 'agent:split'))
 })
 
-test('memo and task layouts persist without losing neighboring panels', () => {
-  const state = normalizeDock({ version: 1, groups: [{ id: 'memo', kind: 'memo' }, { id: 'tasks', kind: 'tasks' }, { id: 'editor', kind: 'editor' }], tree: { axis: 'row', ratio: .5, first: { id: 'tasks' }, second: { axis: 'row', ratio: .5, first: { id: 'memo' }, second: { id: 'editor' } } } })
-  assert.deepEqual(state.groups.map(g => g.id), ['memo', 'tasks', 'editor'])
-  assert.deepEqual(dockIds(state.tree), ['tasks', 'memo', 'editor'])
+test('retired task layouts are removed without losing neighboring panels', () => {
+  const state = normalizeDock({ version: 1, groups: [{ id: 'memo', kind: 'memo' }, { id: 'old-task-group', kind: 'tasks' }, { id: 'editor', kind: 'editor' }], tree: { axis: 'row', ratio: .5, first: { id: 'old-task-group' }, second: { axis: 'row', ratio: .5, first: { id: 'memo' }, second: { id: 'editor' } } }, tabs: { tasks: 'old-task-group', 'editor:file': 'editor' }, active: { 'old-task-group': 'tasks', editor: 'file' } })
+  assert.deepEqual(state.groups.map(g => g.id), ['memo', 'editor'])
+  assert.deepEqual(dockIds(state.tree), ['memo', 'editor'])
+  assert.deepEqual(state.tabs, { 'editor:file': 'editor' })
+  assert.deepEqual(state.active, { editor: 'file' })
 })
 
 test('DOM browser geometry and tabs survive normalization while retired features disappear', () => {

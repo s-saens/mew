@@ -28,8 +28,7 @@ export function defaultDockTree(editor: DockNode | null, groups: DockGroup[]): D
   const editing = split('col', .69, editor, panel('terminal'))
   const tools = split('col', .4, panel('git'), split('col', .65, panel('agent'), panel('debugger')))
   const work = split('row', 2 / 3, editing, tools)
-  const planning = panel('tasks')
-  return split('row', .74, work, planning)
+  return work
 }
 
 /** Place a newly mounted panel without rearranging any existing branches. */
@@ -78,9 +77,9 @@ export function dockRects(tree: DockNode | null, rect: DockRect, result: Record<
 export function normalizeDock(value: unknown): DockState {
   if (!value || typeof value !== 'object' || (value as DockState).version !== 1) return emptyDock()
   const raw = value as DockState, seen = new Set<string>()
-  const groups = Array.isArray(raw.groups) ? raw.groups.filter((g) => g && typeof g.id === 'string' && g.id.length < 300 && ['editor', 'agent', 'terminal', 'git', 'memo', 'tasks', 'debugger', 'browser'].includes(g.kind) && !seen.has(g.id) && !!seen.add(g.id)).slice(0, 64) : []
-  const retired = new Set((Array.isArray(raw.groups) ? raw.groups : []).filter(group => group && typeof group.id === 'string' && (group.kind as string) === 'features').map(group => group.id))
-  retired.add('features')
+  const groups = Array.isArray(raw.groups) ? raw.groups.filter((g) => g && typeof g.id === 'string' && g.id.length < 300 && ['editor', 'agent', 'terminal', 'git', 'memo', 'debugger', 'browser'].includes(g.kind) && !seen.has(g.id) && !!seen.add(g.id)).slice(0, 64) : []
+  const retired = new Set((Array.isArray(raw.groups) ? raw.groups : []).filter(group => group && typeof group.id === 'string' && ['features', 'tasks'].includes(group.kind as string)).map(group => group.id))
+  retired.add('features'); retired.add('tasks')
   const used = new Set<string>()
   const walk = (node: DockNode | null, depth = 0): DockNode | null => {
     if (!node || typeof node !== 'object' || depth > 32) return null

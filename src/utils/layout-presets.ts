@@ -25,7 +25,7 @@ export function normalizeLayoutSnapshot(value: unknown): LayoutSnapshot {
   }
   return {
     version: 1, dock: { ...normalizeDock(raw.dock), tabs: {}, active: {} },
-    open: Object.fromEntries(layoutPanels.map(id => [id, raw.open?.[id] === true])) as LayoutSnapshot['open'],
+    open: Object.fromEntries(layoutPanels.map(id => [id, id !== 'tasks' && raw.open?.[id] === true])) as LayoutSnapshot['open'],
     sidebarWidth: number(raw.sidebarWidth, 256, 180, 480),
     tools: { memo: raw.tools?.memo === 'popup' ? 'popup' : 'tab', tasks: raw.tools?.tasks === 'popup' ? 'popup' : 'tab' }, popups,
   }
@@ -61,9 +61,9 @@ export function layoutFingerprint(value: LayoutSnapshot): string {
 
 export function factoryLayout(current: LayoutSnapshot): LayoutSnapshot {
   const editor = current.dock.groups.find(group => group.kind === 'editor') ?? { id: 'editor:main', kind: 'editor' as const }
-  const groups = [editor, ...(['terminal', 'git', 'agent', 'tasks'] as DockKind[]).map(kind => ({ id: kind, kind }))]
+  const groups = [editor, ...(['terminal', 'git', 'agent'] as DockKind[]).map(kind => ({ id: kind, kind }))]
   return normalizeLayoutSnapshot({ ...current, dock: { version: 1, groups, tree: defaultDockTree({ id: editor.id }, groups), tabs: {}, active: {} },
-    open: Object.fromEntries(layoutPanels.map(id => [id, ['sidebar', 'editor', 'terminal', 'git', 'agent', 'tasks'].includes(id)])), sidebarWidth: 256, tools: { memo: 'tab', tasks: 'tab' }, popups: {} })
+    open: Object.fromEntries(layoutPanels.map(id => [id, ['sidebar', 'editor', 'terminal', 'git', 'agent'].includes(id)])), sidebarWidth: 256, tools: { memo: 'tab', tasks: 'tab' }, popups: {} })
 }
 export function initialLayoutPresets(factory: LayoutSnapshot): LayoutPreset[] {
   const editor = factory.dock.groups.find(group => group.kind === 'editor')!
