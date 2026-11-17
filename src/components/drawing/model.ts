@@ -21,7 +21,7 @@ export interface DrawingObject extends Bounds {
   closed?: boolean
 }
 export interface DrawingGrid { size: number; visible: boolean; snap: boolean; objectSnap?: boolean; snapTolerance?: number }
-export interface DrawingDocument { version: 1; objects: DrawingObject[]; grid: DrawingGrid }
+export interface DrawingDocument { version: 1; objects: DrawingObject[]; grid: DrawingGrid; canvas?: { width: number; height: number } }
 export interface DrawingViewport extends Point { zoom: number }
 export type Viewport = DrawingViewport
 export type SelectionIds = readonly string[] | ReadonlySet<string>
@@ -57,7 +57,7 @@ export function cloneObject(object: DrawingObject): DrawingObject {
 }
 
 export function cloneDocument(document: DrawingDocument): DrawingDocument {
-  return { version: 1, grid: { ...document.grid }, objects: document.objects.map(cloneObject) }
+  return { version: 1, ...(document.canvas ? { canvas: { ...document.canvas } } : {}), grid: { ...document.grid }, objects: document.objects.map(cloneObject) }
 }
 
 function paint(value: unknown, fallback: string): string {
@@ -117,7 +117,8 @@ export function normalizeDocument(value: unknown): DrawingDocument | null {
     objects.push(object)
   }
   const grid = raw.grid && typeof raw.grid === 'object' ? raw.grid as Record<string, unknown> : {}
-  return { version: 1, objects, grid: {
+  const canvas = raw.canvas as Record<string, unknown> | undefined
+  return { version: 1, objects, ...(canvas && typeof canvas === 'object' ? { canvas: { width: number(canvas.width, 512, 1, 1_000_000), height: number(canvas.height, 384, 1, 1_000_000) } } : {}), grid: {
     size: number(grid.size, 20, 2, 1000), visible: grid.visible !== false, snap: grid.snap !== false,
     ...(typeof grid.objectSnap === 'boolean' ? { objectSnap: grid.objectSnap } : {}),
     ...(grid.snapTolerance !== undefined ? { snapTolerance: number(grid.snapTolerance, 6, 1, 24) } : {}),
@@ -164,6 +165,7 @@ export function reorderObjects(objects: readonly DrawingObject[], ids: Selection
 }
 
 function sameDocument(a: DrawingDocument, b: DrawingDocument): boolean {
+  if (a.canvas?.width !== b.canvas?.width || a.canvas?.height !== b.canvas?.height) return false
   if (a.objects.length !== b.objects.length || a.grid.size !== b.grid.size || a.grid.visible !== b.grid.visible || a.grid.snap !== b.grid.snap ||
     (a.grid.objectSnap ?? false) !== (b.grid.objectSnap ?? false) || (a.grid.snapTolerance ?? 6) !== (b.grid.snapTolerance ?? 6)) return false
   for (let index = 0; index < a.objects.length; index++) {

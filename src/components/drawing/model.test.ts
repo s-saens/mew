@@ -201,6 +201,60 @@ test('SVG export includes rotated stroke bounds and handles empty drawings', () 
   near(bounds.x, -90); near(bounds.y, -140); near(bounds.width, 80); near(bounds.height, 130)
 })
 
+test('optional canvas dimensions normalize safely without adding a canvas to legacy documents', () => {
+  const legacy = createDocument()
+  assert.equal('canvas' in normalizeDocument(legacy)!, false)
+  const document = { ...legacy, canvas: { width: 801, height: 451 } }
+  assert.deepEqual(normalizeDocument(document), document)
+  assert.deepEqual(normalizeDocument({ ...document, canvas: { width: 0, height: 2_000_000 } })!.canvas, { width: 1, height: 1_000_000 })
+  assert.deepEqual(normalizeDocument({ ...document, canvas: { width: NaN, height: Infinity } })!.canvas, { width: 512, height: 384 })
+})
+
+test('canvas cloning and undo retain independent dimension snapshots including legacy transitions', () => {
+  const legacy = createDocument()
+  const document = { ...legacy, canvas: { width: 800, height: 450 } }
+  const clone = cloneDocument(document)
+  clone.canvas!.width = 999
+  assert.equal(document.canvas.width, 800)
+  const history = new DrawingHistory(legacy)
+  history.commit(document)
+  document.canvas.height = 999
+  assert.deepEqual(history.current.canvas, { width: 800, height: 450 })
+  const resized = history.current
+  resized.canvas!.width = 640
+  history.commit(resized)
+  resized.canvas!.width = 999
+  assert.deepEqual(history.current.canvas, { width: 640, height: 450 })
+  history.commit({ ...history.current, canvas: { width: 640, height: 360 } })
+  assert.deepEqual(history.undo().canvas, { width: 640, height: 450 })
+  assert.deepEqual(history.undo().canvas, { width: 800, height: 450 })
+  assert.equal('canvas' in history.undo(), false)
+  assert.deepEqual(history.redo().canvas, { width: 800, height: 450 })
+})
+
+test('finite canvas SVG export keeps exact centered dimensions and restores editable metadata', () => {
+  const document = { ...createDocument(), canvas: { width: 801, height: 451 } }
+  const expectedBounds = { x: -400.5, y: -225.5, width: 801, height: 451 }
+  assert.deepEqual(drawingExportBounds(document), expectedBounds)
+  document.objects.push(createObject('rect', { x: -1000, y: 900, width: 1200, height: 800, rotation: 45, strokeWidth: 100 }))
+  assert.deepEqual(drawingExportBounds(document, 200), expectedBounds)
+  const svg = serializeSvg(document, { padding: 200, background: '#fff' })
+  assert.match(svg, /^<svg\b[^>]*width="801" height="451" viewBox="-400\.5 -225\.5 801 451"/)
+  assert.ok(svg.includes('<rect x="-400.5" y="-225.5" width="801" height="451" fill="#fff"/>'))
+  assert.deepEqual(parseSvgDocument(svg), document)
+})
+
+test('legacy SVG export continues cropping objects with padding and does not restore a canvas', () => {
+  const document = createDocument()
+  document.objects.push(createObject('rect', { x: 200, y: -100, width: 80, height: 40, stroke: 'none' }))
+  assert.deepEqual(drawingExportBounds(document, 10), { x: 190, y: -110, width: 100, height: 60 })
+  const svg = serializeSvg(document, { padding: 10 })
+  assert.match(svg, /^<svg\b[^>]*width="100" height="60" viewBox="190 -110 100 60"/)
+  const restored = parseSvgDocument(svg)!
+  assert.deepEqual(restored, document)
+  assert.equal('canvas' in restored, false)
+})
+
 test('invalid and unsafe imported drawings are rejected or normalized', () => {
   const document = createDocument()
   document.objects = [createObject('rect', { x: Infinity, y: NaN, width: -1, fill: 'url(https://example.com/image)' })]

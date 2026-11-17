@@ -35,3 +35,5 @@ export { openDropdownOnArrow } from './dropdown-keyboard'
 export { getFixedPopupLayout } from './fixed-popup-layout'
 
 export { LoadingIndicator } from './loading-indicator'
+
+export { MediaPreviewDialog } from './media-preview-dialog'

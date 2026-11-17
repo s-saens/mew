@@ -13,6 +13,7 @@ import { DrawingObjectView } from './DrawingObjectView'
 import { DrawingInspector, DrawingPaintPopover, NumberField, PaintButtons, type PaintTarget } from './DrawingInspector'
 import { FreehandSampler, finalizeFreehand } from './freehand'
 import { buildSnapTargets, snapDrawingBounds, snapDrawingPoint, type SnapGuide, type SnapTargets } from './snapping'
+import { loadDrawingImage } from './images'
 import './drawing.css'
 
 type Tool = 'select' | 'hand' | 'rect' | 'ellipse' | 'line' | 'path' | 'freehand' | 'text'
@@ -32,11 +33,11 @@ const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y)
 const boundedZoom = (zoom: number) => Math.max(.05, Math.min(16, zoom))
 const round = (n: number, step: number) => Math.round(n / step) * step
 
-export function DrawingEditor({ onClose, onSave, context: destination = 'agent', projectRoot: requestedRoot }: { onClose: () => void; onSave: (file: File) => Promise<void>; context?: 'agent' | 'document'; projectRoot?: string }) {
+export function DrawingEditor({ onClose, onSave, context: destination = 'agent', projectRoot: requestedRoot, initialImage }: { onClose: () => void; onSave: (file: File) => Promise<void>; context?: 'agent' | 'document'; projectRoot?: string; initialImage?: { src: string; name: string } }) {
   const { drawingStorage } = useWorkspaceApi()
   const { getDrawingScope, loadDrawing, saveDrawing } = drawingStorage
   useUiLocale()
-  const titleId = useId(), gridId = useId()
+  const titleId = useId(), gridId = useId(), clipId = useId()
   const history = useRef(new DrawingHistory())
   const [doc, setDoc] = useState<DrawingDocument>(() => history.current.current)
   const docRef = useRef(doc); docRef.current = doc
@@ -60,11 +61,15 @@ export function DrawingEditor({ onClose, onSave, context: destination = 'agent',
   const [busy, setBusy] = useState(false)
   const busyRef = useRef(busy); busyRef.current = busy
   const [confirmClose, setConfirmClose] = useState(false)
-  const [name, setName] = useState('')
+  const [name, setName] = useState(initialImage?.name.replace(/\.[^.]+$/, '') ?? '')
+  const [imageLoading, setImageLoading] = useState(!!initialImage)
+  const [imageLoaded, setImageLoaded] = useState(!initialImage)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [records, setRecords] = useState<DrawingSummary[]>([])
   const [recordsLoading, setRecordsLoading] = useState(destination === 'agent')
   const projectRoot = useRef<string | null>(requestedRoot ?? null)
   const scopePromise = useRef<ReturnType<typeof getDrawingScope> | null>(null)
+  const initialized = useRef(false)
   const saved = useRef(JSON.stringify(createDocument()))
   const savedExport = useRef<{ document: string; svgName: string; png: File } | null>(null)
   const svgRef = useRef<SVGSVGElement>(null), stageRef = useRef<HTMLDivElement>(null)
@@ -101,6 +106,25 @@ export function DrawingEditor({ onClose, onSave, context: destination = 'agent',
   })
 
   useEffect(() => {
+    if (!initialImage) return
+    const controller = new AbortController()
+    setImageLoading(true); setError('')
+    void loadDrawingImage(initialImage.src, controller.signal).then(image => {
+      if (controller.signal.aborted) return
+      const next = { ...createDocument(), canvas: { width: image.width, height: image.height }, objects: [image] }
+      initialized.current = true
+      const baseline = history.current.reset(next)
+      preview(baseline); saved.current = JSON.stringify(baseline)
+      const stage = stageRef.current!
+      const zoom = Math.min(1, stage.clientWidth / image.width, stage.clientHeight / image.height)
+      setView({ x: stage.clientWidth / 2, y: stage.clientHeight / 2, zoom })
+      setImageLoaded(true)
+    }).catch(error => { if (!controller.signal.aborted) setError(uiText('이미지를 추가하지 못했습니다.') + ' ' + (error instanceof Error ? error.message : '')) })
+      .finally(() => { if (!controller.signal.aborted) setImageLoading(false) })
+    return () => controller.abort()
+  }, [initialImage?.src, loadAttempt])
+
+  useEffect(() => {
     if (destination === 'document') return
     let active = true
     const pending = getDrawingScope(requestedRoot); scopePromise.current = pending
@@ -118,7 +142,14 @@ export function DrawingEditor({ onClose, onSave, context: destination = 'agent',
     const observer = new ResizeObserver(() => {
       const width = stage.clientWidth, height = stage.clientHeight
       setSize({ width, height })
-      setView(current => ({ ...current, x: current.x + (width - previous.width) / 2, y: current.y + (height - previous.height) / 2 }))
+      if (!initialized.current && !initialImage && width > 0 && height > 0) {
+        initialized.current = true
+        const next = { ...docRef.current, canvas: { width, height } }
+        const baseline = history.current.reset(next)
+        preview(baseline); saved.current = JSON.stringify(baseline)
+      }
+      const dx = (width - previous.width) / 2, dy = (height - previous.height) / 2
+      setView(current => ({ ...current, x: current.x + dx, y: current.y + dy }))
       previous = { width, height }
     })
     observer.observe(stage)
@@ -209,7 +240,7 @@ export function DrawingEditor({ onClose, onSave, context: destination = 'agent',
   function chooseTool(next: Tool) { settleGesture(true); finishText(); if (penRef.current) finishPen(); setTool(next); if (next !== 'select') setSelected([]); setPaint(null); setPanel(null); focusCanvas() }
 
   function pointerDown(event: ReactPointerEvent<SVGSVGElement>) {
-    if (busy || (event.button !== 0 && event.button !== 1)) return
+    if (busy || imageLoading || !imageLoaded || (event.button !== 0 && event.button !== 1)) return
     event.preventDefault(); focusCanvas()
     if (textId) finishText()
     const screen = pointOf(event), start = worldAt(screen), base = docRef.current
@@ -224,6 +255,8 @@ export function DrawingEditor({ onClose, onSave, context: destination = 'agent',
     if (space.current || tool === 'hand' || event.button === 1) {
       gesture.current = { mode: 'pan', start, screen, base, ids: [], view: viewRef.current }; setPanning(true); return
     }
+    const canvas = base.canvas
+    if (canvas && tool !== 'select' && (Math.abs(start.x) > canvas.width / 2 || Math.abs(start.y) > canvas.height / 2)) return
     const target = event.target as Element
     const handle = target.getAttribute('data-resize-handle') as ResizeHandle | null
     if (handle && bounds) { gesture.current = { mode: 'resize', start, screen, base, ids: selected, view, bounds, handle, object: selectedObjects.length === 1 ? selectedObjects[0] : undefined, targets: snapTargets(selected) }; return }
@@ -500,7 +533,7 @@ export function DrawingEditor({ onClose, onSave, context: destination = 'agent',
   }
 
   async function save() {
-    if (busyRef.current) return
+    if (busyRef.current || imageLoading || !imageLoaded) return
     settleGesture(true)
     finishText(); if (penRef.current) finishPen()
     if (!docRef.current.objects.length) return
@@ -540,7 +573,7 @@ export function DrawingEditor({ onClose, onSave, context: destination = 'agent',
     try {
       const stored = await loadDrawing(record.id, projectRoot.current ?? undefined), restored = parseSvgDocument(stored.svg)
       if (!restored) throw new Error(uiText('이 그림의 편집 데이터를 읽을 수 없습니다.'))
-      commit(restored); saved.current = JSON.stringify(restored); setName(record.name); setSelected([]); setPanel(null); setPen(null); fit(restored.objects)
+      commit(restored); saved.current = JSON.stringify(docRef.current); setName(record.name); setSelected([]); setPanel(null); setPen(null); fit(restored.objects)
       for (const object of restored.objects.filter(object => object.type === 'text')) void loadDrawingFont(object.fontFamily ?? 'Arial', object.text).catch(() => {})
     } catch (err) { setError(err instanceof Error ? err.message : uiText('그림을 불러오지 못했습니다.')) }
     finally { busyRef.current = false; setBusy(false) }
@@ -611,12 +644,14 @@ export function DrawingEditor({ onClose, onSave, context: destination = 'agent',
           <input className="drawing-name" aria-label={uiText('그림 이름')} placeholder={uiText('제목 없는 그림')} value={name} onChange={event => setName(event.target.value)} maxLength={120} disabled={busy} />
           <div className="drawing-header-actions">
             {destination === 'agent' && iconButton(uiText('그림 기록'), <ClockRotateRight />, () => setPanel(panel === 'history' ? null : 'history'), { active: panel === 'history' })}
-            <button type="button" className="drawing-save" disabled={busy || !doc.objects.length && !pen} onClick={() => void save()}>{uiText(busy ? '저장 중…' : '저장')}</button>
+            <button type="button" className="drawing-save" disabled={busy || imageLoading || !imageLoaded || !doc.objects.length && !pen} onClick={() => void save()}>{uiText(busy ? '저장 중…' : '저장')}</button>
             {iconButton(uiText('닫기'), <Xmark />, requestClose)}
           </div>
         </header>
         {error && <div className="drawing-error" role="alert"><span>{error}</span><button type="button" aria-label={uiText('오류 닫기')} onClick={() => setError('')}><Xmark /></button></div>}
-        <div ref={stageRef} className="drawing-stage" inert={busy} data-tool={tool} data-panning={panning || undefined} onDragOver={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy' } }} onDrop={event => { event.preventDefault(); void insertImages([...event.dataTransfer.files], worldAt(pointOf(event))) }}>
+        {imageLoading && <div role="status" className="drawing-error">{uiText('불러오는 중…')}</div>}
+        {initialImage && !imageLoading && !imageLoaded && <button type="button" onClick={() => setLoadAttempt(value => value + 1)}>{uiText('다시 시도')}</button>}
+        <div ref={stageRef} className="drawing-stage" inert={busy || imageLoading || !imageLoaded} data-tool={tool} data-panning={panning || undefined} onDragOver={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy' } }} onDrop={event => { event.preventDefault(); void insertImages([...event.dataTransfer.files], worldAt(pointOf(event))) }}>
           <svg ref={svgRef} data-drawing-canvas tabIndex={0} aria-label={uiText('그림 캔버스')} role="application" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={event => pointerUp(event)} onPointerCancel={event => pointerUp(event, true)}
             onDoubleClick={event => {
               if (penRef.current) { finishPen(); return }
@@ -635,9 +670,11 @@ export function DrawingEditor({ onClose, onSave, context: destination = 'agent',
                 event.preventDefault(); const rect = svgRef.current!.getBoundingClientRect(); setContext({ x: rect.left + size.width / 2, y: rect.top + size.height / 2 })
               }
             }}>
-            <defs><pattern id={gridId} width={gridStep * view.zoom} height={gridStep * view.zoom} patternUnits="userSpaceOnUse" x={view.x} y={view.y}><circle cx={0} cy={0} r={.8} fill="var(--color-ink-muted)" /></pattern></defs>
+            <defs>{doc.canvas && <clipPath id={clipId}><rect x={-doc.canvas.width / 2} y={-doc.canvas.height / 2} width={doc.canvas.width} height={doc.canvas.height} /></clipPath>}<pattern id={gridId} width={gridStep * view.zoom} height={gridStep * view.zoom} patternUnits="userSpaceOnUse" x={view.x} y={view.y}><circle cx={0} cy={0} r={.8} fill="var(--color-ink-muted)" /></pattern></defs>
             {doc.grid.visible && <rect width="100%" height="100%" fill={`url(#${gridId})`} pointerEvents="none" />}
             <g transform={`translate(${view.x} ${view.y}) scale(${view.zoom})`}>
+              {doc.canvas && <rect data-canvas-bounds x={-doc.canvas.width / 2} y={-doc.canvas.height / 2} width={doc.canvas.width} height={doc.canvas.height} fill="transparent" stroke="var(--color-edge-bright)" strokeWidth={1 / view.zoom} />}
+              <g clipPath={doc.canvas ? `url(#${clipId})` : undefined}>
               {doc.objects.map(object => <DrawingObjectView key={object.id} object={object} />)}
               {stroke && <DrawingObjectView object={stroke} />}
               {pen && <><DrawingObjectView object={pen} />{pen.points?.map((point, index) => <g key={index}>
@@ -647,6 +684,7 @@ export function DrawingEditor({ onClose, onSave, context: destination = 'agent',
               </g>)}</>}
               {guides.map((guide, index) => <line key={index} data-snap-guide x1={guide.axis === 'x' ? guide.value : guide.from - 12 / view.zoom} x2={guide.axis === 'x' ? guide.value : guide.to + 12 / view.zoom} y1={guide.axis === 'y' ? guide.value : guide.from - 12 / view.zoom} y2={guide.axis === 'y' ? guide.value : guide.to + 12 / view.zoom} stroke="var(--color-accent)" strokeWidth={1 / view.zoom} strokeDasharray={`${4 / view.zoom} ${3 / view.zoom}`} pointerEvents="none" />)}
               {marquee && <rect {...marquee} fill="color-mix(in srgb, var(--color-accent) 12%, transparent)" stroke="var(--color-accent)" strokeWidth={1 / view.zoom} />}
+              </g>
               {box && !textId && <g transform={selectionTransform} className="drawing-selection">
                 <rect width={Math.max(1, box.width)} height={Math.max(1, box.height)} fill="none" stroke="var(--color-accent)" strokeWidth={1 / view.zoom} pointerEvents="none" />
                 <line x1={box.width / 2} x2={box.width / 2} y1={0} y2={-27 / view.zoom} stroke="var(--color-accent)" strokeWidth={1 / view.zoom} pointerEvents="none" />

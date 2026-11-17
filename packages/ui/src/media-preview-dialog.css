@@ -1,0 +1,12 @@
+.mew-dialog-overlay.media-preview-overlay { z-index: var(--layer-viewer, 1300); background: rgb(0 0 0 / .7); animation: media-preview-enter 160ms ease-out; }
+.mew-dialog.media-preview-dialog { position: relative; width: auto; max-width: 100%; max-height: 100%; border: 0; background: transparent; box-shadow: none; overflow: visible; }
+.media-preview-content { position: relative; display: flex; align-items: center; justify-content: center; }
+.media-preview-content > :is(img, video) { display: block; max-height: calc(100dvh - 3rem); max-width: calc(100vw - 3rem); border-radius: 6px; object-fit: contain; }
+.media-preview-content > video { width: min(60rem, calc(100vw - 3rem)); background: black; }
+.media-preview-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; }
+.media-preview-actions button { display: flex; width: 32px; height: 32px; align-items: center; justify-content: center; border-radius: 50%; background: rgb(0 0 0 / .65); color: white; }
+.media-preview-actions button:hover { background: rgb(0 0 0 / .85); }
+.media-preview-overlay.is-closing { animation: media-preview-exit 120ms ease-in forwards; }
+@keyframes media-preview-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes media-preview-exit { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .media-preview-overlay, .media-preview-overlay.is-closing { animation: none; } }

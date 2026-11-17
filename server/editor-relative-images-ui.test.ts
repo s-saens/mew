@@ -58,7 +58,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
       await page.locator('.ProseMirror').evaluate((el, count) => new Promise<void>((resolve, reject) => {
         const started = Date.now()
         const check = () => {
-          const imgs = Array.from(el.querySelectorAll('img')) as { complete: boolean; naturalWidth: number; getAttribute: (name: string) => string | null }[]
+          const imgs = Array.from(el.querySelectorAll('img[src]')) as { complete: boolean; naturalWidth: number; getAttribute: (name: string) => string | null }[]
           if (imgs.length === count && imgs.every(img => img.complete && img.naturalWidth > 0)) return resolve()
           if (Date.now() - started > 4500) return reject(new Error(JSON.stringify({images: imgs.map(img => ({src:img.getAttribute('src'),complete:img.complete,width:img.naturalWidth}))})))
           el.ownerDocument.defaultView!.requestAnimationFrame(check)

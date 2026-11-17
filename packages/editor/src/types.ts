@@ -8,6 +8,7 @@ export interface EditorOpenLinkOptions {
 export type EditorOpenLink = (path: string, options?: EditorOpenLinkOptions) => void
 
 export interface EditorDrawingOptions {
+  initialImage?: { src: string; name: string }
   onClose: () => void
   onSave: (file: File) => Promise<void>
 }

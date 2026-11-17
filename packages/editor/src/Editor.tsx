@@ -33,7 +33,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffec
 import { createPortal } from 'react-dom'
 import type { EditorApi, EditorCollab, EditorDrawingOptions, EditorOpenLink, TableWidths, TreeNode } from './types'
 import { ResizableImage } from './ResizableImage'
-import { ImageSourceContext } from './editor/image-source-context'
+import { ImageEditingContext, ImageSourceContext } from './editor/image-source-context'
 import { AudioNode, VideoNode, Youtube, YOUTUBE_URL_RE } from './MediaNodes'
 import { Database } from './database/Database'
 import { DbReferencePicker } from './database/DbReferencePicker'
@@ -377,6 +377,7 @@ export const Editor = forwardRef<
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [drawing, setDrawing] = useState<DrawingSession | null>(null)
   const drawingRef = useRef<DrawingSession | null>(null)
+  const imageScope = useMemo(() => ({}), [path, api])
   const canDraw = !!renderDrawingEditor && !readOnly
   const drawingContextRef = useRef({ path, api, canDraw })
   drawingContextRef.current = { path, api, canDraw }
@@ -2276,7 +2277,9 @@ export const Editor = forwardRef<
         />
       )}
       <ImageSourceContext.Provider value={resolveImageSource}>
+      <ImageEditingContext.Provider value={{ scope: imageScope, renderDrawingEditor: canDraw ? renderDrawingEditor : undefined, upload: file => trackedApi.uploadAsset(file) }}>
         <EditorContent editor={editor} />
+      </ImageEditingContext.Provider>
       </ImageSourceContext.Provider>
       {pageName && createPortal(<InlinePageNameInput onSubmit={submitPageName} onCancel={() => closePageName()} />, pageName.mount)}
       {voice.portal}

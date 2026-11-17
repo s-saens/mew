@@ -3477,7 +3477,9 @@ function AgentSessionView({
   const [savingDefaults, setSavingDefaults] = useState(false)
   const [attachingQueued, setAttachingQueued] = useState(false)
   const queuedEditVersionRef = useRef(0)
-  const [drawingContext, setDrawingContext] = useState<{ projectRoot: string; target: 'composer' | 'queue'; queueVersion: number } | null>(null)
+  const [drawingContext, setDrawingContext] = useState<{ projectRoot: string; target: 'composer' | 'queue'; queueVersion: number; initialImage?: { src: string; name: string } } | null>(null)
+  const drawingContextRef = useRef(drawingContext)
+  drawingContextRef.current = drawingContext
   const drawingWorkspaceRef = useRef(fileWorkspace)
   drawingWorkspaceRef.current = fileWorkspace
   useEffect(() => {
@@ -3755,7 +3757,7 @@ function AgentSessionView({
   const saveDrawingAttachment = async (file: File) => {
     const context = drawingContext
     if (!context) throw new Error(uiText('그림판을 다시 열어 주세요'))
-    const isCurrent = () => drawingWorkspaceRef.current === context.projectRoot
+    const isCurrent = () => drawingContextRef.current === context && drawingWorkspaceRef.current === context.projectRoot
       && (context.target !== 'queue' || queuedEditVersionRef.current === context.queueVersion)
     if (!isCurrent()) throw new Error(uiText('작업 폴더나 편집 중인 메시지가 변경되었습니다'))
     const attached = await attachFiles([file], context.target, { projectRoot: context.projectRoot, isCurrent })
@@ -4789,10 +4791,14 @@ function AgentSessionView({
           kind={previewAttachment.isImage ? 'image' : 'video'}
           src={rawUrl(previewAttachment.relPath, previewAttachment.project)}
           name={previewAttachment.relPath.split('/').pop() ?? previewAttachment.relPath}
+          onEdit={previewAttachment.isImage && !composerCliMode && !composerAttaching ? () => {
+            setDrawingContext({ projectRoot: fileWorkspace, target: editingQueued ? 'queue' : 'composer', queueVersion: queuedEditVersionRef.current, initialImage: { src: rawUrl(previewAttachment.relPath, previewAttachment.project), name: previewAttachment.relPath.split('/').pop() ?? uiText('사진') } })
+            setPreviewAttachment(null)
+          } : undefined}
           onClose={() => setPreviewAttachment(null)}
         />
       )}
-      {drawingContext && <DeferredDrawingEditor onClose={() => { setDrawingContext(null); requestAnimationFrame(() => agentInputRef.current?.focus()) }} onSave={saveDrawingAttachment} />}
+      {drawingContext && <DeferredDrawingEditor initialImage={drawingContext.initialImage} projectRoot={drawingContext.projectRoot} onClose={() => { setDrawingContext(null); requestAnimationFrame(() => agentInputRef.current?.focus()) }} onSave={saveDrawingAttachment} />}
         </>
       )}
 

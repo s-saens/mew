@@ -1,12 +1,37 @@
+import { MediaPreviewDialog } from '@mew/ui'
+import { uiText } from '@mew/ui/i18n-core'
+import { Maximize } from 'iconoir-react'
 import { NodeViewWrapper, ReactNodeViewRenderer, type NodeViewProps } from '@tiptap/react'
-import { useContext, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { imageNode } from './imageSchema'
-import { ImageSourceContext } from './editor/image-source-context'
+import { ImageEditingContext, ImageSourceContext } from './editor/image-source-context'
 
 const MIN_WIDTH = 80
 
-function ImageView({ node, updateAttributes, selected, editor }: NodeViewProps) {
+function ImageView({ node, updateAttributes, selected, editor, getPos }: NodeViewProps) {
   const resolveSrc = useContext(ImageSourceContext)
+  const editing = useContext(ImageEditingContext)
+  const [preview, setPreview] = useState(false)
+  const [drawing, setDrawing] = useState(false)
+  const latest = useRef({ editing, node })
+  latest.current = { editing, node }
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  useEffect(() => { setPreview(false); setDrawing(false) }, [editing?.scope])
+  const canEdit = editor.isEditable && !!editing?.renderDrawingEditor
+  useEffect(() => { if (!canEdit) setDrawing(false) }, [canEdit])
+  const src = resolveSrc(node.attrs.src ?? '')
+  const name = node.attrs.alt || uiText('사진')
+  async function saveImage(file: File) {
+    const original = node.attrs.src, scope = editing?.scope
+    const isCurrent = () => alive.current && !editor.isDestroyed && editor.isEditable && latest.current.editing?.scope === scope
+      && latest.current.node.attrs.src === original && !!latest.current.editing?.renderDrawingEditor
+    if (!editing || !isCurrent()) throw new Error(uiText('문서가 변경되었습니다. 그림판을 다시 여세요.'))
+    const { url } = await editing.upload(file)
+    const pos = getPos()
+    if (!isCurrent() || pos === undefined || editor.state.doc.nodeAt(pos)?.attrs.src !== original) throw new Error(uiText('문서가 변경되었습니다. 그림판을 다시 여세요.'))
+    updateAttributes({ src: url })
+  }
   const imgRef = useRef<HTMLImageElement>(null)
   const [liveWidth, setLiveWidth] = useState<number | null>(null)
   const width = liveWidth ?? (node.attrs.width as number | null)
@@ -38,7 +63,7 @@ function ImageView({ node, updateAttributes, selected, editor }: NodeViewProps) 
     <NodeViewWrapper className="group relative my-2 w-fit max-w-full" data-drag-handle>
       <img
         ref={imgRef}
-        src={resolveSrc(node.attrs.src ?? '')}
+        src={src}
         alt={node.attrs.alt ?? ''}
         title={node.attrs.title ?? undefined}
         className={`block max-w-full rounded-md ${selected ? 'ring-2 ring-accent' : ''}`}
@@ -46,6 +71,9 @@ function ImageView({ node, updateAttributes, selected, editor }: NodeViewProps) 
         onDoubleClick={() => editor.isEditable && updateAttributes({ width: null })}
         draggable={false}
       />
+      <button type="button" contentEditable={false} className="absolute right-1 top-1 flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/85" aria-label={uiText('사진 확대')} data-tip={uiText('사진 확대')} onMouseDown={event => { event.preventDefault(); event.stopPropagation() }} onClick={event => { event.stopPropagation(); setPreview(true) }}><Maximize width={18} height={18} aria-hidden="true" /></button>
+      {preview && !drawing && <MediaPreviewDialog src={src} name={name} kind="image" onClose={() => setPreview(false)} onEdit={canEdit ? () => setDrawing(true) : undefined} />}
+      {drawing && editing?.renderDrawingEditor?.({ initialImage: { src, name }, onClose: () => setDrawing(false), onSave: saveImage })}
       {editor.isEditable && (
         <>
           <div className={`${handleClass} left-1`} onMouseDown={(e) => startResize(e, -1)} />

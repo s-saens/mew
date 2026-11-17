@@ -21,6 +21,7 @@ function unescapeXml(value: string): string {
 function n(value: number): string { return Number.isFinite(value) ? String(Math.round(value * 1000) / 1000) : '0' }
 
 export function drawingExportBounds(document: DrawingDocument, padding = 32): Bounds {
+  if (document.canvas) return { x: -document.canvas.width / 2, y: -document.canvas.height / 2, ...document.canvas }
   if (!document.objects.length) return { x: -256, y: -192, width: 512, height: 384 }
   let x = Infinity, y = Infinity, right = -Infinity, bottom = -Infinity
   for (const object of document.objects) {

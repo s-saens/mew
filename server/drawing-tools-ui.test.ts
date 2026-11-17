@@ -93,6 +93,10 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       const canvas = dialog.locator('[data-drawing-canvas]'), objects = canvas.locator('[data-drawing-object]')
       await canvas.waitFor()
       const stage = dialog.locator('.drawing-stage')
+      const stageBounds = await stage.boundingBox(), canvasBounds = await canvas.locator('[data-canvas-bounds]').boundingBox()
+      assert.ok(stageBounds && canvasBounds)
+      near(canvasBounds.x, stageBounds.x); near(canvasBounds.y, stageBounds.y)
+      near(canvasBounds.width, stageBounds.width); near(canvasBounds.height, stageBounds.height)
       const transparency = await stage.evaluate(element => {
         const browserWindow = element.ownerDocument.defaultView!
         const style = browserWindow.getComputedStyle(element)
