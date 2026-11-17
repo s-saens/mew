@@ -10,6 +10,7 @@ import { promisify } from 'node:util'
 import { gunzipSync } from 'node:zlib'
 import { createTmuxManager } from '@mew/tmux-term/server'
 import { CommandButtonResultStore, CommandButtonRunningError } from './command-button-results.ts'
+import { upsertUser } from './auth.ts'
 
 const exec = promisify(execFile)
 const owner = 'command-results@example.test'
@@ -55,6 +56,7 @@ let tmux: string | undefined
 try { tmux = execFileSync('which', ['tmux'], { encoding: 'utf8' }).trim() } catch { /* optional */ }
 
 test('one-shot results survive tmux exit, replace the previous run, and remain scoped', { skip: !tmux, timeout: 45_000 }, async t => {
+  upsertUser(owner, { displayName: 'Command Results', hash: 'fixture', role: 'owner', mustChangePassword: false, createdAt: 0, passwordChangedAt: 0 })
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-button-results-'))
   const oldNamespace = process.env.MEW_MULTIPLEXER_NAMESPACE
   const namespace = `mew-button-test-${crypto.randomBytes(8).toString('hex')}`

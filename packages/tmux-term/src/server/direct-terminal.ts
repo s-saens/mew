@@ -16,11 +16,11 @@ export function directTerminalSpec(kind: DirectTerminalKind, name: string): { co
     : { command: process.env.SHELL || '/bin/sh', args: ['-l'] }
 }
 
-export function createDirectTerminal(name: string, kind: DirectTerminalKind, cwd: string): void {
+export function createDirectTerminal(name: string, kind: DirectTerminalKind, cwd: string, env: NodeJS.ProcessEnv = process.env): void {
   if (sessions.has(name)) return
   const spec = directTerminalSpec(kind, name)
   preparePtyHelper()
-  const terminal = pty.spawn(spec.command, spec.args, { name: 'xterm-256color', cols: 80, rows: 24, cwd, env: process.env as Record<string, string> })
+  const terminal = pty.spawn(spec.command, spec.args, { name: 'xterm-256color', cols: 80, rows: 24, cwd, env: env as Record<string, string> })
   const session: DirectSession = { process: terminal, clients: new Map(), output: '' }
   sessions.set(name, session)
   terminal.onData(data => {

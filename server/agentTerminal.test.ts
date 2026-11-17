@@ -1,7 +1,18 @@
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import test from 'node:test'
 import type { TmuxManager, TmuxSession } from '@mew/tmux-term/server'
-import { agentTerminalSessionName, isShellTerminal, startAgentTerminal, stopAgentTerminal, terminalBackends } from './agentTerminal.ts'
+
+const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-terminal-account-'))
+process.env.MEW_DATA_DIR = fixtureDir
+const { upsertUser } = await import('./auth.ts')
+const { agentTerminalSessionName, isShellTerminal, startAgentTerminal, stopAgentTerminal, terminalBackends } = await import('./agentTerminal.ts')
+for (const email of ['owner', 'member', 'other']) {
+  upsertUser(email, { displayName: email, hash: 'unused', role: 'owner', mustChangePassword: false, createdAt: 0, passwordChangedAt: 0 })
+}
+test.after(() => fs.rmSync(fixtureDir, { recursive: true, force: true }))
 
 function fakeTmux() {
   const sessions: TmuxSession[] = []
@@ -20,7 +31,16 @@ function fakeTmux() {
     sendKey: async () => {},
     sendInput: async () => {},
     capture: async () => '',
-    startCommand: async () => { throw new Error('Unexpected dedicated command') },
+    startCommand: async (name, command, cwd) => {
+      runs.push({ name, command, cwd })
+      if (process.platform !== 'win32') {
+        const file = /^exec \/bin\/sh '([^']+)'$/.exec(command)?.[1]
+        assert.ok(file)
+        assert.match(fs.readFileSync(file, 'utf8'), /MEW_GIT_ACCOUNT_CAPABILITY_FILE/)
+        fs.rmSync(path.dirname(file), { recursive: true, force: true })
+      }
+      sessions.push({ name, createdAt: 1, attached: false, windows: 1 })
+    },
     runCommand: async (name, command, cwd) => {
       runs.push({ name, command, cwd })
       sessions.push({ name, createdAt: 1, attached: false, windows: 1 })
@@ -74,7 +94,8 @@ test('explicit terminal identity separates the same tab across accounts, logical
   assert.equal(new Set(sessions.map(value => value.session)).size, identities.length)
   assert.ok(!sessions.some(value => value.session === agentTerminalSessionName('tmux', 'same-tab')), 'legacy terminal names remain separate')
   await startAgentTerminal(fake.manager, 'tmux', 'same-tab', '/shared-cwd', main)
-  assert.equal(fake.creates.length, identities.length, 'reconnect within the same root reuses its terminal')
+  assert.equal(fake.runs.length, identities.length, 'reconnect within the same root reuses its terminal')
+  assert.ok(fake.runs.every(run => !run.command.includes('owner') && !run.command.includes('member')), 'bootstrap command does not expose account credentials')
   await stopAgentTerminal(fake.manager, 'tmux', 'same-tab', identities[3])
   assert.deepEqual(fake.kills, [sessions[3].session])
   assert.equal(fake.sessions.length, identities.length - 1)
@@ -88,7 +109,7 @@ test('new single-project terminals retain their execution across modes and old a
   const returned = await startAgentTerminal(fake.manager, 'tmux', 'new-tab', '/shared-cwd', identity, { allowLegacy: true })
   assert.equal(multi.session, single.session)
   assert.equal(returned.session, single.session)
-  assert.equal(fake.creates.length, 1)
+  assert.equal(fake.runs.length, 1)
   const legacy = agentTerminalSessionName('tmux', 'old-tab')
   fake.sessions.push({ name: legacy, createdAt: 1, attached: false, windows: 1 })
   assert.equal((await startAgentTerminal(fake.manager, 'tmux', 'old-tab', '/shared-cwd', identity, { allowLegacy: true })).session, legacy)

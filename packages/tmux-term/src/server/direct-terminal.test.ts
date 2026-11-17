@@ -29,6 +29,17 @@ test('multiplexer commands use fixed arguments and shell needs no multiplexer', 
   assert.notEqual(directTerminalSpec('shell', 'fixture').command, 'tmux')
 })
 
+test('direct shell receives its session environment', { skip: process.platform === 'win32', timeout: 10000 }, async () => {
+  const name = `mewdirect-env-${process.pid}`
+  createDirectTerminal(name, 'shell', process.cwd(), { ...process.env, MEW_TEST_TERMINAL_OWNER: 'owner-fixture' })
+  try {
+    const client = new Client()
+    connectDirectTerminal(name, client.asSocket(), 80, 24, () => true)
+    client.input('printf "owner=%s\\n" "$MEW_TEST_TERMINAL_OWNER"\r')
+    await until(() => client.output.includes('owner=owner-fixture'))
+  } finally { await stopDirectTerminal(name, 'shell') }
+})
+
 test('shell survives disconnection, shares output, replays it and stops on tab close', { skip: process.platform === 'win32', timeout: 10000 }, async () => {
   const name = `mewdirect-test-${process.pid}`
   createDirectTerminal(name, 'shell', process.cwd())

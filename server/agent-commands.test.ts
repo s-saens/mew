@@ -16,6 +16,8 @@ import { createAgentCommandRouter } from './agent-command-routes.ts'
 import { setFeature } from './access-policy.ts'
 import { pathsForWorkspace, workspaceContext } from './paths.ts'
 import { currentWorkspaceScope } from './workspace-scope.ts'
+import { upsertUser } from './auth.ts'
+import { gitConnections } from './git-connections.ts'
 
 const exec = promisify(execFile)
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-cli-test-'))
@@ -158,6 +160,8 @@ test('real tmux: immediate output, failure, terminal interaction, cancellation, 
   process.env.PATH = `${bin}:${previousPath}`
   const real = createTmuxManager({ cwd: temp })
   const realStore = new AgentCommandStore(real, path.join(temp, 'real-records'))
+  upsertUser(owner, { displayName: 'CLI Owner', hash: 'fixture', role: 'owner', mustChangePassword: false, createdAt: 0, passwordChangedAt: 0 })
+  gitConnections.set(owner, { provider: 'github', host: 'github.com', login: 'cli-owner', identity: { name: 'CLI Owner', email: 'cli@example.test' }, accessToken: 'cli-fixture-token' })
   const waitFor = async (predicate: () => Promise<boolean>) => {
     const deadline = Date.now() + 12_000
     while (!await predicate()) {
@@ -173,6 +177,11 @@ test('real tmux: immediate output, failure, terminal interaction, cancellation, 
     return { record, output: gunzipSync(fs.readFileSync(path.join(realStore.directory(owner, id), 'output.gz'))).toString() }
   }
   try {
+    const credential = await realStore.start(owner, input(`printf 'protocol=https\\nhost=github.com\\npath=owner/repo.git\\n\\n' | git credential fill | awk '/^password=/ { print $0 == "password=cli-fixture-token" ? "account-ok" : "wrong-account" }'`))
+    const credentialResult = await finished(credential.id)
+    assert.equal(credentialResult.record.state, 'completed')
+    assert.match(credentialResult.output, /account-ok/)
+    assert.doesNotMatch(credentialResult.output, /cli-fixture-token/)
     const fast = await realStore.start(owner, input('printf "한글 first\\n"; printf "last\\n" >&2'))
     const first = await finished(fast.id)
     assert.equal(first.record.state, 'completed')
@@ -198,7 +207,7 @@ test('real tmux: immediate output, failure, terminal interaction, cancellation, 
     assert.equal(big.record.previewTruncated, true)
     assert.ok(fs.statSync(path.join(realStore.directory(owner, large.id), 'preview.txt')).size <= 512 * 1024)
     // Reading through a fresh store emulates an HTTP server restart without rerunning the command.
-    assert.equal((await new AgentCommandStore(real, realStore.root).list(owner, scope)).length, 5)
+    assert.equal((await new AgentCommandStore(real, realStore.root).list(owner, scope)).length, 6)
   } finally {
     await exec(tmuxBin!, ['-L', socket, 'kill-server']).catch(() => {})
     process.env.PATH = previousPath

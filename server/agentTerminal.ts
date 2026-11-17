@@ -2,6 +2,9 @@ import crypto from 'node:crypto'
 import { AGENT_TERMINAL_SESSION_PREFIX, createDirectTerminal, directTerminalNames, stopDirectTerminal, type DirectTerminalKind, type TmuxManager } from '@mew/tmux-term/server'
 import { findExecutable, RUNTIMES, resolvedTerminalSpec } from './agentRuntimes.ts'
 import { spawnSpecCommand } from './spawnSpecCommand.ts'
+import { agentGitEnv } from './agent-git-identity.ts'
+import { workspaceContext } from './paths.ts'
+import { terminalGitBootstrap } from './terminal-git-bootstrap.ts'
 import type { WorkspaceScope } from '../shared/workspace-scope.ts'
 
 export { AGENT_TERMINAL_SESSION_PREFIX }
@@ -52,7 +55,9 @@ export async function startAgentTerminal(
     const qualified = directSessionName(runtime, tab, identity)
     const legacy = directSessionName(runtime, tab)
     const session = !names.has(qualified) && options.allowLegacy && names.has(legacy) ? legacy : qualified
-    createDirectTerminal(session, runtime, cwd)
+    const account = identity?.account ?? workspaceContext.getStore()?.account
+    const env = !names.has(session) && account ? agentGitEnv(process.env, account) : process.env
+    createDirectTerminal(session, runtime, cwd, env)
     return { session }
   }
   const entry = RUNTIMES[runtime]
@@ -62,7 +67,12 @@ export async function startAgentTerminal(
   const session = selectedSession(names, runtime, tab, identity, options)
   const running = names.has(session)
   if (!running) {
-    if (entry.terminalLaunch === 'shell') await manager.create(session, cwd)
+    const account = identity?.account ?? workspaceContext.getStore()?.account
+    if (entry.terminalLaunch === 'shell' && account) {
+      const bootstrap = terminalGitBootstrap(agentGitEnv(process.env, account))
+      try { await manager.startCommand(session, bootstrap.command, cwd) } catch (error) { bootstrap.cleanup(); throw error }
+    }
+    else if (entry.terminalLaunch === 'shell') await manager.create(session, cwd)
     else await manager.runCommand(session, spawnSpecCommand(spec), cwd)
   }
   return { session }

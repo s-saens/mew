@@ -1,12 +1,12 @@
 ---
 title: "Per-account Git connections and execution"
 created: 2026-09-29
-updated: "2026-11-09"
-description: "Per-account GitHub authorization, encrypted storage, and Git command boundaries. Covers author identity, scoped credentials, incidental commits and the temporary attachment exception, managed cloning, general-agent commit attribution, and command-button and local-ref attribution."
+updated: "2026-11-17"
+description: "Per-account GitHub authorization, encrypted storage, and Git command boundaries across the Git panel, terminals, and agents. Covers scoped credentials, author identity, incidental commits, managed cloning, and local-ref attribution."
 상위파일: "MOC.md"
 ---
 
-[Usage](../../../docs/guides/projects.md#github-login) · [Decision 0179](../history/decisions/0179-mew-account-git-connections.md)
+[Usage](../../../docs/guides/projects.md#github-login) · [Decision 0179](../history/decisions/0179-mew-account-git-connections.md) · [Decision 0181](../decisions/0181-account-shell-git-credentials.md)
 
 ## Ownership and storage
 
@@ -59,11 +59,14 @@ description: "Per-account GitHub authorization, encrypted storage, and Git comma
 ### Agent execution and OS boundaries
 
 - AI task files receive only the Mew owner and connection ID, provider, and host. The current connection ID is checked at execution start and immediately before each commit, and work does not continue with a disconnected or replaced connection. Tokens are not placed in AI prompts or input.json.
-- Project command-button invocations use the connected GitHub author and committer identity, or the Mew profile and login email when disconnected. Identity is scoped to the invocation; it does not change shared Git configuration or provide remote credentials. Shell commands and terminal buttons can still use OS credentials for remote Git operations.
+- Project command-button invocations use the connected GitHub author and committer identity, or the Mew profile and login email when disconnected. One-shot buttons also use the invoking account's connection for GitHub HTTPS authentication. Identity and credentials are scoped to the invocation and do not change shared Git configuration. Other command-button sessions use their existing OS authentication.
 - Local branch and history ref actions use the connected GitHub identity for reflogs when available; disconnected local actions remain available.
 - General agents pin author/committer environment to the Mew account starting the request: connected GitHub name/private email, otherwise Mew profile name/login email. Overwrite/remove inherited server/runtime author/date variables without changing or forwarding shared Git settings or tokens.
+- New terminal sessions use the same account-specific author and committer identity, with the Mew profile as the disconnected fallback.
 - Detached supervisors and ACP children retain that identity through reconnection and process recreation. Already-running supervisors are unchanged; use a new tab. Internal execution without an account retains its environment.
-- Regular terminals, cloning into external folders, and agent remote authentication use the existing OS execution environment. Account selection in the app is not a shell sandbox, and working trees are not cloned per user. Commit signing and hooks follow existing Git settings.
+- New Mew terminal and agent sessions use the starting Mew account's GitHub connection for GitHub HTTPS Git credentials. Standard `git@github.com:` and `ssh://git@github.com/` remotes are rewritten to HTTPS for those processes without changing repository configuration. An account without a GitHub connection does not fall back to the OS credential helper for GitHub. Sessions already running before the change must be closed and recreated to receive the new environment, including restored tmux, Zellij, and Screen sessions.
+- The shell helper uses a signed, protected account capability file and resolves the current connection on each invocation, including token refresh. The token is not placed in the process environment or command arguments. A disconnected account cannot use a previously stored connection through the helper. Windows shell bootstrap has not been verified.
+- External-folder cloning and processes started outside Mew retain their existing OS execution environment. Account selection in the app is not a shell sandbox, and working trees are not cloned per user. Commit signing and hooks follow existing Git settings.
 
 ## Verification
 

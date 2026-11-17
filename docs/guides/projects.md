@@ -1,7 +1,7 @@
 ---
 title: "Projects and file navigation"
-description: "Explains single- and multi-project desktop modes, independent project panels with movement handles, and project selection through My/All. Covers setup, personal shortcuts, permanent deletion, project hierarchy, files, Git metadata access, tasks, and the multi-project database limitation."
-updated: "2026-11-08"
+description: "Explains project selection, single- and multi-project modes, files, tasks, Git operations, and per-account GitHub connections for the Git panel, terminals, and agents. Covers setup, personal shortcuts, project deletion, and the multi-project database limitation."
+updated: "2026-11-17"
 상위파일:
   - "MOC.md"
 ---
@@ -305,9 +305,9 @@ You can also connect through **GitHub Login** in the Git panel header. Start log
 - File autosave, creation, copying, and similar operations remain available while disconnected. Incidental automatic commits are skipped in this state, and a connection is established when you explicitly commit.
 - The initial provider is github.com. GitHub SSH remotes use HTTPS for transfers without changing the saved address. GitHub determines repository access permissions, organization SSO approval, and branch protection. Only an extensible provider contract is in place for GitLab and Enterprise; they are not yet supported.
 - Approval codes can expire, and you must log in again if a token expires or authorization is revoked. Approval that was in progress before a server restart must be started again. Login alone does not run Push. Push resumes after successful login only if one was pending.
-- This connection applies to commits and remote operations managed by Mew. Shell commands in terminals and regular agents, and cloning into external folders, use the existing OS environment.
+- This connection also supplies GitHub credentials to Git commands in new Mew terminal and agent sessions. Standard GitHub SSH remotes use HTTPS for these transfers without changing the saved address. If the connection is missing, connect the intended GitHub account in the Git panel. Close and recreate sessions that started before this behavior was applied, including restored multiplexer sessions. Commands started outside Mew and external-folder cloning continue to use the OS environment.
 
-API behavior, token storage, testing, and execution boundaries follow the [Per-Account Git Connection Contract](../../.mew/docs/development/git-connections.md); decision changes follow [ADR 0179](../../.mew/docs/history/decisions/0179-mew-account-git-connections.md).
+API behavior, token storage, testing, and execution boundaries follow the [Per-Account Git Connection Contract](../../.mew/docs/development/git-connections.md); decisions follow [ADR 0179](../../.mew/docs/history/decisions/0179-mew-account-git-connections.md) and [ADR 0181](../../.mew/docs/decisions/0181-account-shell-git-credentials.md).
 
 ## Home Screen Currently Unavailable
 

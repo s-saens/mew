@@ -1,6 +1,7 @@
 import { getUser, normalizeEmail, userProfile } from './auth.ts'
 import { gitConnections } from './git-connections.ts'
 import { workspaceContext } from './paths.ts'
+import { accountGitCredentialEnv } from './account-git-credentials.ts'
 
 export function agentGitEnv(base: NodeJS.ProcessEnv, account = workspaceContext.getStore()?.account): NodeJS.ProcessEnv {
   if (!account) return { ...base }
@@ -11,5 +12,5 @@ export function agentGitEnv(base: NodeJS.ProcessEnv, account = workspaceContext.
   const name = Array.from(identity.name).filter(char => char >= ' ' && char !== '\u007f' && char !== '<' && char !== '>').join('').trim() || email.split('@')[0]
   const env = { ...base }
   for (const key of Object.keys(env)) if (/^GIT_(AUTHOR|COMMITTER)_/.test(key)) delete env[key]
-  return { ...env, GIT_AUTHOR_NAME: name, GIT_AUTHOR_EMAIL: identity.email, GIT_COMMITTER_NAME: name, GIT_COMMITTER_EMAIL: identity.email }
+  return accountGitCredentialEnv({ ...env, GIT_AUTHOR_NAME: name, GIT_AUTHOR_EMAIL: identity.email, GIT_COMMITTER_NAME: name, GIT_COMMITTER_EMAIL: identity.email }, email)
 }

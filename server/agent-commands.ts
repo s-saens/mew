@@ -127,7 +127,7 @@ export class AgentCommandStore {
     record.startedAt = Date.now()
     writeFileAtomic(path.join(directory, 'record.json'), JSON.stringify(record))
     try {
-      await this.manager.startCommand(record.session, spawnSpecCommand({ cmd: process.execPath, args: [runner, directory] }), record.cwd)
+      await this.manager.startCommand(record.session, spawnSpecCommand({ cmd: process.execPath, args: [runner, directory], env: { MEW_DATA_DIR: DATA_DIR } }), record.cwd)
     } catch (error) {
       record.state = 'failed'
       record.finishedAt = Date.now()

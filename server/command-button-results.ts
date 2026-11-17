@@ -73,7 +73,7 @@ export class CommandButtonResultStore {
       }
       writeFileAtomic(path.join(current, 'record.json'), JSON.stringify(next))
       try {
-        const commandLine = spawnSpecCommand({ cmd: process.execPath, args: [runner, current] })
+        const commandLine = spawnSpecCommand({ cmd: process.execPath, args: [runner, current], env: { MEW_DATA_DIR: DATA_DIR } })
         await this.manager.startCommand(session, commandWithGitIdentity(commandLine, owner), cwd)
       } catch (error) {
         fs.rmSync(current, { recursive: true, force: true })

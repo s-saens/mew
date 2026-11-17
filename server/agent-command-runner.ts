@@ -14,6 +14,7 @@ import { killMemoryScope, memoryScopeCommand } from './agent-memory.ts'
 import { stopProcessGroup } from './platform/process.ts'
 import { windowsCommand } from './platform/windows/command.ts'
 import { terminalBackend } from '../packages/tmux-term/src/server/backends/index.ts'
+import { accountGitCredentialEnv } from './account-git-credentials.ts'
 
 const exec = promisify(execFile)
 export const COMMAND_PREVIEW_CHARS = 512 * 1024
@@ -91,10 +92,11 @@ export async function runAgentCommand(directory: string): Promise<void> {
       ? { ...windowsCommand(recordFile, completionFile, drainedFile), unit: undefined }
       : memoryScopeCommand('/bin/sh', ['-c', wrapper, 'mew-command', shell, record.command, drainedFile, marker])
     memoryScope = command.unit
+    const env = { ...process.env, TERM: 'xterm-256color' }
     terminal = pty.spawn(command.cmd, command.args, {
       name: 'xterm-256color', cwd: record.cwd,
       cols: process.stdout.columns || 80, rows: process.stdout.rows || 24,
-      env: { ...process.env, TERM: 'xterm-256color' } as Record<string, string>,
+      env: (record.owner ? accountGitCredentialEnv(env, record.owner) : env) as Record<string, string>,
     })
     terminal.onData(data => {
       lastOutput = Date.now()
