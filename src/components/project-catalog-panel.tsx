@@ -8,10 +8,11 @@ import { projectHierarchy } from '../utils/project-hierarchy'
 import { ProjectIcon } from './ProjectIcon'
 import { projectAddCopy } from './project-add-copy'
 
-export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMutation, onBusyChange, selection = false, onFavoritesChange, activePath, onContextMenu, renderActions }: {
+export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMutation, onBusyChange, selection = false, onFavoritesChange, activePath, onContextMenu, renderActions, deletedProject }: {
   paths: string[]
   selection?: boolean
   activePath?: string | null
+  deletedProject?: { path: string } | null
   onContextMenu?: (path: string, event: React.MouseEvent<HTMLButtonElement>) => void
   renderActions?: (path: string) => React.ReactNode
   onFavoritesChange?: (paths: string[]) => void
@@ -38,6 +39,14 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
   const pathsKey = paths.join('\0')
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   useEffect(() => {
+    if (!deletedProject) return
+    const root = deletedProject.path.replace(/\\/g, '/').replace(/\/+$/, '')
+    setProjects(previous => previous?.filter(project => {
+      const candidate = project.path.replace(/\\/g, '/').replace(/\/+$/, '')
+      return candidate !== root && !candidate.startsWith(`${root}/`)
+    }) ?? previous)
+  }, [deletedProject])
+  useEffect(() => {
     const controller = new AbortController()
     discoveryRequest.current = controller
     setLoading(true)
@@ -52,7 +61,7 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
       if (!controller.signal.aborted) setError(err instanceof Error ? err.message : String(err))
     }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => { controller.abort(); if (discoveryRequest.current === controller) discoveryRequest.current = null }
-  }, [reload, pathsKey, fetchProjectRegistry])
+  }, [reload, pathsKey, fetchProjectRegistry, deletedProject])
 
   async function importProject(project: RegisteredProject) {
     if (pending.current) return

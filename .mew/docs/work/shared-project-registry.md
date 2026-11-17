@@ -1,8 +1,8 @@
 ---
 title: "Shared projects and project setup"
-description: "Records shared registry creation, discovery, personal shortcuts, and the November 6 setup and deletion work. Includes the November 7 invisible deletion-error diagnosis and direct four-choice project setup, followed by horizontal icon-and-name presentation."
+description: "Records shared registry creation, discovery, personal shortcuts, and the November 6 setup and deletion work. Includes the November 7 invisible deletion-error diagnosis and direct four-choice project setup, followed by horizontal icon-and-name presentation and the immediate catalog refresh after deletion."
 created: "2026-11-02"
-updated: "2026-11-07"
+updated: "2026-11-17"
 ---
 
 ## Purpose and resulting behavior
@@ -248,3 +248,9 @@ The [project feature](../features/projects-files-search/opening-projects-tabs-an
 Replace the vertical project setup cards with four choices in one horizontal row. Each choice presents a larger square icon container and a short centered name beneath it: **New project**, **Git clone**, **Workspace**, and **Browse**. Remove secondary descriptions and navigation chevrons. The choice screen can be wider than the forms, while remaining inside the viewport. Keep the existing direct entry, focus restoration, lazy catalog, busy state, and retry behavior.
 
 The [navigation contract](../development/ui-project-navigation.md#shared-ui-for-adding-projects-and-browsing-server-files) and [project feature](../features/projects-files-search/opening-projects-tabs-and-groups.md#create-or-link-a-project) own the current presentation. Local verification passed 19 focused tests: 10 project-add component tests, two project-add/catalog browser fixtures, and seven App modes covering onboarding, creation, empty/missing personal lists, deletion/removal recovery, and keyboard navigation. Geometry assertions verify a shared horizontal row, square icon containers of at least 56px, centered labels below icons, no secondary copy or chevrons, and no label overlap in four languages down to 320px. Reviewed desktop and 390px/320px captures in light and dark themes. `npm run build` passed TypeScript and Vite with the existing chunk-size warning; `npm run lint` exited successfully with warnings. `npm run check:docs` validated 756 descriptions without metadata errors and reported 37 existing missing-target links; changed links and anchors were inspected. `git diff --check` passed. Physical-device interaction was not tested. No server lifecycle operation or deployment is part of this change.
+
+## Selection catalog after deletion — 2026-11-17
+
+A successful permanent deletion now removes the target and its descendants from the open project selection catalog and starts a fresh registry request. Failed or canceled deletion retains the existing rows; removing a personal shortcut remains a separate operation. See the [project selection contract](../features/projects-files-search/opening-projects-tabs-and-groups.md). The browser regression uses mocked deletion and registry responses; no actual project files were deleted.
+
+Local verification passed the project deletion and collapse browser regressions, catalog snapshot tests, the project build, and lint with warnings. The existing full-App deletion fixture failed using the old project row selector; a local selector adjustment reached a separate project setup surface-size assertion failure. The documentation check reported 39 existing link errors. No deployment or server restart was performed.

@@ -38,7 +38,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   onOpen: () => void
   onPreview?: (path: string) => void
   onRemove?: (path: string) => void
-  onDelete?: (path: string) => Promise<void>
+  onDelete?: (path: string, onDeleted: () => void) => Promise<void>
   onReorder?: (paths: string[]) => void
   sidebarHost?: HTMLElement | null
   sidebarEnabled?: boolean
@@ -73,6 +73,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   const [editingPath, setEditingPath] = useState<string | null>(null)
   const [deleteChoices, setDeleteChoices] = useState(false)
   const [deletingPath, setDeletingPath] = useState<string | null>(null)
+  const [deletedProject, setDeletedProject] = useState<{ path: string } | null>(null)
   const iconTitleId = useId()
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null)
   const suppressClickUntil = useRef(0)
@@ -215,7 +216,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
   </>
 
   function catalog() {
-    return <ProjectCatalogPanel selection paths={paths} activePath={activePath} onFavoritesChange={onReorder}
+    return <ProjectCatalogPanel selection paths={paths} activePath={activePath} deletedProject={deletedProject} onFavoritesChange={onReorder}
       onContextMenu={(path, event) => { if (canChangeIcon) { event.preventDefault(); openContextMenu(path, event.clientX, event.clientY, event.currentTarget) } }}
       renderActions={path => showingSidebar && canUseCommands ? <CommandButtonMenu project={WORKSPACE_PROJECT} workspacePath={path === activePath ? activeWorkingPath ?? path : path} shortcutEnabled={path === activePath} title={`${labelOf(path)} · ${t('project.commands')}`} className="mew-project-command" /> : null} beforeMutation={beforeProjectMutation} onBusyChange={setCatalogBusy}
       onOpen={async path => {
@@ -373,7 +374,12 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
         }}>{deleteCopy.remove}</ActionMenuItem>}
       </>}
     </ActionMenu>}
-    {deletingPath && canDelete && onDelete && <ProjectDeleteDialog path={deletingPath} onDelete={onDelete} onClose={() => setDeletingPath(null)} />}
+    {deletingPath && canDelete && onDelete && <ProjectDeleteDialog path={deletingPath} onDelete={async path => {
+      let notified = false
+      const notifyDeleted = () => { if (!notified) { notified = true; setDeletedProject({ path }) } }
+      await onDelete(path, notifyDeleted)
+      notifyDeleted()
+    }} onClose={() => setDeletingPath(null)} />}
     {editingPath && canChangeIcon && <DialogFrame labelledBy={iconTitleId} onClose={() => setEditingPath(null)}>
       <div className="p-3">
         <div className="mb-2 flex items-center justify-between gap-2"><h2 id={iconTitleId} className="text-sm font-semibold text-ink">{t('project.icon')}</h2>
