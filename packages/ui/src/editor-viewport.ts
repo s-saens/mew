@@ -55,9 +55,10 @@ export function observeEditorViewport(container: HTMLElement, onResize: () => vo
     }
     const fixedBar = bar && win.getComputedStyle(bar).position === 'fixed' && bar.getBoundingClientRect().height > 0
     const statusHeight = fixedBar && status ? status.getBoundingClientRect().height : 0
-    container.style.setProperty('--editor-key-bar-height', `${fixedBar ? bar.getBoundingClientRect().height : 0}px`)
+    const cssZoom = container.currentCSSZoom ?? (parseFloat(win.getComputedStyle(container.ownerDocument.documentElement).zoom) || 1)
+    container.style.setProperty('--editor-key-bar-height', `${fixedBar ? bar.getBoundingClientRect().height / cssZoom : 0}px`)
     if (reserveKeyBar) {
-      container.style.setProperty('--editor-status-bar-height', `${statusHeight}px`)
+      container.style.setProperty('--editor-status-bar-height', `${statusHeight / cssZoom}px`)
     }
     if (viewportZoomRatio(win) !== 1) {
       container.style.maxHeight = originalMaxHeight
@@ -66,7 +67,7 @@ export function observeEditorViewport(container: HTMLElement, onResize: () => vo
     // The body continues behind the floating keys; only the status row occupies footer space.
     const availableBottom = fixedBar ? bar.getBoundingClientRect().bottom + statusHeight : bottom
     const height = Math.max(0, Math.min(bottom, availableBottom) - container.getBoundingClientRect().top)
-    const maxHeight = `${height}px`
+    const maxHeight = `${height / cssZoom}px`
     if (container.style.maxHeight !== maxHeight) container.style.maxHeight = maxHeight
     onResize()
     // Property/search inputs also live in the editor, outside the rich-text selection.
@@ -95,6 +96,7 @@ export function observeEditorViewport(container: HTMLElement, onResize: () => vo
   keyboard?.addEventListener('geometrychange', schedule)
   win.document.addEventListener('fullscreenchange', schedule)
   win.addEventListener('resize', schedule)
+  win.addEventListener('mew:workspace-zoom', schedule)
   container.addEventListener('focusin', schedule)
   schedule()
   return () => {
@@ -105,6 +107,7 @@ export function observeEditorViewport(container: HTMLElement, onResize: () => vo
     keyboard?.removeEventListener('geometrychange', schedule)
     win.document.removeEventListener('fullscreenchange', schedule)
     win.removeEventListener('resize', schedule)
+    win.removeEventListener('mew:workspace-zoom', schedule)
     container.removeEventListener('focusin', schedule)
     if (frame !== null) win.cancelAnimationFrame(frame)
     container.style.maxHeight = originalMaxHeight

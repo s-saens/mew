@@ -14,19 +14,22 @@ import React from ${JSON.stringify(import.meta.resolve('react'))};
 import {createRoot} from ${JSON.stringify(import.meta.resolve('react-dom/client'))};
 import {Editor} from ${JSON.stringify(path.join(root, 'packages/editor/src/Editor.tsx'))};
 import {CodePane} from ${JSON.stringify(path.join(root, 'src/components/CodePane.tsx'))};
+import {applyWorkspaceZoom} from ${JSON.stringify(path.join(root, 'src/utils/workspace-zoom.ts'))};
 import {observeEditorViewport} from "@mew/ui";
+window.applyWorkspaceZoom=applyWorkspaceZoom;
 const api={db:{},fetchFile:async()=>({content:''}),fetchLinkPreview:async()=>({title:null,description:null})};
 function Fixture(){
  const [mode,setMode]=React.useState('hotview'), [value,setValue]=React.useState(${JSON.stringify(content)});
  const host=React.useRef(null); React.useEffect(()=>observeEditorViewport(host.current,()=>{},true),[]);
  const handle=React.useRef(null); window.value=value; window.handle=handle;
  return <><header style={{height:40}}><button onClick={()=>setMode('hotview')}>Hotview</button><button onClick={()=>setMode('plain')}>Plain</button><button onClick={()=>setValue(${JSON.stringify(content)})}>Reset</button></header>
- <main ref={host} style={{display:'flex',flexDirection:'column',height:window.innerHeight-40,position:'relative'}}><div style={{flex:1,minHeight:0}}>{mode==='hotview'?<Editor ref={handle} value={value} onChange={setValue} api={api} path="fixture.md"/>:<CodePane ref={handle} path="fixture.md" value={value} onChange={setValue} readOnly={false} showMobileKeyBar/>}</div><div data-editor-status-bar style={{flexShrink:0,height:16}}>File size · selected characters</div></main>
+ <main ref={host} style={{display:'flex',flexDirection:'column',height:'calc(100% - 40px)',position:'relative'}}><div style={{flex:1,minHeight:0}}>{mode==='hotview'?<Editor ref={handle} value={value} onChange={setValue} api={api} path="fixture.md"/>:<CodePane ref={handle} path="fixture.md" value={value} onChange={setValue} readOnly={false} showMobileKeyBar/>}</div><div data-editor-status-bar style={{flexShrink:0,height:16}}>File size · selected characters</div></main>
  <div id="keyboard" style={{position:'fixed',left:0,right:0,bottom:0,height:0,background:'#454545',zIndex:100,pointerEvents:'none'}}/></>;
 }
 createRoot(document.getElementById('root')).render(<Fixture/>);`
   const candidates: string[] = [source], styles: string[] = []
   const bundle = await build({ input: 'virtual:keyboard.tsx', write: false, platform: 'browser', output: { format: 'esm', codeSplitting: false },
+    onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) },
     transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } },
     plugins: [{ name: 'keyboard-fixture', resolveId(id) { if (id === 'virtual:keyboard.tsx') return id },
       async load(id) {
@@ -162,6 +165,15 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
           assert.equal(statusBox.y + statusBox.height, dockBox.y, 'status sits directly above the dock, including its safe area')
           assert.equal((await bar.boundingBox())!.y + (await bar.boundingBox())!.height, statusBox.y, 'extra keys sit directly above status')
         }
+        for (const zoom of [90, 125, 100]) {
+          await page.evaluate(`window.applyWorkspaceZoom(${zoom})`)
+          await page.waitForFunction(`(() => {
+            const bar = document.querySelector('[data-mobile-key-bar]').getBoundingClientRect();
+            const status = document.querySelector('[data-editor-status-bar]').getBoundingClientRect();
+            const dock = document.querySelector('.mobile-dock').getBoundingClientRect();
+            return Math.abs(bar.bottom - status.top) < 1 && Math.abs(status.bottom - dock.top) < 1;
+          })()`, undefined, { timeout: 2500 })
+        }
         await page.locator('#root').evaluate(el => {
           el.style.removeProperty('--mobile-dock-space')
           el.setAttribute('data-mobile-keyboard', 'true')
@@ -169,6 +181,13 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`
         })
         await page.evaluate('window.setVisibleViewport(500)')
         await page.waitForFunction('document.querySelector("[data-mobile-key-bar]").getBoundingClientRect().bottom === 484')
+        await page.evaluate('window.applyWorkspaceZoom(90)')
+        await page.waitForFunction(`(() => {
+          const bar = document.querySelector('[data-mobile-key-bar]').getBoundingClientRect();
+          const status = document.querySelector('[data-editor-status-bar]').getBoundingClientRect();
+          return Math.abs(status.height - 14.4) < 0.1 && Math.abs(bar.bottom - status.top) < 1 && Math.abs(status.bottom - 500) < 1;
+        })()`, undefined, { timeout: 2500 })
+        await page.evaluate('window.applyWorkspaceZoom(100)')
         await page.evaluate('window.setVisibleViewport(null)')
         await page.locator('#root').evaluate(el => {
           el.removeAttribute('data-mobile-keyboard')

@@ -1,8 +1,8 @@
 ---
 title: "Workspace zoom controls"
-description: "Records the hamburger menu workspace zoom controls, local persistence, verification, and remaining device and runtime limits."
+description: "Records workspace zoom controls and persistence, Dock and editor footer alignment, local verification, and physical-device limits."
 created: "2026-11-10"
-updated: "2026-11-10"
+updated: "2026-11-18"
 ---
 
 ## Purpose and result
@@ -28,6 +28,12 @@ The workspace menu Chromium test passed, including section order, divider, and k
 Root CSS zoom scaled the workspace height a second time, leaving a gap at reduced levels and clipping the bottom at increased levels. The viewport observer now converts the measured visible bottom to zoomed CSS coordinates and updates when the menu changes zoom. The [workspace layout contract](../development/ui-workspace-layout.md#device-safe-areas) describes the geometry. CSS zoom does not change media-query breakpoints like browser-controlled zoom.
 
 The Chromium safe-area fixture passed at 50%, 80%, 100%, 125%, and 200%, checking the real Dock and workspace boundaries; existing fullscreen and keyboard viewport tests passed. The menu and zoom unit tests also passed. `npm run build` and `npm run lint` passed, with existing warnings. `npm run check:docs` found no description errors and reported 40 missing local links elsewhere. No server or launcher was operated. Physical Android/Brave and device keyboard behavior remain unverified.
+
+## Mobile editor footer alignment
+
+At reduced workspace zoom, the editor applied its zoomed height measurement as a CSS height limit. The second reduction pulled the file-size row upward and left a gap above the Dock. The editor and floating keys now convert their measurements to CSS lengths, keeping the status row between the keys and the Dock or keyboard. See the [editor input contract](../development/ui-editor-input.md#mobile-auxiliary-key-bar).
+
+The Chromium regression failed against the previous code at 90% zoom and passed at 90%, 125%, and reset to 100% after the fix. It also checked 90% with a simulated keyboard. Five editor keyboard, floating key, fullscreen keyboard, and safe-area checks passed. The separate editor status fixture timed out waiting for its Hotview button before the change. The local build and lint passed with warnings. Documentation metadata passed, and the link checker reported 39 missing targets outside the changed documents. Physical Android Brave verification remains open.
 
 ## November 11: Place zoom at the top
 

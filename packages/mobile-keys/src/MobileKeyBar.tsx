@@ -97,8 +97,11 @@ export function MobileKeyBar({
     const bar = barRef.current
     const originalBottom = bar?.style.bottom ?? ''
     const update = () => {
+      if (!bar) return
       const bottom = Math.min((viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight), virtualKeyboardViewportBottom())
-      if (bar) bar.style.bottom = `calc(max(var(--mobile-dock-space, 0px), ${Math.max(0, window.innerHeight - bottom)}px) + var(--editor-status-bar-height, 0px))`
+      const cssZoom = bar.currentCSSZoom ?? (parseFloat(getComputedStyle(document.documentElement).zoom) || 1)
+      const viewportInset = Math.max(0, window.innerHeight - bottom) / cssZoom
+      bar.style.bottom = `calc(max(var(--mobile-dock-space, 0px), ${viewportInset}px) + var(--editor-status-bar-height, 0px))`
     }
     update()
     viewport?.addEventListener('resize', update)
@@ -106,12 +109,14 @@ export function MobileKeyBar({
     keyboard?.addEventListener('geometrychange', update)
     document.addEventListener('fullscreenchange', update)
     window.addEventListener('resize', update)
+    window.addEventListener('mew:workspace-zoom', update)
     return () => {
       viewport?.removeEventListener('resize', update)
       viewport?.removeEventListener('scroll', update)
       keyboard?.removeEventListener('geometrychange', update)
       document.removeEventListener('fullscreenchange', update)
       window.removeEventListener('resize', update)
+      window.removeEventListener('mew:workspace-zoom', update)
       if (bar) bar.style.bottom = originalBottom
     }
   }, [placement])
