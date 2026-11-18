@@ -1,7 +1,7 @@
 ---
 title: "CLI Releases and npm Publishing"
-description: "Release procedure for the mew-ide npm package, curl script and standalone CLI bundle, managed Postgres, Windows WSL assets, and prebuilt runtimes. Covers matching versions, immutable assets, protected publishing, licensing, and pending platform acceptance."
-updated: "2026-11-17"
+description: "Release procedure for the mew-ide npm package, curl installer, and platform runtime archives. Tracks the prepared 0.1.1 version, protected publishing, licensing, and pending platform acceptance."
+updated: "2026-11-18"
 상위파일:
   - "../../../docs/deployment/native.md"
   - "../development/cli-distribution.md"
@@ -84,6 +84,8 @@ public `main/install.sh` entry, publish and accept its matching runtime release.
 Assign reviewers for `cli-release`, `npm-publish`, `desktop-release`, and the separate `windows-installer-release` environment in the repository settings. The workflow uses the current repository through `${{ github.repository }}`. After a transfer, follow the [Repository Transfer Checks](repository-maintenance.md#transferring-github-ownership) to verify reviewers, allowed tags, protection rules, and settings previously supplied by the organization for every release environment. The [agent execution rules](../development/getting-started.md) require a build after implementation changes and prohibit deployment and server lifecycle operations; agents do not push tags, run workflows, or deploy on the user's behalf.
 
 ## Initial Publication and Subsequent Versions
+
+The source tree prepares version `0.1.1` for the first public CLI release. The matching GitHub runtime release, npm publication, and clean-host acceptance are pending.
 
 For the initial publication, verify scope permissions using the responsible person's npm account before proceeding. First create the runtime tag release, then review the package contents in `apps/cli/` and publish.
 

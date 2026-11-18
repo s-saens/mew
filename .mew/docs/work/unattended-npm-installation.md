@@ -1,7 +1,7 @@
 ---
 title: "Unattended npm installation and remote onboarding"
-description: "Records implementation of the mew-ide npm entry, managed Postgres, persistent background/login startup, Windows WSL bootstrap, and shared remote-access onboarding. Distinguishes local checks from publication and clean-host acceptance."
-updated: "2026-11-17"
+description: "Records implementation of the mew-ide npm entry, managed Postgres, background startup, Windows WSL bootstrap, and remote onboarding. Includes local verification for the 0.1.1 release preparation and pending publication."
+updated: "2026-11-18"
 ---
 
 # Unattended npm installation and remote onboarding
@@ -57,6 +57,10 @@ canonical rename contract. Application row-page behavior was not changed.
 Temporary browser images were inspected at 390px and 1100px. They are local
 verification artifacts rather than public screenshot updates. Test-owned
 browsers and PostgreSQL processes were closed after verification.
+
+## 0.1.1 release preparation
+
+Aligned the CLI package, npm lockfile, and shell installer at version `0.1.1` so the runtime tag and installer refer to the same release. The local build, shell syntax check, and release action test passed on Node.js 24.16.0. The CLI suite passed 75 tests and skipped the opt-in real PostgreSQL test. GitHub Actions and clean-host installation remain pending. See the [release procedure](../operations/cli-release.md).
 
 ## Remaining gates
 

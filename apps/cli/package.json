@@ -1,6 +1,6 @@
 {
   "name": "mew-ide",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Install and run Mew with a managed database and browser-first setup.",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
