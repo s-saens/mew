@@ -1,8 +1,8 @@
 import { LoadingIndicator } from '@mew/ui/loading-indicator'
 import { startupUiText as uiText } from '@mew/ui/i18n-startup'
 
-export function PanelLoading() {
-  return <div role="status" aria-label={uiText('불러오는 중…')} aria-busy="true" className="mew-panel-surface flex h-full min-h-0 flex-1 items-center justify-center bg-surface text-ink-secondary">
+export function PanelLoading({ transparent = false }: { transparent?: boolean } = {}) {
+  return <div role="status" aria-label={uiText('불러오는 중…')} aria-busy="true" className={`flex h-full min-h-0 flex-1 items-center justify-center text-ink-secondary${transparent ? '' : ' mew-panel-surface bg-surface'}`}>
     <LoadingIndicator size={20} />
   </div>
 }

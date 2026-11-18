@@ -8,7 +8,7 @@ updated: "2026-11-07"
 status_hash: "03b352e53f93242f9efdfd05c5bd632f9bf92dd1a456279d6b0eb0efd066cd3f"
 files: ["src/components/file-action-menu.tsx", "src/hooks/use-external-file-actions.tsx", "src/components/file-browser-favorites.tsx", "server/file-favorites.ts", "src/components/file-browser.tsx", "src/components/file-browser-path.tsx", "src/components/file-browser-path-suggestions.ts", "src/components/project-add-inline.tsx", "src/components/project-catalog-panel.tsx", "src/components/LinkProjectDialog.tsx", "src/components/ProjectCreationAgentDialog.tsx", "server/project-registry.ts", "src/components/ProjectSwitcher.tsx", "src/components/project-panel-copy.ts", "src/components/project-delete-dialog.tsx", "src/components/project-delete-copy.ts", "src/components/scope-toggle.tsx", "server/projects.ts", "server/cloud-storage.ts"]
 commits: []
-description: "Defines project selection, managed and external path display, account shortcuts, creation, hierarchy, switching, deletion, icons, and worktree boundaries. Notes the incomplete transition to a starred shared catalog."
+description: "Defines project selection, catalog loading feedback, managed and external paths, account shortcuts, creation, hierarchy, switching, deletion, icons, and worktree boundaries. Notes the incomplete transition to a starred shared catalog."
 상위파일:
   - "MOC.md"
   - "_projects-files-search.md"
@@ -17,6 +17,8 @@ description: "Defines project selection, managed and external path display, acco
 ## Requirements
 
 The transition to a single starred catalog is in progress. The former My/All description below remains the previous contract until the selection, ordering, keyboard behavior, and verification are complete, except for the current changes below. See the [work record](../../work/project-selection-favorites.md).
+
+While the project selector loads the catalog component or waits for its first results, show three loading dots directly on the selector surface.
 
 The mobile selector fills the available screen with a transparent panel over the theme background, without a dark dialog backdrop. Its header places **+** immediately left of Close. The project-add popup offers **New project**, **Git clone**, and **Browse**; the separate Workspace choice has been removed. In project selection, projects outside the server-managed `~/.mew/projects` root show their full path beside the name. Duplicate names also show paths when needed to distinguish managed projects.
 

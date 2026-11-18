@@ -1,8 +1,8 @@
 ---
 title: "Project catalog loading"
-description: "Records the November 17 project selection delay, immediate saved-catalog response, Unity cache discovery fix, selection-priority cancellation, verification, and server application boundary."
+description: "Records project catalog loading delays, immediate saved results, Unity discovery exclusions, selection-priority cancellation, and the transparent loading indicator fix and verification."
 created: "2026-11-17"
-updated: "2026-11-17"
+updated: "2026-11-18"
 ---
 
 The project selector waited for nested discovery beneath every registered project before displaying any row. A read-only scan of the current registry reached the final registered root but did not complete within 20 seconds. This supports a filesystem-discovery delay; it does not measure the mobile network or the reported request itself.
@@ -22,3 +22,9 @@ The same root, scanned after the change, took 1.2 seconds and 161 directory read
 The selector starts a saved-catalog request and a full discovery request independently. Selecting a saved entry cancels the panel's discovery request and starts switching without waiting for discovery. The server stops scheduling discovery after its final caller disconnects; another active caller keeps a shared scan alive, and already submitted filesystem operations may finish. An isolated HTTP fixture held discovery while obtaining a snapshot and switching a project, and panel and registry tests cover cancellation and shared callers. These checks do not measure a real mobile session.
 
 The priority regression suite passed 27 tests across the HTTP fixture, panel, registry, and Unity discovery. The production build passed. Targeted lint completed with one React effect warning; the documentation check reported 39 existing link errors. No server lifecycle operation or deployment was performed.
+
+## Transparent project selector loading
+
+The fallback shown during the catalog module download painted a strip in the shared panel background color. The selector now uses the transparent variant of the shared fallback, so the three dots appear directly on its surface.
+
+An isolated mobile Chromium test held the module download open and verified three visible dots on a transparent background, followed by the catalog search field after release. The panel-scoped picker and shared indicator tests, production build, and lint passed. Lint reported warnings. Physical-device appearance remains unverified.

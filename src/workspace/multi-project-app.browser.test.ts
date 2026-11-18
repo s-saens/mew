@@ -41,7 +41,11 @@ async function fixtureBundle() {
   const chunks = result.output.filter(item => item.type === 'chunk'), entry = chunks.find(item => item.isEntry)!
   const scripts = new Map(chunks.map(chunk => ['/' + chunk.fileName, chunk.code]))
   const compiler = await compile(await fs.readFile(path.join(root, 'src/index.css'), 'utf8'), { base: path.join(root, 'src'), onDependency() {} })
-  const css = compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]) + '\n' + await fs.readFile(sourcePath('components/project-board.css'), 'utf8')
+  const fixtureStyles = await Promise.all([
+    fs.readFile(sourcePath('components/project-board.css'), 'utf8'),
+    fs.readFile(path.join(root, 'packages/ui/src/loading-indicator.css'), 'utf8'),
+  ])
+  const css = [compiler.build([...new Set(candidates.join('\n').match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))]), ...fixtureStyles].join('\n')
   return { scripts, html: `<html class="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="root"></div><script type="module" src="/${entry.fileName}"></script></body></html>` }
 }
 
@@ -130,6 +134,33 @@ async function installApp(page: Page, fixture: Awaited<ReturnType<typeof fixture
   return { errors, consoleErrors, requests, contents, saves, commandReads, scopes, saveStarted, saveCompleted,
     holdAlphaSave: () => { holdSave = true }, releaseSave: () => { holdSave = false; releaseSave?.() } }
 }
+
+test('mobile project selector shows only dots while the catalog module loads', { timeout: 30_000 }, async t => {
+  const fixture = await bundleOnce(), browser = await connectTestBrowser()
+  t.after(() => browser.close())
+  const page = await browser.newPage({ viewport: { width: 390, height: 700 }, hasTouch: true })
+  await installApp(page, fixture, ['/alpha', '/beta'])
+  let releaseCatalog!: () => void
+  const catalogGate = new Promise<void>(resolve => { releaseCatalog = resolve })
+  await page.route('**/project-catalog-panel-*.js', async route => {
+    await catalogGate
+    await route.fallback()
+  })
+  try {
+    await page.goto(origin)
+    await page.locator('[data-project-switcher]').click()
+    const panel = page.getByRole('dialog', { name: 'Project selection', exact: true })
+    const status = panel.getByRole('status')
+    await status.waitFor()
+    assert.equal(await status.locator('.mew-loading-dot').count(), 3)
+    assert.equal(await status.locator('.mew-loading-dot').first().isVisible(), true)
+    assert.equal(await status.evaluate(element => getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)')
+    releaseCatalog()
+    await panel.getByRole('textbox', { name: 'Search projects' }).waitFor()
+  } finally {
+    releaseCatalog()
+  }
+})
 
 test('real workspace controllers isolate same-name editor saves and preserve drafts across compact tool and mode changes', { timeout: 65_000 }, async t => {
   const fixture = await bundleOnce(), browser = await connectTestBrowser()
