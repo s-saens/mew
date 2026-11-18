@@ -168,14 +168,14 @@ On other distributions, install the equivalent packages first. Follow [Finish se
 From a native Termux terminal, download the pinned Mew source and run setup in one command:
 
 ```bash
-pkg install -y curl && curl -fsSL https://github.com/s-saens/mew/releases/download/mew-termux-v0.1.5/install-termux.sh | bash
+pkg install -y curl && curl -fsSL https://github.com/s-saens/mew/releases/download/mew-termux-v0.1.6/install-termux.sh | bash
 ```
 
-Setup uses `~/.local/opt/mew-termux` and prompts in your terminal. Run the same command again to resume setup. Use `~/.local/opt/mew-termux/mew status` to check the instance. This download has no Git history, so `./mew update` is unavailable with this installation.
+Setup installs source in `~/.local/opt/mew-termux-0.1.6` and uses defaults without prompting. A fresh setup uses `~/mew-workspace` and picks a port starting at 5000. It preserves existing configuration and prepares a local PostgreSQL database when no external `DATABASE_URL` is configured. Open the printed setup link in your phone browser to create the first administrator.
 
 Termux is experimental and full setup has not been verified. When running the source setup directly in Termux, it offers to install a missing Node LTS and npm, compiler, make, Python, and tmux using `pkg` without sudo. If Node fails to start because of mismatched Termux libraries, update the installed Termux packages with `pkg update` and `pkg upgrade`, then check `node --version` before retrying.
 
-These prerequisite steps do not establish Android support. Native npm dependencies and the mandatory Chrome and Playwright browser preparation may still fail on Android; the latter currently supports Linux, macOS, and Windows hosts. Use a supported host if setup cannot finish.
+Run the same command again to retry setup. Use `bash ~/.local/opt/mew-termux-0.1.6/mew status` to check the instance. The downloaded source has no Git history. Server-side Chrome and Playwright features are unavailable on native Termux.
 
 ### Finish setup
 

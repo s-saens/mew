@@ -80,6 +80,7 @@ is_termux() {
 }
 
 interactive() { [ -t 0 ]; }
+unattended=false
 
 # Node runs the server's TypeScript directly, which needs type stripping on by default (22.18+).
 node_version_ok() {
@@ -94,7 +95,7 @@ need_node() {
   node_version_ok && return 0
   say "Node 22.18+ (or 24+) is required; found: $(node -v 2>/dev/null || echo 'none')"
   if is_termux; then
-    if interactive && yes_no "Install Termux Node.js LTS and npm with pkg?" y; then
+    if $unattended || { interactive && yes_no "Install Termux Node.js LTS and npm with pkg?" y; }; then
       pkg install -y nodejs-lts npm
       export PATH="$PREFIX/bin:$PATH"
       hash -r
@@ -147,7 +148,7 @@ need_build_tools() {
   say "  compiler/python3 — needed to build the terminal (node-pty)"
   say "  tmux             — the terminal panel itself"
   if is_termux; then
-    if interactive && yes_no "Install missing Termux packages with pkg?" y; then
+    if $unattended || { interactive && yes_no "Install missing Termux packages with pkg?" y; }; then
       pkg install -y "${missing[@]}"
     else
       die "install them with: pkg install $pkgs"
@@ -188,7 +189,12 @@ start_server() {
   local pid
   if pid=$(running_pid); then say "already running (pid $pid) — $(url)"; return 0; fi
   [ -f dist/index.html ] || die "not built yet — run: ./mew setup"
-  npm run browsers:check || die "browser dependencies are incomplete — run: npm run browsers:install"
+  prepare_source_browsers check || die "browser dependencies are incomplete — run: npm run browsers:install"
+  if is_termux && [ -z "${DATABASE_URL:-}" ]; then
+    # shellcheck source=tools/termux-postgres.sh
+    . "$APP/tools/termux-postgres.sh"
+    start_termux_postgres
+  fi
   mkdir -p "$STATE_DIR"
   nohup "${MEW_NODE:-node}" server/serve.ts >>"$LOG" 2>&1 &
   echo $! >"$PIDFILE"
@@ -199,12 +205,20 @@ start_server() {
 
 stop_server() {
   local pid
-  if ! pid=$(running_pid); then say "not running"; return 0; fi
-  kill "$pid"
-  for _ in $(seq 1 20); do running_pid >/dev/null || break; sleep 0.2; done
-  running_pid >/dev/null && kill -9 "$pid" 2>/dev/null || true
-  rm -f "$PIDFILE"
-  say "stopped"
+  if pid=$(running_pid); then
+    kill "$pid"
+    for _ in $(seq 1 20); do running_pid >/dev/null || break; sleep 0.2; done
+    running_pid >/dev/null && kill -9 "$pid" 2>/dev/null || true
+    rm -f "$PIDFILE"
+    say "stopped"
+  else
+    say "not running"
+  fi
+  if is_termux && [ -z "${DATABASE_URL:-}" ]; then
+    # shellcheck source=tools/termux-postgres.sh
+    . "$APP/tools/termux-postgres.sh"
+    stop_termux_postgres
+  fi
 }
 
 create_first_owner() {
@@ -246,6 +260,10 @@ remote_access_guide() {
 }
 
 cmd_setup() {
+  if [ "${1:-}" = --termux-defaults ]; then
+    is_termux || die "Termux defaults require native Termux"
+    unattended=true
+  fi
   need_node
   need_build_tools
 
@@ -253,7 +271,8 @@ cmd_setup() {
     say "using existing settings: $CONFIG"
   else
     local ws port
-    ws=$(ask "Folder to edit — each subfolder in it becomes a project" "$HOME/mew-workspace")
+    ws="$HOME/mew-workspace"
+    if ! $unattended; then ws=$(ask "Folder to edit — each subfolder in it becomes a project" "$ws"); fi
     ws=${ws/#\~/$HOME}
     mkdir -p "$ws"; ws=$(cd "$ws" && pwd)
     if [ -z "$(ls -A "$ws")" ]; then
@@ -261,20 +280,25 @@ cmd_setup() {
       printf '# Welcome to mew\n\nEvery top-level folder in this workspace is a project.\nThis file is `docs/README.md`.\n' >"$ws/docs/README.md"
       say "workspace was empty — created $ws/docs to start with"
     fi
-    port=$(pick_port "$(ask 'Port' 5000)")
+    port=5000
+    if ! $unattended; then port=$(ask 'Port' "$port"); fi
+    port=$(pick_port "$port")
     set_config MEW_WORKSPACE "$ws"
     set_config MEW_TEAM_PORT "$port"
 
-    if [ -t 0 ] && yes_no "Connect a Postgres for the /db table view? (you can do it later)" n; then
+    if ! $unattended && [ -t 0 ] && yes_no "Connect a Postgres for the /db table view? (you can do it later)" n; then
       set_config DATABASE_URL "$(ask 'DATABASE_URL' 'postgres://mew:mew@127.0.0.1:5432/mew')"
     fi
     say "settings written to $CONFIG"
   fi
   load_config
+  if is_termux && [ -z "${DATABASE_URL:-}" ]; then
+    command -v pg_ctl >/dev/null 2>&1 || pkg install -y postgresql
+  fi
 
   say "installing dependencies..."
   npm ci --no-audit --no-fund
-  npm run browsers:install
+  prepare_source_browsers install
   say "building..."
   npm run build
   create_first_owner
@@ -288,7 +312,12 @@ cmd_setup() {
   else
     say "Next: open the URL above and sign in with your existing account."
   fi
-  if [ -t 0 ]; then remote_access_guide; fi
+  if ! $unattended && [ -t 0 ]; then remote_access_guide; fi
+}
+
+prepare_source_browsers() {
+  if is_termux; then return 0; fi
+  npm run "browsers:$1"
 }
 
 cmd_update() {
@@ -296,7 +325,7 @@ cmd_update() {
   git pull --ff-only origin main || die "git pull failed — commit or stash your local changes first"
   say "installing dependencies..."
   npm ci --no-audit --no-fund || die "dependency installation failed — update failed"
-  npm run browsers:install || die "browser dependency installation failed — update failed; server was not restarted"
+  prepare_source_browsers install || die "browser dependency installation failed — update failed; server was not restarted"
   say "building..."
   npm run build || die "build failed — update failed; server was not restarted"
   say "restarting..."
@@ -337,13 +366,13 @@ EOF
 }
 
 case "${1:-setup}" in
-  setup) cmd_setup ;;
+  setup) cmd_setup "${2:-}" ;;
   remote-access) load_config; remote_access_guide "${2:-account}" ;;
   update) cmd_update ;;
   status) cmd_status ;;
   start) load_config; start_server; say "$(url)" ;;
-  stop) stop_server ;;
-  restart) load_config; npm run browsers:check || die "browser dependencies are incomplete — run: npm run browsers:install"; stop_server; start_server; say "$(url)" ;;
+  stop) if is_termux; then load_config; fi; stop_server ;;
+  restart) load_config; prepare_source_browsers check || die "browser dependencies are incomplete — run: npm run browsers:install"; stop_server; start_server; say "$(url)" ;;
   logs) mkdir -p "$STATE_DIR"; touch "$LOG"; tail -f -n 100 "$LOG" ;;
   users) shift; load_config; node server/usersCli.ts "$@" ;;
   help | -h | --help) usage ;;

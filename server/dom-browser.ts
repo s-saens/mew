@@ -3,7 +3,7 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import type { IncomingMessage, Server } from 'node:http'
 import type { Http2SecureServer } from 'node:http2'
-import { chromium, type Browser, type BrowserContext, type Page, type CDPSession } from 'playwright-core'
+import type { Browser, BrowserContext, Page, CDPSession } from 'playwright-core'
 import { WebSocket, WebSocketServer } from 'ws'
 import { DOM_BROWSER_WS, type DomBrowserCommand, type DomBrowserMessage } from '../shared/dom-browser.ts'
 import { resolveAuth, type RequestAuth } from './reqAuth.ts'
@@ -182,6 +182,7 @@ export class DomBrowserSession {
   }
 
   private async launch(executablePath: string): Promise<Page> {
+    const { chromium } = await import('playwright-core')
     const launchOptions = { executablePath, chromiumSandbox: true, headless: true, args: ['--disable-dev-shm-usage'] }
     const contextOptions = { viewport: this.viewport, colorScheme: this.colorScheme, serviceWorkers: 'block' as const, acceptDownloads: false }
     const browser = await chromium.launch(launchOptions)
