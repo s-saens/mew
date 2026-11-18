@@ -25,8 +25,9 @@ import {writeAgentEventCache} from '${root}/src/utils/agentEventCache.ts';
 import {I18nProvider} from '${root}/src/i18n.tsx';
 import {onMewcatNotice,setNotificationPreferences} from '${root}/src/utils/mewcat-notifications.ts';
 import {useMewcatNotifications} from '${root}/src/hooks/use-mewcat-notifications.ts';
+import {useMobilePanelSwipe} from '${root}/src/hooks/use-mobile-panel-swipe.ts';
 window.setNoticePreferences=setNotificationPreferences;
-localStorage.setItem('mew:locale','ko');window.messages=[];window.clearTabs=[];window.notices=[];window.sockets={};window.socketAttempts={};window.fail=false;window.outsideClicks=0;
+localStorage.setItem('mew:locale','ko');window.messages=[];window.clearTabs=[];window.notices=[];window.sockets={};window.socketAttempts={};window.fail=false;window.outsideClicks=0;window.panelSwipes=[];
 const fresh=new URLSearchParams(location.search).has('fresh');
 const tabs=(fresh?['fresh']:['first','second']).map(id=>({id,label:id,renamed:true,runtime:'codex',cwd:'/workspace'}));
 localStorage.setItem('mew:agent-tabs:'+JSON.stringify('/workspace'),JSON.stringify(tabs));
@@ -44,11 +45,12 @@ class Socket {
 window.WebSocket=Socket;
 function Fixture(){
  useMewcatNotifications(false,'connection-owner');
+ const swipeRoot=useMobilePanelSwipe((panel,direction)=>window.panelSwipes.push([panel,direction]),${replyOnly});
  const [noticeTab,setNoticeTab]=React.useState();
  React.useEffect(()=>{const open=event=>setNoticeTab(event.detail.target.tabId);window.addEventListener('mew:open-notification',open);return()=>window.removeEventListener('mew:open-notification',open)},[]);
  const [layout,setLayout]=React.useState({version:1,groups:[{id:'agent:restored',kind:'agent'}],tabs:Object.fromEntries(tabs.map(tab=>['agent:'+tab.id,'agent:restored'])),active:{'agent:restored':tabs[0].id},tree:{id:'agent:restored'}});
  const panel=<AgentPanel requestedNoticeTab={noticeTab} onNoticeHandled={()=>setNoticeTab(undefined)} project="test" workspacePath="/workspace" tree={[]} focusedFilePath={null} onOpenFile={()=>{}} onClose={()=>{}} />;
- return <><button id="outside" onClick={()=>window.outsideClicks++}>Outside panel</button><button id="fullscreen" onClick={()=>document.documentElement.requestFullscreen()}>Fullscreen</button><div style={{height:'calc(100% - 40px)',position:'relative',display:'flex'}}>{matchMedia('(min-width:768px)').matches?<DockWorkspace value={layout} onChange={setLayout} foreground="agent" apiRef={null} onEditorDrop={()=>'main'}>{panel}</DockWorkspace>:panel}</div></>;
+ return <><button id="outside" onClick={()=>window.outsideClicks++}>Outside panel</button><button id="fullscreen" onClick={()=>document.documentElement.requestFullscreen()}>Fullscreen</button><div ref={swipeRoot} data-workspace-panel="agent" style={{height:'calc(100% - 40px)',position:'relative',display:'flex'}}>{matchMedia('(min-width:768px)').matches?<DockWorkspace value={layout} onChange={setLayout} foreground="agent" apiRef={null} onEditorDrop={()=>'main'}>{panel}</DockWorkspace>:panel}</div></>;
 }
 createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18nProvider>);`
   const bundle = await build({ input: 'virtual:connection.tsx', write: false, platform: 'browser', output: { format: 'iife' }, transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } }, plugins: [{
@@ -172,6 +174,11 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
           await page.mouse.move(x - 65, y, { steps: 4 })
           await page.mouse.up()
         }
+        assert.equal(await preview.count(), 0, 'a horizontal swipe does not select a reply')
+        assert.deepEqual(await page.evaluate('window.panelSwipes'), width === 390 ? [['agent', 1]] : [])
+        const questionReply = session.locator('[data-agent-question]').getByRole('button', { name: '답글 달기' })
+        if (width === 390) await questionReply.tap()
+        else await questionReply.click()
         await preview.getByText('Saved conversation', { exact: true }).waitFor()
         assert.equal(await composerValue(draft), 'Draft before first connection')
         assert.equal(await draft.evaluate(el => el.ownerDocument.activeElement === el), true)
@@ -180,16 +187,24 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         await preview.waitFor({ state: 'hidden' })
         assert.equal(await composerValue(draft), 'Draft before first connection')
 
-        const replyButton = session.locator('[data-agent-reply-button]').first()
-        await replyButton.focus()
-        await replyButton.press('Enter')
-        await preview.waitFor()
+        await page.evaluate(`(() => {
+          const socket = window.sockets.first;
+          socket.emit({type:'turn_start'});
+          socket.emit({type:'update',update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Agent answer'}}});
+          socket.emit({type:'turn_end',stopReason:'end_turn'});
+        })()`)
+        const answer = session.locator('[data-agent-turn]').filter({ hasText: 'Agent answer' })
+        const answerReply = answer.getByRole('button', { name: '답글 달기' })
+        await answerReply.focus()
+        await answerReply.press('Enter')
+        await preview.getByText('Agent answer', { exact: true }).waitFor()
+        assert.equal(await answer.locator('button[aria-expanded="false"]').count(), 1)
         await draft.fill('')
         assert.equal(await send.isDisabled(), true, 'a reply target alone cannot be sent')
         await draft.fill('! Keep this in the reply')
         assert.equal(await composerValue(draft), '! Keep this in the reply')
         await send.click()
-        assert.equal(await page.evaluate('window.messages.at(-1).text'), '> Saved conversation\n\n! Keep this in the reply')
+        assert.equal(await page.evaluate('window.messages.at(-1).text'), '> Agent answer\n\n! Keep this in the reply')
         assert.equal(await composerValue(draft), '')
         await preview.waitFor({ state: 'hidden' })
         assert.deepEqual(errors, [])

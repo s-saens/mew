@@ -1,6 +1,6 @@
 ---
 title: "UI workspace panels, Dock, and gestures"
-description: "Workspace geometry, safe areas, Dock layout, mobile project panel appearance, panel borders, tab motion, and gestures. Covers layout restoration and removal of legacy task panel entries."
+description: "Workspace geometry, safe areas, Dock layout, mobile project panel appearance, panel borders, tab motion, and mobile tab swipes over agent messages. Covers layout restoration and removal of legacy task panel entries."
 created: "2026-11-03"
 updated: "2026-11-08"
 상위파일: "ui-contracts.md"
@@ -195,6 +195,8 @@ Below 768px, `useMobilePanelSwipe` determines the `data-workspace-panel` within 
 In the body, horizontal scrollability is checked for the touch-start element and its ancestors up to the corresponding `data-workspace-panel`. If any area has `overflow-x` set to `auto`, `scroll`, or `overlay` and satisfies `scrollWidth > clientWidth`, the entire touch is left to native browser scrolling, without invoking `preventDefault` or tab switching. This rule applies even at either end, regardless of current scroll position or movement direction. Areas with no actual horizontal overflow or only vertical scrolling retain existing tab switching. Detection stops at the starting panel's boundary; Plain's `data-mobile-key-bar` retains the tab-switching priority rule below.
 
 `EditorPane` marks Markdown Hotview as an allowed body area. For regular files and Markdown Plain, only swipes starting on ordinary buttons within `data-mobile-key-bar` switch tabs, preserving horizontal scrolling, selection, and pinching throughout the body. Arrow presses and drags control the cursor instead; entering an arrow cancels an in-progress tab swipe. See [Mobile auxiliary key bar](ui-editor-input.md#mobile-auxiliary-key-bar). `EditorPane` enables `CodePane`'s shared modifier key bar in mobile Plain regardless of keyboard visibility, floating over the body above status without a separate layout reservation. Embedded editors may omit this option. The key bar uses Esc, Tab, Ctrl, Shift, arrow keys, and Undo/Redo for editable files from the CodeMirror keymap; collaborative history also follows the existing keymap. Swipes prevent horizontal scrolling of the key bar and subsequent key clicks; short taps execute existing key functions.
+
+Agent message bubbles are part of the swipe area. Use the [Reply button](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#reply-to-a-message) to select a message.
 
 Horizontal scrolling and reordering in the tab row, popups and input fields, task-row deletion, Gantt scrolling, and schedule dragging remain separate gestures. Multiple fingers, `touchcancel`, window resizing, blur, and screen hiding cancel an active gesture. Actual tab switching occurs only when the current foreground panel matches the starting panel. The rationale for separating switching roles is recorded in [ADR 0079](../decisions/0079-mobile-panel-swipes.md).
 

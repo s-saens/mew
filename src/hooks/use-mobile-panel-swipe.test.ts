@@ -67,11 +67,6 @@ test('mobile panel swipes attach after delayed workspace mount and reattach afte
     fixture.render(true)
     await settle()
     assert.notEqual(win.document.querySelector('[data-test-host]'), previousHost)
-    const target = win.document.querySelector('[data-test-target]')!
-    target.setAttribute('data-agent-swipe-reply', '')
-    swipe(1)
-    assert.equal(fixture.swipes.length, 1, 'reply gestures do not switch panel tabs')
-    target.removeAttribute('data-agent-swipe-reply')
     swipe(-1)
     assert.deepEqual(fixture.swipes.map(swipe => ({ ...swipe })), [{ panel: 'sidebar', direction: 1 }, { panel: 'sidebar', direction: -1 }], 'new workspace host receives one swipe handler after a project is added')
   } finally {

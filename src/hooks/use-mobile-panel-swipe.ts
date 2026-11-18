@@ -4,7 +4,7 @@ import { useWorkspaceDesktop, useWorkspaceView } from '../workspace/workspace-vi
 
 type TabbedPanel = 'sidebar' | 'editor' | 'agent' | 'terminal' | 'git' | 'tasks'
 const tabbedPanels: readonly string[] = ['sidebar', 'editor', 'agent', 'terminal', 'git', 'tasks']
-const excluded = '.mobile-dock, [data-dock-tab-bar], [role="dialog"], [role="menu"], [role="listbox"], input, textarea, select, [role="slider"], [data-attachment-token], [data-mobile-arrow], .task-swipe, [data-gantt-grab], .task-gantt-scroller, [data-popup-resize], [data-agent-swipe-reply]'
+const excluded = '.mobile-dock, [data-dock-tab-bar], [role="dialog"], [role="menu"], [role="listbox"], input, textarea, select, [role="slider"], [data-attachment-token], [data-mobile-arrow], .task-swipe, [data-gantt-grab], .task-gantt-scroller, [data-popup-resize]'
 
 function swipePanel(target: Element): TabbedPanel | null {
   if (target.closest(excluded)) return null

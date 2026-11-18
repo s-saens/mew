@@ -71,7 +71,6 @@ import { flushSync } from 'react-dom'
 import { EditPencil, NavArrowRight, NavArrowUp, RefreshDouble, Send as SendIcon, Terminal as TerminalIcon, Undo, Xmark } from 'iconoir-react'
 import { AgentCommandBubble, AgentCommandPopup } from './agent-command-bubble'
 import { AgentLoadingBubbles, AgentReplyPending } from './agent-loading-bubbles'
-import { AgentSwipeReply, quoteAgentReply } from './agent-swipe-reply'
 import { useAgentCommands } from '../hooks/use-agent-commands'
 import { useAgentClearFeedback } from '../hooks/use-agent-clear-feedback'
 import { useAgentEventState } from '../hooks/use-agent-event-state'
@@ -371,6 +370,11 @@ type AgentAttachment = {
 }
 
 type QueuedEdit = { index: number; text: string; original: string; attachments: AgentAttachment[]; settings: AgentMessageSettings }
+
+function quoteAgentReply(text: string, draft: string): string {
+  const quote = text.trim().split(/\r?\n/).map(line => `> ${line}`).join('\n')
+  return `${quote}\n\n${draft}`
+}
 
 type StartupPrompt = {
   type: 'prompt'; text: string; displayText: string
@@ -4328,14 +4332,11 @@ function AgentSessionView({
                 agentInputRef.current?.focus()
               }
               : undefined
-            const content = <AgentConversationItem item={item} expanded={expanded} showSettings={settingsChanges.has(item.key)}
+            return <div key={item.key}><AgentConversationItem item={item} expanded={expanded} showSettings={settingsChanges.has(item.key)}
             workError={workErrors[item.key]} onLoadWork={loadWorkDetails}
             project={project} readOnly={!!historyPreview} loadingActive={visible} busy={item.key === pendingReplyKey ? null : !historyPreview && item.kind === 'turn' && !item.done ? meta?.activeTask === 'cli' ? false : meta?.busy ?? null : false}
             now={item.kind === 'turn' && !item.done ? now : 0} toggle={toggle} send={send} onOpenFile={onOpenFile} onOpenError={setErrorDetail}
-            onRunCommand={allowTerminal ? runCodeCommand : undefined} codeRunDisabled={codeRunDisabled || (item.kind === 'turn' && !item.done)} onReply={reply} />
-            return reply
-              ? <div key={item.key} className="group"><AgentSwipeReply text={replyText} label={t('comment.reply')} onReply={reply} showButton={item.kind !== 'turn'}>{content}</AgentSwipeReply></div>
-              : <div key={item.key}>{content}</div>
+            onRunCommand={allowTerminal ? runCodeCommand : undefined} codeRunDisabled={codeRunDisabled || (item.kind === 'turn' && !item.done)} onReply={reply} /></div>
           })())}
       </div>
       {!conversationLoading && timeline.length > 0 && (
@@ -5179,6 +5180,14 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
   useUiLocale()
   const { t } = useI18n()
   const [preview, setPreview] = useState<AgentAttachment | null>(null)
+  const replyButton = onReply && <HoverTipLayer className="shrink-0">
+    <button type="button" data-agent-reply-button
+      onClick={event => { event.stopPropagation(); onReply() }}
+      aria-label={t('comment.reply')} data-tip={t('comment.reply')}
+      className="flex size-8 items-center justify-center rounded text-ink-muted hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-ink">
+      <Undo width={16} height={16} aria-hidden="true" />
+    </button>
+  </HoverTipLayer>
   if (item.kind === 'user') {
     const files = conversationAttachments(item.text, item.attachments, item.images, project).map(file => ({
       project: file.project, relPath: file.path, mimeType: file.mimeType,
@@ -5229,6 +5238,7 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
               className="flex min-w-0 flex-1 items-start gap-2 rounded-lg rounded-tr-none bg-surface-raised px-3 py-2 text-left text-ink">
               <span className={`min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text ${open ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>{questionText}</span>
             </button>}
+            {replyButton}
           </div>
         )}
         </div>
@@ -5268,7 +5278,7 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
     const detailsKey = `${item.key}:details`
     const detailsOpen = expanded.has(detailsKey)
     const canStop = busy === true && !item.done
-    const actionSpace = canStop ? 30 : 0
+    const actionSpace = (canStop ? 32 : 0) + (onReply ? 32 : 0)
     return (
       <div data-agent-turn className="min-w-0 rounded-lg rounded-tl-none border border-edge bg-surface">
         {open && <div data-agent-turn-header className="sticky -top-3 z-20 flex h-8 items-center rounded-tr-lg border-b border-edge bg-surface">
@@ -5280,8 +5290,7 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
           <div data-agent-turn-actions className="flex shrink-0 items-center">
             {canStop && <button type="button" onClick={() => send({ type: 'cancel' })} className="flex size-8 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover hover:text-ink" aria-label={uiText("중단")} title={uiText("중단")} data-tip={uiText("중단")}><span className="size-2 rounded-[1px] bg-current" /></button>}
             {answerText && <CopyButton text={answerText} label={uiText("이 답변 복사")} rail />}
-            {onReply && <button type="button" data-agent-reply-button onClick={onReply} aria-label={t('comment.reply')} data-tip={t('comment.reply')}
-              className="flex size-8 items-center justify-center rounded text-ink-muted hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"><Undo width={16} height={16} aria-hidden="true" /></button>}
+            {replyButton}
           </div>
         </div>}
         {!open && <div data-agent-turn-header className="relative min-h-9">
@@ -5294,11 +5303,14 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
                   ? <AgentReplyPending label={t('common.loading')} active={loadingActive} /> : summary}</span>
               </span>
           </button>
-          {canStop && <button type="button" onClick={() => send({ type: 'cancel' })}
-            className="absolute right-0 top-0 m-1.5 flex h-6 w-6 items-center justify-center rounded text-ink-secondary hover:bg-surface-raised hover:text-ink"
-            aria-label={uiText("중단")} title={uiText("중단")} data-tip={uiText("중단")}>
-            <span className="h-2.5 w-2.5 rounded-[1px] bg-current" />
-          </button>}
+          {(canStop || onReply) && <div className="absolute right-0 top-0.5 flex items-center">
+            {canStop && <button type="button" onClick={() => send({ type: 'cancel' })}
+              className="flex size-8 items-center justify-center rounded text-ink-secondary hover:bg-surface-raised hover:text-ink"
+              aria-label={uiText("중단")} title={uiText("중단")} data-tip={uiText("중단")}>
+              <span className="h-2.5 w-2.5 rounded-[1px] bg-current" />
+            </button>}
+            {replyButton}
+          </div>}
         </div>}
         {open && (
           <div className="space-y-2 px-3 py-2">
