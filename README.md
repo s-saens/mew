@@ -1,8 +1,4 @@
----
-description: "Mew introduction, current workspace screenshots, and three installation routes: npm, curl in WSL/Linux/macOS, and source setup. Covers documents, code, agents across eight projects, mobile access, security, development, and pending prebuilt publication."
----
-
-# mew : my easy workspace
+ # mew : my easy workspace
 
 **A browser workspace for your documents, code, and AI agents.**
 
