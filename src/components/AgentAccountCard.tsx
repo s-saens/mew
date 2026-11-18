@@ -1,6 +1,9 @@
 import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { HoverTipLayer } from '@mew/ui/hover-tip-layer'
+import { uiText } from '@mew/ui/i18n-core'
+import { RefreshDouble } from 'iconoir-react'
 import { type LoginDesktopSession } from '../api/client'
 import { SUBSCRIPTION_URLS, type AccessIssue, type RuntimeAccount } from '../../shared/agent-access'
 import { LoginDesktopViewer } from './LoginDesktopViewer'
@@ -15,7 +18,19 @@ const copy = {
 }
 const button = 'rounded border border-edge-bright px-3 py-1.5 text-sm text-ink-secondary hover:bg-surface-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50'
 
-export function AgentAccountCard({ runtime, issue = null, queued = false, embedded = false }: { runtime: string; issue?: AccessIssue | null; queued?: boolean; embedded?: boolean }) {
+type SettingsAccountActions = {
+  onLogin: () => void
+  onLogout?: () => void
+  disabled: boolean
+}
+
+export function AgentAccountCard({ runtime, issue = null, queued = false, embedded = false, settingsActions }: {
+  runtime: string
+  issue?: AccessIssue | null
+  queued?: boolean
+  embedded?: boolean
+  settingsActions?: SettingsAccountActions
+}) {
   const { fetchAgentRuntimeAccount } = useWorkspaceApi()
   const { locale } = useI18n()
   const c = copy[locale]
@@ -23,7 +38,7 @@ export function AgentAccountCard({ runtime, issue = null, queued = false, embedd
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [revision, setRevision] = useState(0)
-  const [browser, setBrowser] = useState<string | null>(null)
+  const [browser, setBrowser] = useState<{ url: string; container?: Element | null } | null>(null)
   const refresh = useCallback(() => setRevision((value) => value + 1), [])
   useEffect(() => {
     let alive = true
@@ -38,6 +53,43 @@ export function AgentAccountCard({ runtime, issue = null, queued = false, embedd
   const planLabel = unsubscribed && (!account?.plan || account.plan.toLowerCase() === 'free')
     ? c.free
     : `${account?.plan ?? c.unknown}${unsubscribed ? ` · ${c.free}` : account?.subscription === 'paid' ? ` · ${c.paid}` : ''}`
+  const subscriptionBrowser = browser && <SubscriptionBrowser {...browser} onClose={() => { setBrowser(null); refresh() }} />
+  if (settingsActions) {
+    const authentication = account?.authentication ?? 'unknown'
+    const connected = authentication === 'connected' || authentication === 'api_key'
+    const identity = authentication === 'api_key' ? c.api : account?.account ?? (connected ? uiText('연결됨') : c.unknown)
+    const subscriptionLabel = unsubscribed || problem === 'subscription_required' ? c.subscribe
+      : account?.subscription === 'paid' ? c.manage : c.browser
+    return <section aria-label={c.title} className="mt-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-ink">{c.title}</h3>
+        <HoverTipLayer>
+          <button type="button" aria-label={c.refresh} data-tip={c.refresh} disabled={loading || settingsActions.disabled} onClick={refresh}
+            className="grid h-8 w-8 place-items-center rounded-md text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40">
+            <RefreshDouble width={16} height={16} aria-hidden />
+          </button>
+        </HoverTipLayer>
+      </div>
+      <div aria-live="polite" aria-busy={loading} className="my-2 space-y-1.5 text-sm text-ink-secondary">
+        {loading ? <p>{c.loading}</p> : error ? <p role="alert">{c.failed}</p>
+          : authentication === 'signed_out' ? <p>{c.signedOut}</p>
+          : <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-1.5">
+              <dt>{c.account}</dt><dd className="break-words font-medium text-ink">{identity}</dd>
+              {authentication !== 'api_key' && <><dt>{c.plan}</dt><dd className="break-words text-ink">{planLabel}</dd></>}
+            </dl>}
+        {authentication === 'api_key' && <p className="text-xs">{c.apiNote}</p>}
+        {problem && <p role="alert" className="text-warning">{c[problem]}</p>}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {!loading && !connected && <button type="button" className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-ink-on-accent hover:bg-accent-strong focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
+          disabled={settingsActions.disabled} onClick={settingsActions.onLogin}>{uiText('로그인')}</button>}
+        {url && !loading && <button type="button" className={button} onClick={event => setBrowser({ url, container: event.currentTarget.closest('[role="dialog"]') })}>{subscriptionLabel}</button>}
+        {settingsActions.onLogout && !loading && authentication !== 'signed_out' &&
+          <button type="button" className={button} disabled={settingsActions.disabled} onClick={settingsActions.onLogout}>{uiText('로그아웃')}</button>}
+      </div>
+      {subscriptionBrowser}
+    </section>
+  }
   const content = <div className="space-y-2 py-2" aria-live="polite" aria-busy={loading}>
     {loading ? <p>{c.loading}</p> : <>
       <p className="break-words">{c.account}: <strong className="font-medium text-ink">{account?.authentication === 'signed_out' ? c.signedOut : account?.account ?? (account?.authentication === 'api_key' ? c.api : c.unknown)}</strong></p>
@@ -47,7 +99,7 @@ export function AgentAccountCard({ runtime, issue = null, queued = false, embedd
     </>}
     {problem && queued && <p>{c.paused}</p>}
     <div className="flex flex-wrap gap-2">
-      {url && <button type="button" className={button + ' text-accent'} onClick={() => setBrowser(url)}>{unsubscribed || problem === 'subscription_required' ? c.subscribe : c.manage}</button>}
+      {url && <button type="button" className={button + ' text-accent'} onClick={() => setBrowser({ url })}>{unsubscribed || problem === 'subscription_required' ? c.subscribe : c.manage}</button>}
       <button type="button" className={button} disabled={loading} onClick={refresh}>{c.refresh}</button>
     </div>
   </div>
@@ -60,11 +112,11 @@ export function AgentAccountCard({ runtime, issue = null, queued = false, embedd
       <summary className="cursor-pointer py-1 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">{problem ? c[problem] : c.title}</summary>
       {content}
     </details>}
-    {browser && <SubscriptionBrowser url={browser} onClose={() => { setBrowser(null); refresh() }} />}
+    {subscriptionBrowser}
   </section>
 }
 
-function SubscriptionBrowser({ url, onClose }: { url: string; onClose: () => void }) {
+function SubscriptionBrowser({ url, container, onClose }: { url: string; container?: Element | null; onClose: () => void }) {
   const { openLoginDesktop, closeLoginDesktop } = useWorkspaceApi()
   const { locale } = useI18n()
   const c = copy[locale]
@@ -98,10 +150,10 @@ function SubscriptionBrowser({ url, onClose }: { url: string; onClose: () => voi
   }}>
     <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-edge p-3">
       <span className="min-w-0 break-all text-sm">{new URL(url).host}</span>
-      <button ref={closeRef} type="button" className={button} onClick={onClose}>{c.close}</button>
+      <button ref={closeRef} type="button" className={button} onClick={onClose}>{container ? uiText('닫기') : c.close}</button>
     </div>
     <p className="shrink-0 px-3 py-2 text-xs text-ink-secondary">{c.hint}</p>
     {page ? <LoginDesktopViewer streamUrl={page.streamUrl} reopen={async () => { const next = await openLoginDesktop(url); tabs.current.add(next.id); return next.streamUrl }} />
       : <p className="p-4 text-sm" role={error ? 'alert' : 'status'}>{error ? c.failed : c.opening}</p>}
-  </div></FloatingLoginWindow>, document.body)
+  </div></FloatingLoginWindow>, container ?? document.body)
 }

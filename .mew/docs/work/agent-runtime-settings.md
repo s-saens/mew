@@ -1,7 +1,8 @@
 ---
 title: "Agent runtime settings improvements"
-description: "Records the runtime settings dialog clarification, explicit override and environment variable removal, local verification, management actions, runtime status synchronization, and remaining host CLI readiness limits."
+description: "Records the runtime settings dialog redesign, launch overrides, environment variable removal, management actions, runtime status synchronization, and local verification."
 created: "2026-11-17"
+updated: "2026-11-18"
 ---
 
 # Agent runtime settings improvements
@@ -19,3 +20,11 @@ Local checks: the settings browser test exercised reset cancellation and confirm
 ## Runtime list refresh after removal
 
 Runtime settings now publish the refreshed runtime list after installation or removal so open selectors and agent setup update their actions. A mocked browser regression reproduced the missing Install button after removal and passed after the fix; it also checks the existing settings dialog. The two targeted browser tests and the project build passed; lint passed with warnings. The documentation check still reports 39 existing link errors. No provider runtime was removed, no server was restarted, and no deployment was performed.
+
+## Runtime settings navigation on 2026-11-18
+
+The previous dialog put install, login, reset, and uninstall actions on the same screen, with a Save button even when no execution settings had changed. The dialog now opens on the installation and account overview. Launch options and management actions each have a dedicated view. The [runtime guide](../../../docs/configuration/agent-runtimes.md#installation-login-and-subscriptions) lists the tasks available in each view.
+
+All 20 focused tests passed. Browser checks at 360px and 1100px covered keyboard navigation, stable tab positions, pending edits across tabs, reset and uninstall confirmations, and the separate Codex connector and CLI statuses. At 360px the Save button stayed within the viewport after ten environment rows were added. The suite also covered account actions, installation progress, updates, settings storage, and shared translations. The browser tests used mocked provider APIs.
+
+The local build passed, including TypeScript, and lint passed with warnings. The project-wide localization check flagged Korean UI literals outside the runtime settings changes. The documentation checker validated descriptions and reported the same 39 broken links as before the edits. Live provider operations and physical-device checks remain unverified.

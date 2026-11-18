@@ -7,7 +7,7 @@ import type { InstallFailure } from '../hooks/use-runtime-install'
 import { refreshAgentRuntimes } from '../utils/agentPickerCache'
 import { SessionTerminalOutputPopup } from './SessionTerminalPopup'
 
-export function RuntimeInstallAction({ runtimeId, label, status, installing, installFailure, install, disabled }: {
+export function RuntimeInstallAction({ runtimeId, label, status, installing, installFailure, install, disabled, primary }: {
   runtimeId: string
   label: string
   status?: AgentRuntimeStatus | null
@@ -15,6 +15,7 @@ export function RuntimeInstallAction({ runtimeId, label, status, installing, ins
   installFailure: InstallFailure | null
   install: (id: string) => Promise<void>
   disabled?: boolean
+  primary?: boolean
 }) {
   useUiLocale()
   const [open, setOpen] = useState(false)
@@ -41,6 +42,7 @@ export function RuntimeInstallAction({ runtimeId, label, status, installing, ins
   const blocked = !!disabled || !!status?.installing || busy || installing !== null
   const terminalLabel = `${label} · ${uiText('설치')} · ${uiText('터미널 세션 보기')}`
   const actionClass = 'relative shrink-0 rounded px-2.5 py-1 text-xs text-ink-secondary hover:bg-surface-raised hover:text-ink disabled:opacity-40'
+  const installClass = primary ? 'rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-ink-on-accent hover:bg-accent-strong disabled:opacity-40' : actionClass
   // eslint-disable-next-line no-control-regex -- Strip terminal control sequences from the captured output.
   const text = (busy && progress?.state === 'failed' ? '' : progress?.output ?? '').replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').replace(/\r\n?/g, '\n')
   const output = !busy && failure && !text.includes(failure) ? [text, failure].filter(Boolean).join('\n') : text
@@ -49,14 +51,14 @@ export function RuntimeInstallAction({ runtimeId, label, status, installing, ins
     {(showOutput || canInstall) && <button
       ref={actionRef}
       type="button"
-      className={actionClass}
+      className={showOutput ? actionClass : installClass}
       disabled={!showOutput && blocked}
       aria-label={showOutput ? terminalLabel : undefined}
       aria-busy={busy || undefined}
       data-tip={showOutput ? terminalLabel : undefined}
       onClick={() => { if (showOutput) setOpen(true); else void install(runtimeId) }}
     >{showOutput ? <Terminal aria-hidden width={16} height={16} /> : uiText('설치')}</button>}
-    {failed && canInstall && <button type="button" disabled={blocked} className={actionClass} onClick={() => {
+    {failed && canInstall && <button type="button" disabled={blocked} className={installClass} onClick={() => {
       actionRef.current?.focus()
       void install(runtimeId)
     }}>{uiText('다시 시도')}</button>}

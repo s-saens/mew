@@ -6,9 +6,9 @@ status: "implemented"
 created: "2026-09-18"
 updated: "2026-11-18"
 status_hash: "ce50d3fa70fce93520dfd200e419db9b718cebd2b370a52a9250e624fc80aed1"
-files: ["src/components/RuntimeInstallProgress.tsx", "src/components/AgentPanel.tsx", "src/components/RuntimeSettingsModal.tsx", "src/components/agentRuntimes.tsx", "server/agentRuntimes.ts", "server/agentRuntimeInstall.ts", "server/agentDefaults.ts"]
+files: ["src/components/RuntimeInstallProgress.tsx", "src/components/AgentPanel.tsx", "src/components/RuntimeSettingsModal.tsx", "src/components/RuntimeLaunchSettings.tsx", "src/components/agentRuntimes.tsx", "server/agentRuntimes.ts", "server/agentRuntimeInstall.ts", "server/agentDefaults.ts"]
 commits: []
-description: "Feature contract for background runtime installation, the picker’s installation and update terminal buttons, executable readiness, authentication, and model, effort, and permission defaults. Covers failed attempts, provider-specific installers, and host CLI updates for Codex and Claude."
+description: "Defines runtime installation, update terminals, and the settings dialog for readiness, account access, advanced execution settings, and management. Covers failed attempts, provider-specific installers, host CLI updates, and model, effort, and permission defaults."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -42,8 +42,9 @@ description: "Feature contract for background runtime installation, the picker�
 - The server acknowledges background starts independently of installer completion. Attempt-specific reads return the outcome of the accepted installation even if a client connection is interrupted. The server keeps the latest attempt and its last 12,000 characters per runtime in memory. A retry replaces that attempt. See [ADR 0188](../../decisions/0188-agent-runtime-installation-attempts.md).
 - Presence checks follow the executable selected for launch. If an account’s saved executable is missing and the default is installed, the picker directs the user to the executable setting. Saving or resetting settings refreshes the open runtime list. The [runtime guide](../../../../docs/configuration/agent-runtimes.md) lists provider and host prerequisites.
 
-- The management section makes execution-settings reset and runtime removal visible. Each requires confirmation; unsupported automatic removals remain disabled with manual-removal guidance. Reset clears account-scoped execution settings, not saved model defaults or provider login.
-- Runtime settings separate installation and account controls from advanced execution settings, explain Claude and Codex connector scope, and support clearing command/argument overrides and removing individual saved environment variables. Other masked values are preserved.
+- Runtime settings open on **Overview**, which shows installation status and available actions to install the runtime and access its provider account. Codex and Claude distinguish the bundled connector from the CLI that runs sessions. Supported account queries show the identity and plan directly. Login and logout actions reflect the reported authentication state.
+- **Advanced execution settings** holds editable launch options. Switching tabs preserves edits while the dialog is open. Save becomes available after an edit and applies changes to new sessions. Clearing an executable or arguments restores the default. Removing an environment variable preserves the other masked values.
+- **Management** provides separate confirmations for resetting execution settings and uninstalling the runtime. Reset clears account-scoped launch options and preserves model defaults and provider login. Unsupported removal stays disabled with guidance for manual removal.
 - The runtime settings dialog appears above the list through the shared `DialogFrame` body portal, and interactions inside it do not close the dropdown behind it.
 
 - The input field's Save icon is centered in a transparent container with the same height as the adjacent dropdown. It now manages [saved prompt drafts](agent-input-mentions-skills-and-attachments.md#saved-prompt-drafts). Existing runtime defaults and their API remain available to session initialization.
