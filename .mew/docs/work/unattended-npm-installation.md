@@ -1,6 +1,6 @@
 ---
 title: "Unattended npm installation and remote onboarding"
-description: "Records implementation of the mew-ide npm entry, managed Postgres, background startup, Windows WSL bootstrap, and remote onboarding. Includes local verification for the 0.1.1 release preparation and pending publication."
+description: "Records implementation of the mew-ide npm entry, managed Postgres, background startup, Windows WSL bootstrap, and remote onboarding. Includes local verification for the 0.1.1 release preparation and the 0.1.2 cross-platform fixes and pending publication."
 updated: "2026-11-18"
 ---
 
@@ -61,6 +61,12 @@ browsers and PostgreSQL processes were closed after verification.
 ## 0.1.1 release preparation
 
 Aligned the CLI package, npm lockfile, and shell installer at version `0.1.1` so the runtime tag and installer refer to the same release. The local build, shell syntax check, and release action test passed on Node.js 24.16.0. The CLI suite passed 75 tests and skipped the opt-in real PostgreSQL test. GitHub Actions and clean-host installation remain pending. See the [release procedure](../operations/cli-release.md).
+
+## 0.1.2 release preparation
+
+The 0.1.1 runtime checks failed on both macOS architectures when the temporary directory included a symlink and on both Windows architectures when the test compared POSIX permission bits. The next candidate resolves the archive root before comparing physical paths and checks directory and credential modes on POSIX. Local regression coverage includes a symlinked staging root and an existing directory with permissive modes.
+
+On Linux with Node 24.16.0, the build and lint passed. Of 77 CLI tests, 76 passed and the opt-in database test was skipped. All eight release runtime and action tests passed. Documentation metadata passed and the global checker reported 39 existing missing links. Native release verification uses the protected GitHub workflow.
 
 ## Remaining gates
 

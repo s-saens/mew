@@ -69,8 +69,6 @@ test('a first launch creates a private sibling cluster and database, keeps passw
   const state = JSON.parse(await fs.readFile(path.join(dir, 'installation.json'), 'utf8'))
   assert.match(state.password, /^[\w-]{43}$/)
   assert.equal(state.port, 55432)
-  assert.equal((await fs.stat(dir)).mode & 0o777, 0o700)
-  assert.equal((await fs.stat(path.join(dir, 'installation.json'))).mode & 0o777, 0o600)
   assert.deepEqual((await fs.readdir(dir)).sort(), ['cluster', 'installation.json'])
   assert.ok(f.calls[0].args.includes('--auth-host=scram-sha-256'))
   assert.ok(f.calls[0].args.includes('--auth-local=scram-sha-256'))
@@ -83,6 +81,18 @@ test('a first launch creates a private sibling cluster and database, keeps passw
   await result.stop()
   assert.ok(f.calls.some(call => call.kill === 'SIGINT'))
   await result.failure
+})
+
+// Windows installations run managed PostgreSQL in WSL, where POSIX mode bits apply.
+test('managed PostgreSQL restricts POSIX directory and credential modes', { skip: process.platform === 'win32' }, async t => {
+  const f = await fixture(t)
+  const dir = postgresDirectory(f.dataDir)
+  await fs.mkdir(dir)
+  await fs.chmod(dir, 0o755)
+  const result = await preparePostgres('/fixture', f.options)
+  t.after(() => result.stop())
+  assert.equal((await fs.stat(dir)).mode & 0o777, 0o700)
+  assert.equal((await fs.stat(path.join(dir, 'installation.json'))).mode & 0o777, 0o600)
 })
 
 test('relaunch reuses the cluster and credentials without initializing or deleting stored data', async t => {

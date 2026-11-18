@@ -144,6 +144,7 @@ export async function stageRuntimeSources(root: string, directory: string, manif
 }
 
 export async function validateRuntimeLinks(directory: string) {
+  const archiveRoot = await fs.realpath(directory)
   async function visit(folder: string) {
     for (const entry of await fs.readdir(folder, { withFileTypes: true })) {
       const file = path.join(folder, entry.name)
@@ -151,8 +152,8 @@ export async function validateRuntimeLinks(directory: string) {
         const target = await fs.readlink(file)
         const relative = path.relative(directory, path.resolve(path.dirname(file), target))
         if (process.platform !== 'win32' && path.isAbsolute(target) || relative === '..' || relative.startsWith(`..${path.sep}`)) throw new Error(`Runtime link escapes archive: ${path.relative(directory, file)}`)
-        const actual = path.relative(directory, await fs.realpath(file))
-        if (actual === '..' || actual.startsWith(`..${path.sep}`)) throw new Error(`Runtime link chain escapes archive: ${path.relative(directory, file)}`)
+        const actual = path.relative(archiveRoot, await fs.realpath(file))
+        if (path.isAbsolute(actual) || actual === '..' || actual.startsWith(`..${path.sep}`)) throw new Error(`Runtime link chain escapes archive: ${path.relative(directory, file)}`)
       } else if (entry.isDirectory()) await visit(file)
     }
   }

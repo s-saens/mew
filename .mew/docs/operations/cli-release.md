@@ -1,6 +1,6 @@
 ---
 title: "CLI Releases and npm Publishing"
-description: "Release procedure for the mew-ide npm package, curl installer, and platform runtime archives. Tracks the prepared 0.1.1 version, protected publishing, licensing, and pending platform acceptance."
+description: "Release procedure for the mew-ide npm package, curl installer, and platform runtime archives. Tracks the prepared 0.1.2 version, protected publishing, licensing, and pending platform acceptance."
 updated: "2026-11-18"
 상위파일:
   - "../../../docs/deployment/native.md"
@@ -85,7 +85,9 @@ Assign reviewers for `cli-release`, `npm-publish`, `desktop-release`, and the se
 
 ## Initial Publication and Subsequent Versions
 
-The source tree prepares version `0.1.1` for the first public CLI release. The matching GitHub runtime release, npm publication, and clean-host acceptance are pending.
+Archive link checks resolve the runtime root and final symlink targets against the same physical directory on macOS. CLI tests check Unix permissions on POSIX hosts, including WSL, where the Windows installer runs managed Postgres.
+
+The source tree prepares version `0.1.2` for the first public CLI release. The matching GitHub runtime release, npm publication, and clean-host acceptance are pending.
 
 For the initial publication, verify scope permissions using the responsible person's npm account before proceeding. First create the runtime tag release, then review the package contents in `apps/cli/` and publish.
 
