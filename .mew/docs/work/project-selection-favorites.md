@@ -1,8 +1,8 @@
 ---
 title: "Project selection favorites transition"
-description: "Records the incomplete transition to a single account-starred catalog, default-collapsed nested projects, sibling reordering and hierarchy guides, local checks, and remaining regressions."
+description: "Records the incomplete transition to a single account-starred catalog, default-collapsed nested projects, sibling reordering, hierarchy guides, themed favorite stars, local checks, and remaining regressions."
 created: "2026-11-16"
-updated: "2026-11-17"
+updated: "2026-11-18"
 ---
 
 The requested change replaces the My/All selector with a shared catalog, account-specific stars, favorites-first ordering, drag handles, and collapsible subprojects. It also retains the active workspace when the last star is removed.
@@ -22,3 +22,7 @@ Local verification passed the new desktop/mobile browser regression, catalog sna
 The selector keeps hierarchy based on actual paths. Reordering is limited to siblings with the same favorite status, and the drag preview reflects valid drop positions. Handles align along the left edge, vertical guides show ancestor levels, and rows without children reserve the expansion-control space. The current behavior is defined in the [project selection contract](../features/projects-files-search/opening-projects-tabs-and-groups.md).
 
 Local Chromium tests covered mouse and touch dragging, keyboard movement, expanded subtrees, invalid destinations, and guides at 320, 390, and 1100 pixels. The shared tab drag test and build passed; lint completed with warnings. Documentation descriptions passed, while the link check reported 39 existing errors. No deployment or server restart was performed. Physical-device verification remains outstanding.
+
+## Favorite star color — 2026-11-18
+
+The filled star now uses the theme's primary color so favorites stand out in the [project selection catalog](../features/projects-files-search/opening-projects-tabs-and-groups.md#select-and-organize-projects). The Chromium regression verified the filled star and the unfilled outline in the mobile selector. The build passed and lint completed with warnings. Documentation descriptions passed, and the link check reported 39 existing errors. Verification was local.

@@ -199,6 +199,13 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     assert.equal(rowBounds.x, 0, 'the active project highlight reaches the left screen edge')
     assert.equal(rowBounds.x + rowBounds.width, 390, 'the active project highlight reaches the right screen edge')
     assert.equal(await activeProject.evaluate(element => element.ownerDocument.defaultView!.getComputedStyle(element).paddingInlineStart), '12px', 'row controls retain their inset')
+    const outlineStar = mobileProjects.locator('.mew-project-catalog-pin[aria-pressed="false"] svg').first()
+    const filledStar = activeProject.locator('button[aria-pressed="true"] svg')
+    assert.equal(await filledStar.evaluate(element => element.ownerDocument.defaultView!.getComputedStyle(element).fill), 'rgb(86, 66, 199)', 'a favorite uses the fixture theme accent')
+    assert.deepEqual(await outlineStar.evaluate(element => {
+      const style = element.ownerDocument.defaultView!.getComputedStyle(element)
+      return [style.color, style.fill]
+    }), ['rgb(82, 82, 82)', 'none'], 'an unpinned project keeps the secondary-color outline')
     const mobileAdd = mobileProjects.getByRole('button', { name: 'Add project', exact: true })
     const mobileClose = mobileProjects.getByRole('button', { name: 'Project selection · Close', exact: true })
     const addBox = await mobileAdd.boundingBox(), closeBox = await mobileClose.boundingBox()
