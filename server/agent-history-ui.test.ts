@@ -80,7 +80,13 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       await page.getByText('Question 44', { exact: true }).waitFor()
       assert.equal(await page.getByText('Question 24', { exact: true }).count(), 0)
       if (verifyDistantReply) {
-        await page.locator('button[data-agent-reply-reference]').click()
+        const reference = page.locator('button[data-agent-reply-reference]')
+        const repliedQuestion = page.getByRole('button', { name: 'Question 44', exact: true })
+        const referenceBounds = (await reference.boundingBox())!
+        const questionBounds = (await repliedQuestion.boundingBox())!
+        assert.equal(referenceBounds.x, questionBounds.x, 'the reference starts at the bubble edge')
+        assert.equal(referenceBounds.width, questionBounds.width, 'the reference and bubble share a column')
+        await reference.click()
         const oldAnswer = page.locator('[data-agent-message-id="older-answer"]')
         await oldAnswer.locator('[data-agent-turn-footer]').waitFor()
         assert.equal(await oldAnswer.evaluate(el => el.ownerDocument.activeElement === el), true, 'a distant answer receives focus')
@@ -163,11 +169,16 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       for (const open of [false, true]) {
         if (open) await questionButton.click()
         const bounds = await question.evaluate(el => {
-          const bubble = el.querySelector('button[aria-expanded]')!
-          const copy = el.querySelector('button[title="이 질문 복사"]')!
-          return { left: bubble.getBoundingClientRect().left, copyRight: copy.getBoundingClientRect().right, background: el.ownerDocument.defaultView!.getComputedStyle(copy.parentElement!).backgroundColor }
+          const bubble = el.querySelector('button[aria-expanded]')!.getBoundingClientRect()
+          const copyButton = el.querySelector('button[title="이 질문 복사"]')!
+          const copy = copyButton.getBoundingClientRect()
+          const reply = el.querySelector('button[data-agent-reply-button]')!.getBoundingClientRect()
+          return { left: bubble.left, copyRight: copy.right, replyLeft: reply.left, replyRight: reply.right,
+            centerDifference: Math.abs(copy.top + copy.height / 2 - reply.top - reply.height / 2),
+            background: el.ownerDocument.defaultView!.getComputedStyle(copyButton.parentElement!).backgroundColor }
         })
-        assert.ok(bounds.copyRight < bounds.left, 'question copy sits outside the left of the bubble')
+        assert.ok(bounds.copyRight < bounds.replyLeft && bounds.replyRight < bounds.left, 'copy and reply sit together to the left of the question')
+        assert.ok(bounds.centerDifference < 1, 'question controls share the same row')
         assert.equal(bounds.background, 'rgba(0, 0, 0, 0)', 'question copy container has no bubble background')
         await question.getByRole('button', { name: '이 질문 복사', exact: true }).click()
         assert.equal(await page.evaluate('window.copied'), 'Question 40')

@@ -2,7 +2,7 @@
 title: "Agent message swipe reply"
 created: "2026-11-17"
 updated: "2026-11-18"
-description: "Records agent replies from the original swipe gesture through Reply buttons, composer and mobile keyboard fixes, and linked message references. Includes local checks and application limits."
+description: "Records agent reply gestures, composer and mobile keyboard fixes, linked message references, and the placement of Reply beside Copy on user questions. Includes local checks and application limits."
 ---
 
 Agent conversations now let users swipe a text-bearing question or answer left, or choose its Reply button, to add an editable Markdown quote to the composer. This provides context for a follow-up without replacing the existing draft or introducing a separate message transport. The [conversation contract](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#reply-to-a-message) owns the current behavior.
@@ -36,3 +36,9 @@ Long quoted replies duplicated entire answers in the transcript and provided no 
 The 112 focused Node tests passed. They covered transcript and provider replay, WebSocket range retrieval, queue edits, scheduling, and reply display data. Chromium passed linked-reply and conversation history checks at desktop and mobile widths in both themes, including a jump that skipped intervening history and returned to the retained latest messages. Prompt feedback, scroll controls, and execution-option regressions also passed.
 
 `npm run build` and `npm run lint` passed with warnings. Documentation descriptions and new heading anchors passed local checks. The repository link checker reported the same 39 link errors before and after the documentation changes. Verification used a local build and browser viewport emulation. The new reply protocol takes effect when the updated server and supervisor code is loaded.
+
+## Question button placement (2026-11-18)
+
+Group Copy and Reply together on the left of a question in both disclosure states. Use the same content column for the question and its reply reference. [Bubble display contract](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#task-bubble-status).
+
+Three Chromium tests passed at desktop and mobile widths in both themes. They verified button alignment, copying, reply selection, and navigation from the reference. The local build and lint passed. Documentation descriptions and the contract anchor passed inspection. The link checker reported the same 39 existing errors.

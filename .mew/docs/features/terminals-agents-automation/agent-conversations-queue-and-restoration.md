@@ -8,7 +8,7 @@ updated: "2026-11-18"
 status_hash: "b325d279cf16e291b2bcddda7cc0d70268647e336403acba780cb1081da44668"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-startup-queue.tsx", "src/utils/agent-startup-queue.ts", "src/hooks/use-agent-event-state.ts", "src/hooks/use-agent-work-history.ts", "src/utils/agent-work-loader.ts", "src/hooks/use-agent-tab-previews.ts", "src/hooks/use-agent-session-previews.ts", "src/utils/agent-tab-previews.ts", "src/utils/agentFold.ts", "src/hooks/useGridDrag.ts", "server/agentHost.ts", "server/agentWs.ts", "server/agentTranscript.ts", "server/agent-history-preview.ts", "server/agent-tab-preview.ts", "server/user-ui-routes.ts", "server/agent-session-search-service.ts", "server/agent-transcript-search.ts", "server/agent-runtime-history-search.ts"]
 commits: []
-description: "Agent conversations, bubble controls, linked replies, composer feedback, queues, drafts, history search, and session restoration. Covers navigation to reply sources, keyboard behavior, session conflicts, recovery indicators, and relay liveness."
+description: "Agent conversations, question and answer button placement, linked replies, composer feedback, queues, drafts, history search, and session restoration. Covers navigation to reply sources, keyboard behavior, session conflicts, recovery indicators, and relay liveness."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -27,7 +27,7 @@ description: "Agent conversations, bubble controls, linked replies, composer fee
 - In an empty conversation, use a centered, translated prompt to guide the user to start chatting.
 - Use ↑/↓ in the conversation area to move between questions. From the middle of a long answer, ↑ first returns to that answer's question.
 - Clicking a bubble or answer body focuses the conversation area for question navigation without displaying a border around the entire area. Keep the focus border during keyboard navigation, and hide it when the area is clicked with a pointer, even if it already has focus. Preserve the individual focus indicators of child buttons and links. In `server/agent-history-ui.test.ts`, check clicking an answer after using the input field, clicking again after keyboard navigation, and restoring focus after leaving the area.
-- Click collapsed bubbles to expand their content. Place question copy controls outside the bubble on the left. For collapsed answers, place Reply and the in-progress stop control to the right of the first line and hide the time. Expanded answers use the full bubble width. Their top bar shows status and duration on the left and copy, reply, and the in-progress stop control on the right. Clicking either bar collapses the answer; action buttons work independently.
+- Click collapsed bubbles to expand their content. Group question Copy and Reply outside the bubble on the left. For collapsed answers, place Reply and the in-progress stop control to the right of the first line and hide the time. Expanded answers use the full bubble width. Their top bar shows status and duration on the left and copy, reply, and the in-progress stop control on the right. Clicking either bar collapses the answer; action buttons work independently.
 - Keep both expanded answer bars within their own bubble as they stick to the conversation viewport. Do not display the top `질문으로` button.
 
 ### Scope
@@ -56,7 +56,7 @@ description: "Agent conversations, bubble controls, linked replies, composer fee
 
 ### Reply to a message
 
-Select Reply beside a user question or at the right of an agent answer. The button is available with the message collapsed or expanded. Horizontal swipes in the conversation follow the [mobile tab gesture rules](../../development/ui-workspace-layout.md#mobile-dock-and-panel-switching). Messages without text, such as attachment-only messages, cannot be selected.
+Select Reply next to Copy on the left of a user question or on the right of an agent answer. The button is available with the message collapsed or expanded. Horizontal swipes in the conversation follow the [mobile tab gesture rules](../../development/ui-workspace-layout.md#mobile-dock-and-panel-switching). Messages without text, such as attachment-only messages, cannot be selected.
 
 A compact card above the input shows the source and a single-line excerpt. Selecting another message replaces the preview. Cancel reply removes the preview and keeps the draft. On mobile, tapping Cancel reply leaves an open keyboard visible and a closed keyboard hidden, even if the editor still has focus after dismissal.
 
@@ -321,7 +321,7 @@ Set the top-right corner radius of user chat bubbles and the top-left corner rad
 
 Do not show expand arrows in collapsed question, answer, or task groups. Expand by clicking the collapsed content or pressing Enter or Space on its focused button, and announce the state with `aria-expanded`. Collapse an expanded answer by clicking its top or bottom bar, or by pressing Enter or Space on its focused collapse control. While reading long answers, the bottom bar sticks to the bottom edge of the conversation viewport and does not move above its own answer bubble's top. Retain a background and divider so content does not show through behind the bar, and hide it for collapsed answers.
 
-Place the question copy button outside the bubble background on the left in both collapsed and expanded states. Copy the entire question without changing its collapse state. Place Reply to the right of the question bubble and at the right of the answer header. On expanded answers, place Copy in the same header. Copying and replying retain the expanded state.
+Place question Copy and Reply side by side outside the bubble background on the left in both collapsed and expanded states. Align any reply reference above the question body. Place answer Reply at the right of the answer header, with Copy beside it when expanded. Copying and replying retain the bubble's disclosure state.
 
 For collapsed answer summaries, show the original text of the last answer in up to two lines fitted to the panel width, with an ellipsis at the overflowing end. Put the status dot inline before the first line, so the second line starts at the dot's left edge. Do not use a fixed 80-character limit. Reserve only the first-line width needed for Reply and the in-progress stop control at the right. Do not show task duration in collapsed answers or reserve space or an extra line for it. Expanded answers hide the summary and show the status dot at the left of the top bar, followed by task duration. The bottom bar has a centered upward chevron. Update elapsed time while work is in progress, and do not reserve time space for old transcripts without timing data. Copy the entire answer without changing its collapse state.
 
@@ -340,7 +340,7 @@ Completed tasks preserve the full transcript at termination. Thus, even after th
 
 - Replace the input for opening a session ID directly with unified topic, content, and ID search. Combine the local index, external CLI records, and runtime list, and restore conversations only through list selection after request ID and existing occupancy checks ([Search behavior](#history-search), [Selection rationale](../../decisions/0084-agent-history-search.md)).
 
-- Place question copy outside the bubble background and expanded answer copy and reply controls in the top bar ([Bubble display contract](#task-bubble-status)).
+- Place question Copy and Reply together outside the bubble background on the left, and expanded answer Copy and Reply in the top bar ([Bubble display contract](#task-bubble-status)).
 
 - Show explicit command execution and runtime open errors as small translucent floating notices over the content area. Scroll long errors inside the notice, and retain existing task error records and detail windows. Recoverable command-status polling and connection failures use the loading behavior below while automatic recovery remains active.
 
@@ -418,7 +418,7 @@ Completed tasks preserve the full transcript at termination. Thus, even after th
 
 - 2026-10-05: Passed 3 history, input, and connection UI checks. On desktop and mobile in both themes, verified Copy on the first line and time on the second, summary width per line, time display for short responses, transcripts without times, full response copying, Enter/Space toggling, and existing question navigation and cache restoration. Targeted lint, document boundary, and link checks passed. The full type check failed due to an out-of-scope `변경사항` translation key error in `GitWorkbench.tsx`. No build or server restart was performed.
 
-- User verification criteria: Confirm that question Copy is to the left outside the bubble background and response Copy appears only when expanded. Collapsed responses must hide the time, and their summaries must not overlap the first-line Stop button. Confirm that keyboard activation, full response copying, status dots, and stopping remain usable.
+- User verification criteria: Confirm that question Copy and Reply sit together to the left outside the bubble background and response Copy appears only when expanded. Collapsed responses must hide the time, and their summaries must not overlap the first-line Stop button. Confirm that keyboard activation, full response copying, status dots, and stopping remain usable.
 
 - 2026-10-05: Passed 3 history, input, and connection UI checks. On desktop and mobile in both themes, verified ↑/↓ in the middle of long responses, consecutive question navigation, bottom alignment limits, first/last boundaries, manual scrolling, and input and button focus. Type, targeted lint, and document boundary checks passed. The full document link check failed due to missing `docs/work/remote-access.md` in out-of-scope ADR 0195, and the commit hook's central document map check failed because the same ADR was not registered in the MOC. No build or server restart was performed.
 

@@ -5210,17 +5210,20 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
         {/* 설정줄은 작업 버블과 같은 전체 폭, 사용자 발화만 오른쪽으로 들여쓴다. */}
         <div className="ml-6 space-y-2">
         {preview && <AgentMediaPreviewDialog kind={preview.isImage ? 'image' : 'video'} src={rawUrl(preview.relPath, preview.project)} name={preview.relPath.split('/').pop() ?? preview.relPath} onClose={() => setPreview(null)} />}
-        {item.reply && <div className="mx-9"><AgentReplyLink reply={item.reply} onJump={onJumpToReply} /></div>}
-        {(questionText || files.length > 0) && (
-          <div className="flex items-start gap-1">
-            {questionText && <CopyButton text={questionText} label={uiText("이 질문 복사")} />}
-            {hasReferences ? <div
+        {(item.reply || questionText || files.length > 0) && (
+          <div className={`grid grid-cols-[auto_minmax(0,1fr)] items-start gap-y-2 ${questionText ? 'gap-x-1' : ''}`}>
+            {item.reply && <div className="col-start-2"><AgentReplyLink reply={item.reply} onJump={onJumpToReply} /></div>}
+            {questionText && <div className="col-start-1 flex items-center gap-1">
+              <CopyButton text={questionText} label={uiText("이 질문 복사")} />
+              {replyButton}
+            </div>}
+            {(questionText || files.length > 0) && (hasReferences ? <div
               data-agent-question-bubble
               onClick={event => {
                 if ((event.target as Element).closest('button, a')) return
                 toggleQuestion()
               }}
-              className="relative min-w-0 flex-1 rounded-lg rounded-tr-none bg-surface-raised px-3 py-2 text-left text-ink"
+              className="relative col-start-2 min-w-0 rounded-lg rounded-tr-none bg-surface-raised px-3 py-2 text-left text-ink"
             >
               <button type="button" aria-expanded={open}
                 aria-label={questionText || uiText("첨부 파일 {p0}개", { p0: files.length })}
@@ -5234,10 +5237,9 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
                 {agentMessageContent(item.text.trim(), files, setPreview, onOpenFile)}
               </span>
             </div> : <button type="button" aria-expanded={open} onClick={toggleQuestion}
-              className="flex min-w-0 flex-1 items-start gap-2 rounded-lg rounded-tr-none bg-surface-raised px-3 py-2 text-left text-ink">
+              className="col-start-2 flex min-w-0 items-start gap-2 rounded-lg rounded-tr-none bg-surface-raised px-3 py-2 text-left text-ink">
               <span className={`min-w-0 flex-1 break-words [overflow-wrap:anywhere] select-text ${open ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>{questionText}</span>
-            </button>}
-            {replyButton}
+            </button>)}
           </div>
         )}
         </div>
