@@ -9,6 +9,7 @@ import { AgentExecutionToggles } from './agent-execution-toggles'
 import { useAgentExecutionOptions } from '../hooks/use-agent-execution-options'
 import { useAgentInputDraft } from '../hooks/use-agent-input-draft'
 import { RuntimeInstallProgress } from './RuntimeInstallProgress'
+import { RuntimeUpdateAction, useRuntimeUpdates } from './runtime-update-actions'
 import { AgentAttachmentIcon } from './agent-attachment-icon'
 import { historyDisplayText } from '../utils/agent-history-display'
 import { AgentDocumentReferences, AgentDocumentTag } from './agent-document-tag'
@@ -1413,6 +1414,7 @@ function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) 
   const [error, setError] = useState<{ id: string; message: string } | null>(null)
   const [view, setView] = useState<'runtime' | 'set'>(() => scopedBrowserStorage().getItem('mew:agent-picker-view') === 'set' ? 'set' : 'runtime')
 
+  const updates = useRuntimeUpdates(view === 'runtime')
   const pickerRef = useRef<HTMLDivElement>(null)
   const [runtimeOrder, setRuntimeOrder] = useState<string[]>(() => {
     try {
@@ -1535,6 +1537,7 @@ function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) 
                       {busy ? uiText("설치 중…") : uiText("설치")}
                     </button>
                   )}
+                  {status?.installed && <RuntimeUpdateAction runtimeId={runtime.id} updates={updates} />}
                   {index < 9 && <kbd aria-hidden="true" className="pointer-events-none relative text-xs tabular-nums text-ink-muted">{index + 1}</kbd>}
                   <div className="relative shrink-0"><RuntimeSettingsButton runtimeId={runtime.id} label={runtime.label} /></div>
                   <RuntimeInstallProgress runtimeId={runtime.id} busy={busy} installation={status?.installation} />

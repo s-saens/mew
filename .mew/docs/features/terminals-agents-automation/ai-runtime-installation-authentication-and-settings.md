@@ -8,7 +8,7 @@ updated: "2026-10-31"
 status_hash: "ce50d3fa70fce93520dfd200e419db9b718cebd2b370a52a9250e624fc80aed1"
 files: ["src/components/RuntimeInstallProgress.tsx", "src/components/AgentPanel.tsx", "src/components/RuntimeSettingsModal.tsx", "src/components/agentRuntimes.tsx", "server/agentRuntimes.ts", "server/agentRuntimeInstall.ts", "server/agentDefaults.ts"]
 commits: []
-description: "Feature contract for agent runtime installation, authentication, and model, effort, and permission defaults. Covers connector status, runtime removal, execution-settings reset, composer defaults, and provider-specific interfaces."
+description: "Feature contract for agent runtime installation, authentication, and model, effort, and permission defaults. Covers lazy runtime-picker update actions, connector status, runtime removal, execution-settings reset, composer defaults, and provider-specific interfaces."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -35,6 +35,8 @@ description: "Feature contract for agent runtime installation, authentication, a
 
 <!-- mew:implementation:start -->
 ## Implementation details
+
+- The runtime picker renders before the separate update check completes. Installed rows show an action only for available automatically supported individual updates; Codex and Claude map to their host CLI updates. The existing system permission, job state, idle checks, and errors apply. The [update contract](../appearance-accounts-operations/application-updates-and-operations.md) owns execution.
 
 - Selector rows and the settings dialog display installation status and logs using the shared `RuntimeInstallProgress`. They poll approximately every 1 second and stop after completion. Height-limited logs follow new output while preserving the scroll position when reading earlier logs. Progress is queried again on refresh or reentry.
 - The server keeps the latest installation status and the last 12,000 characters of output for each runtime in memory. It resets them on retry, and Antigravity also outputs download size and percentage, verification, and extraction stages.
