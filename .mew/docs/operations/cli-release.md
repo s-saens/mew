@@ -1,6 +1,6 @@
 ---
 title: "CLI Releases and npm Publishing"
-description: "Release procedure for the mew-ide npm package, curl installer, and platform runtime archives. Tracks the prepared 0.1.2 version, protected publishing, licensing, and pending platform acceptance."
+description: "Release procedure for the mew-ide npm package, curl installer, and platform runtime archives. Tracks the prepared 0.1.3 version, protected publishing, licensing, and pending platform acceptance."
 updated: "2026-11-18"
 상위파일:
   - "../../../docs/deployment/native.md"
@@ -27,7 +27,7 @@ Runtime production dependencies include the pinned embedded Postgres distributio
 
 OS-specific binaries from the official [tmux-builds v3.7c](https://github.com/tmux/tmux-builds/releases/tag/v3.7c) are checked against pinned SHA-256 hashes and included as `bin/tmux`. Linux binaries use upstream static builds; macOS binaries may depend only on system libraries. The upstream license archive, sources, origins, and hashes are preserved together in `notices/tmux/`. npm dependencies' own license files are also retained in runtime node_modules.
 
-Windows executables verify the x64/arm64 zip files from [psmux v3.4.0](https://github.com/psmux/psmux/releases/tag/v3.4.0) against pinned SHA-256 hashes and copy only `bin/psmux.exe`. `native/windows/process-host.cpp` is compiled with MSVC and included in the executable distribution. `notices/psmux/` preserves the checksum-pinned original MIT text, modified crate notices, Cargo.lock, and a complete `.crate` source archive containing the original notices for 247 locked dependencies. `dependencies.json` records declared licenses, selected permitted licenses, origins, and hashes; packaging stops if a license cannot be selected from the reviewed list.
+Windows executables verify the x64/arm64 zip files from [psmux v3.4.0](https://github.com/psmux/psmux/releases/tag/v3.4.0) against pinned SHA-256 hashes and use Windows system tar to extract only `psmux.exe` into `bin/`. `native/windows/process-host.cpp` is compiled with MSVC and included in the executable distribution. `notices/psmux/` preserves the checksum-pinned original MIT text, modified crate notices, Cargo.lock, and a complete `.crate` source archive containing the original notices for 247 locked dependencies. `dependencies.json` records declared licenses, selected permitted licenses, origins, and hashes; packaging stops if a license cannot be selected from the reviewed list.
 
 Internal Windows workspace links are recorded in `runtime-links.json` instead of including symlinks in the archive. The CLI restores only verified `packages/` targets as junctions without administrator privileges. The overall design and current verification scope follow the [Windows Native Contract](../development/windows-native.md).
 
@@ -87,7 +87,7 @@ Assign reviewers for `cli-release`, `npm-publish`, `desktop-release`, and the se
 
 Archive link checks resolve the runtime root and final symlink targets against the same physical directory on macOS. CLI tests check Unix permissions on POSIX hosts, including WSL, where the Windows installer runs managed Postgres.
 
-The source tree prepares version `0.1.2` for the first public CLI release. The matching GitHub runtime release, npm publication, and clean-host acceptance are pending.
+The source tree prepares version `0.1.3` for the first public CLI release. The matching GitHub runtime release, npm publication, and clean-host acceptance are pending.
 
 For the initial publication, verify scope permissions using the responsible person's npm account before proceeding. First create the runtime tag release, then review the package contents in `apps/cli/` and publish.
 

@@ -1,7 +1,7 @@
 ---
 title: "Shell bootstrap installation"
-description: "Defines the curl installer for existing WSL 2, Linux, and macOS: pinned private Node, standalone CLI release assets, integrity and preservation checks, login startup, and reuse of automatic Postgres and browser enrollment. Includes supported-host requirements and release boundaries."
-updated: "2026-11-17"
+description: "Defines the curl installer for existing WSL 2, Linux, and macOS: pinned private Node, standalone CLI release assets, integrity and preservation checks, login startup, and reuse of automatic Postgres and browser enrollment. Includes macOS Bash compatibility, supported-host requirements and release boundaries."
+updated: "2026-11-18"
 ---
 
 # Shell bootstrap installation
@@ -18,6 +18,8 @@ matching GitHub assets is separate from implementation. The initial assets are
 not published; source setup remains available.
 
 ## Host and bootstrap contract
+
+The installer supports macOS system Bash 3.2. Generated launcher paths preserve apostrophes, and cleanup preserves installation failures in the exit status.
 
 Run as an ordinary user in an existing WSL 2 distribution, Linux glibc 2.35+,
 or macOS 15+, on x64/arm64. Bash, curl, tar/gzip, standard text tools, and either

@@ -1,6 +1,6 @@
 ---
 title: "Unattended npm installation and remote onboarding"
-description: "Records implementation of the mew-ide npm entry, managed Postgres, background startup, Windows WSL bootstrap, and remote onboarding. Includes local verification for the 0.1.1 release preparation and the 0.1.2 cross-platform fixes and pending publication."
+description: "Records implementation of the mew-ide npm entry, managed Postgres, background startup, Windows WSL bootstrap, and remote onboarding. Includes local verification for the 0.1.1 release preparation and the 0.1.2–0.1.3 cross-platform fixes and pending publication."
 updated: "2026-11-18"
 ---
 
@@ -67,6 +67,10 @@ Aligned the CLI package, npm lockfile, and shell installer at version `0.1.1` so
 The 0.1.1 runtime checks failed on both macOS architectures when the temporary directory included a symlink and on both Windows architectures when the test compared POSIX permission bits. The next candidate resolves the archive root before comparing physical paths and checks directory and credential modes on POSIX. Local regression coverage includes a symlinked staging root and an existing directory with permissive modes.
 
 On Linux with Node 24.16.0, the build and lint passed. Of 77 CLI tests, 76 passed and the opt-in database test was skipped. All eight release runtime and action tests passed. Documentation metadata passed and the global checker reported 39 existing missing links. Native release verification uses the protected GitHub workflow.
+
+## 0.1.3 release preparation
+
+Both Windows runners passed the CLI test that failed in 0.1.1. The next candidate resolves Windows workspace junctions against the physical runtime root and extracts the pinned psmux executable with Windows system tar. On macOS it supports long daemon socket paths, resolves staged dependency paths, and preserves shell errors and quoted paths in Bash 3.2. The installer fixtures passed with Bash 3.2.57 and bsdtar on Linux. The Windows junction regression also passed on Linux. Native packaging and clean-host acceptance require separate verification.
 
 ## Remaining gates
 

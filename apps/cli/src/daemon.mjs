@@ -6,12 +6,31 @@ import { spawn } from 'node:child_process'
 
 export function controlPath(options) {
   const id = createHash('sha256').update(path.resolve(options.dataDir)).digest('hex').slice(0, 24)
-  return path.join(options.stateDir, 'control', `${id}.sock`)
+  const socket = path.join(options.stateDir, 'control', `${id}.sock`)
+  const maxBytes = process.platform === 'darwin' ? 103 : 107
+  if (!process.getuid || Buffer.byteLength(socket) <= maxBytes) return socket
+  const key = createHash('sha256').update(path.resolve(socket)).digest('hex').slice(0, 24)
+  return path.join('/tmp', `mew-control-${process.getuid()}`, `${key}.sock`)
 }
 
-export function requestDaemon(options, action = 'open', { timeout = 10_000 } = {}) {
+async function checkShortControlDirectory(directory) {
+  const stat = await fs.lstat(directory)
+  if (!stat.isDirectory() || stat.uid !== process.getuid() || (stat.mode & 0o777) !== 0o700) {
+    throw new Error('Mew requires a private socket directory owned by this account.')
+  }
+}
+
+export async function requestDaemon(options, action = 'open', { timeout = 10_000 } = {}) {
+  const filename = controlPath(options)
+  const directory = path.dirname(filename)
+  if (directory !== path.join(options.stateDir, 'control')) {
+    try { await checkShortControlDirectory(directory) } catch (error) {
+      if (error.code === 'ENOENT') return null
+      throw error
+    }
+  }
   return new Promise((resolve, reject) => {
-    const socket = createConnection(controlPath(options))
+    const socket = createConnection(filename)
     let body = '', settled = false
     const finish = (error, value) => {
       if (settled) return
@@ -48,7 +67,8 @@ export function daemonControl(options, { notify = message => { if (process.conne
     async start() {
       const directory = path.dirname(filename)
       await fs.mkdir(directory, { recursive: true, mode: 0o700 })
-      await fs.chmod(directory, 0o700)
+      if (directory === path.join(options.stateDir, 'control')) await fs.chmod(directory, 0o700)
+      else await checkShortControlDirectory(directory)
       const existing = await requestDaemon(options, 'status')
       if (existing) throw new Error('Mew is already running for this data directory.')
       await fs.rm(filename, { force: true })

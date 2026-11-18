@@ -1,7 +1,7 @@
 ---
 title: "Single-Command Execution and Prebuilt Distribution"
-description: "Defines unattended mew-ide execution shared by npm and curl installation, managed Postgres, background/login startup, dedicated and existing Windows WSL paths, browser-first administrator setup, and runtime/package boundaries. Publication and clean-platform acceptance remain separate."
-updated: "2026-11-17"
+description: "Defines unattended mew-ide execution shared by npm and curl installation, managed Postgres, private control sockets, background/login startup, dedicated and existing Windows WSL paths, browser-first administrator setup, and runtime/package boundaries. Publication and clean-platform acceptance remain separate."
+updated: "2026-11-18"
 상위파일:
   - "architecture.md"
   - "../operations/cli-release.md"
@@ -56,7 +56,7 @@ The archive cache for an already verified version is reused without another arch
 
 The runtime manifest must declare `browserDependencies: "server/browser-dependencies.js"` and include that installer. Initial preparation uses `--install` in the invoking terminal before background launch; login startup uses `--check`, so it cannot wait for a hidden sudo prompt or silently install software. OS authorization may still be required for missing native libraries. npm itself may ask permission to download an uncached package; `npx --yes mew-ide` suppresses that npm-owned confirmation. Neither is a Mew configuration questionnaire. Browser preparation finishes before the application's 60-second readiness timer starts. The [browser dependency contract](browser-dependencies.md) owns browser platform limits.
 
-The POSIX daemon exposes only a private local socket in a mode-0700 control directory, with a mode-0600 socket. A repeated launch asks the host to rotate a pending setup capability through its existing IPC and opens the returned URL without writing it to logs or disk. The control endpoint and managed database live outside account data so provisioning does not make a fresh installation look like damaged account storage. Startup uses pinned installed files and never executes `npx` or selects a newer version at login.
+The POSIX daemon exposes only a private local socket in a mode-0700 control directory, with a mode-0600 socket. When the state path exceeds the Unix socket address limit, the CLI uses a short socket path in a mode-0700 directory under /tmp and verifies that the current OS user owns that directory. A repeated launch asks the host to rotate a pending setup capability through its existing IPC and opens the returned URL without writing it to logs or disk. The control endpoint and managed database live outside account data so provisioning does not make a fresh installation look like damaged account storage. Startup uses pinned installed files and never executes `npx` or selects a newer version at login.
 
 The runtime then starts `server/cli-host.js` as a separate process. IPC in `cli-host.ts` carries listener addresses, the private first-owner setup URL and refresh requests, public remote status, and explicit legacy owner-creation responses. It does not send registration keys or login-session tokens. The raw setup capability travels only to the trusted launcher and browser, not ordinary logs. The [first-administrator contract](first-owner-setup.md) defines the installer stdin/stdout protocol. Parent termination, IPC disconnection, and SIGINT/SIGTERM cause the host to shut down.
 

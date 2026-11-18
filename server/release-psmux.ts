@@ -4,7 +4,6 @@ import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { parse } from 'smol-toml'
-import { powershell, encodedPowerShell, quotePowerShell } from './platform/windows/storage.ts'
 const execute = promisify(execFile)
 export const PSMUX_VERSION = '3.4.0'
 const digests: Record<string, string> = { x64: 'a66b6be7c13c6fa0dc3660a267b9e34eaa91a4eb7f07fbd55a0468018bd0f721', arm64: 'b123398e3b37408032bc268b4da6e7a6eab5b56461e0c3414914513a57a7a5cf' }
@@ -92,13 +91,12 @@ export async function installReleasePsmux(directory: string, temporary: string, 
   if (!digests[arch]) throw new Error('Unsupported psmux architecture')
   const name = `psmux-v${PSMUX_VERSION}-windows-${arch}.zip`
   const url = `https://github.com/psmux/psmux/releases/download/v${PSMUX_VERSION}/${name}`
-  const archive = path.join(temporary, name), extracted = path.join(temporary, 'psmux')
+  const archive = path.join(temporary, name)
   await fs.writeFile(archive, await download(url, digests[arch]))
-  await execute(powershell(), encodedPowerShell(`Expand-Archive -LiteralPath ${quotePowerShell(archive)} -DestinationPath ${quotePowerShell(extracted)}`), { timeout: 60_000 })
-  // Copy only the selected executable. No installer or PATH/registry mutation.
   const bin = path.join(directory, 'bin')
   await fs.mkdir(bin, { recursive: true })
-  await fs.copyFile(path.join(extracted, 'psmux.exe'), path.join(bin, 'psmux.exe'))
+  const tar = path.win32.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe')
+  await execute(tar, ['-xf', archive, '-C', bin, 'psmux.exe'], { timeout: 60_000 })
   const version = (await execute(path.join(bin, 'psmux.exe'), ['-V'])).stdout
   if (!version.includes(PSMUX_VERSION)) throw new Error('psmux version mismatch')
   const notices = path.join(directory, 'notices', 'psmux')
@@ -124,14 +122,15 @@ export async function compileWindowsProcessHost(root: string, directory: string)
 /** Encode workspace junctions portably so user extraction needs no symlink privilege. */
 export async function encodeWindowsRuntimeLinks(directory: string): Promise<void> {
   const links: { path: string; target: string }[] = []
-  const scoped = path.join(directory, 'node_modules', '@mew')
+  const archiveRoot = await fs.realpath(directory)
+  const scoped = path.join(archiveRoot, 'node_modules', '@mew')
   for (const entry of await fs.readdir(scoped, { withFileTypes: true })) {
     const file = path.join(scoped, entry.name)
     if (!entry.isSymbolicLink()) continue
     const actual = await fs.realpath(file)
-    const rootRelative = path.relative(directory, actual).replaceAll('\\', '/')
-    if (!rootRelative.startsWith('packages/')) throw new Error('Unexpected Windows workspace link')
-    const location = path.relative(directory, file).replaceAll('\\', '/')
+    const rootRelative = path.relative(archiveRoot, actual).replaceAll('\\', '/')
+    if (!/^packages\/[a-z0-9-]+$/.test(rootRelative)) throw new Error(`Unexpected Windows workspace link: @mew/${entry.name} -> ${rootRelative}`)
+    const location = path.relative(archiveRoot, file).replaceAll('\\', '/')
     links.push({ path: location, target: path.posix.relative(path.posix.dirname(location), rootRelative) })
     await fs.unlink(file)
   }

@@ -63,7 +63,7 @@ test('curl bootstrap installs privately without npm, preserves argument boundari
   await f.run(args)
   const record = JSON.parse((await fs.readFile(f.env.MEW_TEST_LAUNCH_RECORD, 'utf8')).trim())
   assert.deepEqual(record.args, args)
-  assert.equal(record.cwd, f.project)
+  assert.equal(record.cwd, await fs.realpath(f.project))
   assert.ok(record.searchPath.startsWith(path.join(f.installRoot, 'node/v24.21.0-linux-x64/bin')))
   assert.equal(await fs.readFile(path.join(f.project, 'notes.md'), 'utf8'), 'Keep existing work.\n')
   assert.equal((await fs.stat(f.wrapper)).mode & 0o777, 0o700)
@@ -87,6 +87,13 @@ test('checksum and transfer failures stop before running archive contents and cl
     assert.ok(!(await fs.readdir(f.installRoot)).some(name => name.startsWith('.download') || name === '.install-lock'))
     await f.run(['status'])
   }
+})
+
+test('a staging failure preserves its exit status and releases the installer lock', posix, async t => {
+  const f = await fixture(t)
+  await fs.writeFile(path.join(f.directory, 'mocks', 'mktemp'), '#!/bin/sh\nexit 43\n', { mode: 0o700 })
+  await assert.rejects(f.run(), { code: 43 })
+  await assert.rejects(fs.stat(path.join(f.installRoot, '.install-lock')), { code: 'ENOENT' })
 })
 
 test('missing or ambiguous release identity fails before installing Node or running Mew', posix, async t => {

@@ -4,7 +4,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import { EventEmitter } from 'node:events'
-import { daemonControl, requestDaemon, startBackground, serviceArguments, saveLaunchSettings } from '../src/daemon.mjs'
+import { controlPath, daemonControl, requestDaemon, startBackground, serviceArguments, saveLaunchSettings } from '../src/daemon.mjs'
 import { parseOptions } from '../src/options.mjs'
 import { runHost } from '../src/launcher.mjs'
 
@@ -16,6 +16,9 @@ async function fixture(t) {
 
 test('private local control reopens first-owner setup without putting the capability on disk', { skip: process.platform === 'win32' }, async t => {
   const options = await fixture(t), messages = []
+  options.stateDir = path.join(options.stateDir, '界'.repeat(48))
+  const filename = controlPath(options)
+  assert.ok(Buffer.byteLength(filename) <= 103)
   assert.equal(await requestDaemon(options, 'status'), null)
   const control = daemonControl(options, { notify: value => messages.push(value) })
   await control.start()
@@ -27,10 +30,8 @@ test('private local control reopens first-owner setup without putting the capabi
   assert.deepEqual(await requestDaemon(options), { url })
   assert.deepEqual(messages, [{ type: 'mew-ready', url }])
   assert.deepEqual(await requestDaemon(options, 'status'), { running: true, ready: true })
-  const entries = await fs.readdir(path.join(options.stateDir, 'control'))
-  assert.equal(entries.length, 1)
-  assert.equal((await fs.stat(path.join(options.stateDir, 'control'))).mode & 0o777, 0o700)
-  assert.equal((await fs.stat(path.join(options.stateDir, 'control', entries[0]))).mode & 0o777, 0o600)
+  assert.equal((await fs.stat(path.dirname(filename))).mode & 0o777, 0o700)
+  assert.equal((await fs.stat(filename)).mode & 0o777, 0o600)
   const competitor = daemonControl(options)
   await assert.rejects(competitor.start(), /already running/)
   assert.deepEqual(await requestDaemon(options), { url })

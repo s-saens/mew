@@ -2,11 +2,19 @@
 # Install the prebuilt launcher in the current user's environment.
 set -euo pipefail
 
-MEW_INSTALL_VERSION_DEFAULT="0.1.2"
+MEW_INSTALL_VERSION_DEFAULT="0.1.3"
 
 mew_fail() { printf '[mew] %s\n' "$*" >&2; exit 1; }
 mew_log() { printf '[mew] %s\n' "$*" >&2; }
-mew_quote() { printf "'%s'" "${1//\'/\'\\\'\'}"; }
+mew_quote() {
+  local rest="$1"
+  printf "'"
+  while [[ "$rest" == *"'"* ]]; do
+    printf "%s'\\\\''" "${rest%%\'*}"
+    rest="${rest#*\'}"
+  done
+  printf "%s'" "$rest"
+}
 
 mew_check_wrapper() {
   if [ -e "$1" ] || [ -L "$1" ]; then
@@ -73,7 +81,8 @@ HELP
     darwin-arm64) node_sha=bed7eea5325e1108f32ce5228ddd6a5f0f08a499ee42aa7442aea583702f6057;;
   esac
   version="${MEW_INSTALL_VERSION:-$MEW_INSTALL_VERSION_DEFAULT}"
-  [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]] || mew_fail 'Invalid Mew release version.'
+  local version_pattern='^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$'
+  [[ "$version" =~ $version_pattern ]] || mew_fail 'Invalid Mew release version.'
   install_root="${MEW_INSTALL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mew-bootstrap}"
   bin_dir="${MEW_INSTALL_BIN_DIR:-$HOME/.local/bin}"
   for entry in "$install_root" "$bin_dir"; do
@@ -100,7 +109,7 @@ HELP
   mew_lock="$install_root/.install-lock"
   mkdir "$mew_lock" 2>/dev/null || mew_fail "Another installation is active. If it was interrupted, remove only $mew_lock and retry."
   mew_tmp=''
-  trap 'rm -rf "${mew_tmp:-}"; rmdir "$mew_lock" 2>/dev/null || true' EXIT
+  trap 'mew_status=$?; rm -rf "${mew_tmp:-}"; rmdir "$mew_lock" 2>/dev/null || true; exit "$mew_status"' EXIT
   trap 'exit 130' INT
   trap 'exit 143' HUP TERM
   mew_tmp=$(mktemp -d "$install_root/.download.XXXXXXXX")
