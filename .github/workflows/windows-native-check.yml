@@ -1,0 +1,44 @@
+name: Windows native runtime check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            arch: x64
+          - runner: windows-11-arm
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+      - run: npm ci
+      - run: npm ci --prefix apps/cli
+      - run: npm test --prefix apps/cli
+      - run: npm run build
+      - run: node server/release-runtime.ts --output artifacts
+      - name: Validate Windows native runtime fixtures
+        shell: pwsh
+        run: |
+          $env:MEW_TEST_WINDOWS_NATIVE = '1'
+          $env:MEW_DATA_DIR = Join-Path $env:RUNNER_TEMP 'mew-windows-test-data'
+          node server/release-windows-verify.ts artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mew-runtime-win32-${{ matrix.arch }}
+          path: artifacts/*
+          if-no-files-found: error

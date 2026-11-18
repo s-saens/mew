@@ -187,6 +187,19 @@ test('repository source graph stages without missing imports or optional helper 
   assert.match(stdout, /Browser dependencies ready/)
 }))
 
+test('CLI releases build Linux and macOS runtimes and keep native Windows verification manual', async () => {
+  const workflows = path.join(repository, '.github/workflows')
+  const release = parseYaml(await fs.readFile(path.join(workflows, 'cli-release.yml'), 'utf8'))
+  const matrix = release.jobs.runtime.strategy.matrix.include as { platform: string; arch: string }[]
+  assert.deepEqual(matrix.map(({ platform, arch }) => platform + '-' + arch).sort(), ['darwin-arm64', 'darwin-x64', 'linux-arm64', 'linux-x64'])
+  const native = parseYaml(await fs.readFile(path.join(workflows, 'windows-native-check.yml'), 'utf8'))
+  assert.deepEqual(Object.keys(native.on), ['workflow_dispatch'])
+  assert.deepEqual(native.permissions, { contents: 'read' })
+  const job = native.jobs.native
+  assert.deepEqual(job.strategy.matrix.include.map((target: { arch: string }) => target.arch).sort(), ['arm64', 'x64'])
+  assert.ok(job.steps.some((step: {run?: string}) => step.run?.includes('release-windows-verify.ts')))
+})
+
 test('npm-only workflow skips runtime builds and verifies the complete existing release', async () => fixture(async (root, output) => {
   const workflow = parseYaml(await fs.readFile(path.join(repository, '.github/workflows/cli-release.yml'), 'utf8'))
   assert.equal(workflow.jobs.runtime.if, 'inputs.publish_npm != true')
@@ -196,7 +209,7 @@ test('npm-only workflow skips runtime builds and verifies the complete existing 
   assert.equal(workflow.jobs.npm.environment, 'npm-publish')
   assert.equal(workflow.jobs.npm.permissions['id-token'], 'write')
   const releaseStep = workflow.jobs.release.steps.find((step: { run?: string }) => step.run)
-  const files = ['mew-runtime-linux-x64.tar.gz', 'mew-runtime-linux-arm64.tar.gz', 'mew-runtime-darwin-x64.tar.gz', 'mew-runtime-darwin-arm64.tar.gz', 'mew-runtime-win32-x64.tar.gz', 'mew-runtime-win32-arm64.tar.gz', 'mew-cli-standalone.tar.gz', 'install.sh']
+  const files = ['mew-runtime-linux-x64.tar.gz', 'mew-runtime-linux-arm64.tar.gz', 'mew-runtime-darwin-x64.tar.gz', 'mew-runtime-darwin-arm64.tar.gz', 'mew-cli-standalone.tar.gz', 'install.sh']
   const fakeRelease = path.join(root, 'published')
   const sums = []
   for (const file of files) {
@@ -229,8 +242,8 @@ for (const line of lines) {
     return exec('/bin/bash', ['-e', '-c', releaseStep.run], { cwd, env: { ...env, ...additional } })
   }
   await run('complete')
-  await write(fakeRelease, 'SHA256SUMS', sums.slice(0, 6).join('\n') + '\n')
-  await assert.rejects(run('legacy-six'), /Command failed/)
+  await write(fakeRelease, 'SHA256SUMS', sums.slice(0, 4).join('\n') + '\n')
+  await assert.rejects(run('missing-installers'), /Command failed/)
   await write(fakeRelease, 'SHA256SUMS', sums[0] + '\n')
   await assert.rejects(run('subset'), /Command failed/)
   await write(fakeRelease, 'SHA256SUMS', sums.join('\n') + '\n')

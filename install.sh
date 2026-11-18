@@ -2,7 +2,7 @@
 # Install the prebuilt launcher in the current user's environment.
 set -euo pipefail
 
-MEW_INSTALL_VERSION_DEFAULT="0.1.4"
+MEW_INSTALL_VERSION_DEFAULT="0.1.5"
 
 mew_fail() { printf '[mew] %s\n' "$*" >&2; exit 1; }
 mew_log() { printf '[mew] %s\n' "$*" >&2; }

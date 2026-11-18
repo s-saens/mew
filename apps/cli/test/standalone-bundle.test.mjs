@@ -104,7 +104,7 @@ test('the real standalone CLI opens help without npm or the source checkout', as
   assert.match(result.stdout, /curl installer supplies Node.js/)
 })
 
-test('release workflow verifies all eight assets and rejects replacement bytes or incomplete releases', { skip: process.platform === 'win32' }, async t => {
+test('release workflow verifies all six assets and rejects replacement bytes or incomplete releases', { skip: process.platform === 'win32' }, async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-release-fixture-'))
   t.after(() => fs.rm(root, { recursive: true, force: true }))
   const fakeBin = path.join(root, 'bin'), published = path.join(root, 'published')
@@ -113,7 +113,12 @@ test('release workflow verifies all eight assets and rejects replacement bytes o
   await fs.writeFile(path.join(fakeBin, 'gh'), `#!/bin/bash
 set -eu
 case "$1 $2" in
-  'release view') exit 0 ;;
+  'release view') [ "$RELEASE_EXISTS" = true ] ;;
+  'release create')
+    while [ "$1" != --generate-notes ]; do shift; done
+    shift
+    printf '%s\\n' "$@" > ../created-assets
+    ;;
   'release download')
     while [ "$#" -gt 0 ]; do
       if [ "$1" = --dir ]; then target="$2"; break; fi
@@ -124,7 +129,7 @@ case "$1 $2" in
   *) echo 'Unexpected GitHub operation in fixture' >&2; exit 1 ;;
 esac
 `, { mode: 0o755 })
-  const assets = ['mew-runtime-linux-x64.tar.gz', 'mew-runtime-linux-arm64.tar.gz', 'mew-runtime-darwin-x64.tar.gz', 'mew-runtime-darwin-arm64.tar.gz', 'mew-runtime-win32-x64.tar.gz', 'mew-runtime-win32-arm64.tar.gz', 'mew-cli-standalone.tar.gz', 'install.sh']
+  const assets = ['mew-runtime-linux-x64.tar.gz', 'mew-runtime-linux-arm64.tar.gz', 'mew-runtime-darwin-x64.tar.gz', 'mew-runtime-darwin-arm64.tar.gz', 'mew-cli-standalone.tar.gz', 'install.sh']
   for (const file of assets) await fs.writeFile(path.join(published, file), `release fixture ${file}\n`)
   const manifest = async directory => {
     const checksums = await Promise.all(assets.map(async file => `${createHash('sha256').update(await fs.readFile(path.join(directory, file))).digest('hex')}  ${file}\n`))
@@ -133,7 +138,7 @@ esac
   await fs.writeFile(path.join(published, 'SHA256SUMS'), await manifest(published))
   const workflow = await fs.readFile(new URL('../../../.github/workflows/cli-release.yml', import.meta.url), 'utf8')
   const script = workflow.split('      - name: Create immutable runtime release\n')[1].split('\n  npm:')[0].split('        run: |\n')[1].split('\n').map(line => line.replace(/^          /, '')).join('\n')
-  const execute = async (name, change) => {
+  const execute = async (name, change, releaseExists = true) => {
     const directory = path.join(root, name), output = path.join(directory, 'artifacts')
     await fs.mkdir(output, { recursive: true })
     for (const file of assets) {
@@ -142,8 +147,11 @@ esac
       await fs.writeFile(path.join(output, `${file}.sha256`), `${createHash('sha256').update(bytes).digest('hex')}  ${file}\n`)
     }
     await change?.(output)
-    return promisify(execFile)('bash', ['-e', '-o', 'pipefail', '-c', script], { cwd: directory, env: { ...process.env, PATH: `${fakeBin}:${process.env.PATH}`, PUBLISHED_ASSETS: published, PUBLISH_NPM: 'false', RELEASE_TAG: 'mew-cli-v1.2.3', REPOSITORY: 'fixture/mew', GH_TOKEN: '' } })
+    return promisify(execFile)('bash', ['-e', '-o', 'pipefail', '-c', script], { cwd: directory, env: { ...process.env, PATH: `${fakeBin}:${process.env.PATH}`, PUBLISHED_ASSETS: published, RELEASE_EXISTS: String(releaseExists), PUBLISH_NPM: 'false', RELEASE_TAG: 'mew-cli-v1.2.3', REPOSITORY: 'fixture/mew', GH_TOKEN: '' } })
   }
+  await execute('first-publication', output => fs.writeFile(path.join(output, 'mew-runtime-win32-arm64.tar.gz'), 'native diagnostic'), false)
+  const created = await fs.readFile(path.join(root, 'first-publication', 'created-assets'), 'utf8')
+  assert.deepEqual(created.trim().split('\n').sort(), [...assets, 'SHA256SUMS'].sort())
   await execute('identical')
   await assert.rejects(execute('replacement', async output => {
     const file = 'mew-cli-standalone.tar.gz'
