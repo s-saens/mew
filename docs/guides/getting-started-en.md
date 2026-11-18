@@ -1,7 +1,7 @@
 ---
 title: "Getting started with mew"
 updated: "2026-11-17"
-description: "Three installation routes: npm, a curl bootstrap in existing WSL/Linux/macOS, and source setup. Covers managed Postgres, login startup, browser administrator creation, initial agent setup, platform prerequisites, data preservation, remote access, and pending prebuilt publication."
+description: "Covers npm, the WSL/Linux/macOS curl bootstrap, source setup, and the Termux source installer. Includes platform prerequisites, data preservation, initial setup, and remote access."
 ---
 
 # Getting started with mew
@@ -164,6 +164,14 @@ cd mew
 On other distributions, install the equivalent packages first. Follow [Finish setup](#finish-setup). For a server that should start on boot or accept remote connections, use the [deployment guide](../deployment/native.md).
 
 #### Termux on Android
+
+From a native Termux terminal, download the pinned Mew source and run setup in one command:
+
+```bash
+pkg install -y curl && curl -fsSL https://github.com/s-saens/mew/releases/download/mew-termux-v0.1.5/install-termux.sh | bash
+```
+
+Setup uses `~/.local/opt/mew-termux` and prompts in your terminal. Run the same command again to resume setup. Use `~/.local/opt/mew-termux/mew status` to check the instance. This download has no Git history, so `./mew update` is unavailable with this installation.
 
 Termux is experimental and full setup has not been verified. When running the source setup directly in Termux, it offers to install a missing Node LTS and npm, compiler, make, Python, and tmux using `pkg` without sudo. If Node fails to start because of mismatched Termux libraries, update the installed Termux packages with `pkg update` and `pkg upgrade`, then check `node --version` before retrying.
 
