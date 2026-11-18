@@ -1,6 +1,6 @@
 ---
 title: "Single-Command Execution and Prebuilt Distribution"
-description: "Defines unattended mew-ide execution shared by npm and curl installation, managed Postgres, private control sockets, background/login startup, dedicated and existing Windows WSL paths, browser-first administrator setup, and runtime/package boundaries. Publication and clean-platform acceptance remain separate."
+description: "Defines unattended mew-ide execution shared by npm and curl installation, managed Postgres, private control sockets, background/login startup, dedicated and existing Windows WSL paths, browser-first administrator setup, and Linux/macOS runtime distribution. Publication and clean-platform acceptance remain separate."
 updated: "2026-11-18"
 상위파일:
   - "architecture.md"
@@ -11,7 +11,7 @@ updated: "2026-11-18"
 
 After the first release and npm package are published, run `npx mew-ide` from a working folder on a computer with Node.js 24 and npm installed. Installation uses defaults without asking for a workspace, port, or database connection. The launcher downloads the versioned server, UI, dependencies, and terminal binaries, prepares browser prerequisites, and provisions [managed Postgres](managed-postgres.md). Cloning the repository, building the app, installing Docker, and compiling native dependencies are not part of the user flow. Git operations still require Git; external AI providers retain their installation and authentication requirements.
 
-The normal POSIX entry installs a durable copy of the CLI and its dependencies, registers login startup, and starts Mew in the background. The first browser opens when the host is ready. `--foreground` retains terminal-owned execution; `--no-autostart` omits login registration. Windows CMD/PowerShell uses the [managed WSL installation](windows-installer.md). Native Windows host code remains available as a separate implementation, but is not the default npm installation route.
+The normal POSIX entry installs a durable copy of the CLI and its dependencies, registers login startup, and starts Mew in the background. The first browser opens when the host is ready. `--foreground` retains terminal-owned execution; `--no-autostart` omits login registration. Windows CMD/PowerShell uses the [managed WSL installation](windows-installer.md). Maintainers verify the experimental native Windows host in a separate manual workflow.
 
 The [curl bootstrap](shell-installation.md) supplies a pinned private Node and
 standalone CLI without host npm, then uses this same execution contract. Inside
@@ -30,8 +30,8 @@ Only `apps/cli` is the published npm package, named `mew-ide`, with `mew-ide` an
 
 | Item | Boundary |
 | --- | --- |
-| npm package | `apps/cli/`, `mew-ide`, executables `mew-ide` and `mew`, initial version `0.1.0` |
-| Supported runtime | Pinned to Node.js major 24. Linux glibc 2.35 or later and macOS 15 or later, each on x64/arm64. Native Windows x64/arm64 follows its [platform contract](windows-native.md); the [guided Windows installer](windows-installer.md) uses managed WSL 2 for feature compatibility |
+| npm package | `apps/cli/`, `mew-ide`, executables `mew-ide` and `mew`, version matched to the release tag |
+| Supported runtime | Pinned to Node.js major 24. Linux glibc 2.35 or later and macOS 15 or later, each on x64/arm64. Windows installation uses the Linux archive in managed WSL 2 or an existing WSL 2 distribution. [Windows installer](windows-installer.md) |
 | Executable distribution | `mew-cli-v<버전>` releases in GitHub `s-saens/mew`, `mew-runtime-<platform>-<arch>.tar.gz` |
 | Default working folder | The current folder where the command is run. Change with `--workspace` |
 | Configuration | Reads existing XDG `mew/config.env`, with CLI options and explicit environment variables taking precedence. Uses the folder for this run as the working folder instead of the previous `MEW_WORKSPACE` |

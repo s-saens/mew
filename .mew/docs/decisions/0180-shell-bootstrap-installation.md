@@ -1,6 +1,6 @@
 ---
 title: "0180: Add a curl bootstrap alongside npm and source installation"
-description: "Accepts a versioned shell bootstrap with private pinned Node and a standalone CLI bundle. Extends the unattended installer to existing WSL distributions using Windows login tasks while retaining npm and source setup."
+description: "Accepts a versioned shell bootstrap with private pinned Node and a standalone CLI bundle. Extends the unattended installer to existing WSL distributions using Windows login tasks while retaining npm and source setup. ADR 0190 revises the release matrix."
 status: accepted
 date: "2026-11-17"
 ---
@@ -57,7 +57,7 @@ remain separate from Mew configuration. Windows interop and task registration
 must work in an existing WSL installation.
 
 Releases gain a standalone CLI archive and script, both in `SHA256SUMS` beside
-the six platform runtimes. All assets and the script version must agree.
+the six platform runtimes originally selected. [ADR 0190](0190-cli-release-platforms.md) supersedes that platform count. All assets and the script version must agree.
 Publishing and clean-platform login acceptance remain explicit gates. Current
 contracts belong to [shell installation](../development/shell-installation.md)
 and [CLI distribution](../development/cli-distribution.md).

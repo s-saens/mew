@@ -1,6 +1,6 @@
 ---
 title: "CLI Releases and npm Publishing"
-description: "Release procedure for the mew-ide npm package, curl installer, and platform runtime archives. Tracks the prepared 0.1.4 version, protected publishing, licensing, and pending platform acceptance."
+description: "Release procedure for the mew-ide npm package, curl installer, and platform runtime archives. Covers four Linux/macOS runtimes, separate native Windows CI, and publication gates for 0.1.5."
 updated: "2026-11-18"
 상위파일:
   - "../../../docs/deployment/native.md"
@@ -11,7 +11,7 @@ updated: "2026-11-18"
 
 Usage follows the [CLI Distribution Contract](../development/cli-distribution.md). GitHub executables are published to `s-saens/mew`. Publish **only `apps/cli/`**, the unscoped `mew-ide` package; the root source workspace has the same name but is not the executable distribution. An npm organization named `mew-ide` does not reserve the unscoped package. The publisher must verify current package-name availability and account permissions before initial publication. Runtime tag names remain `mew-cli-v<version>` and do not change with the npm name.
 
-The npm package must contain the Windows bootstrap payload generated from the existing installer sources. Inspect a real `npm pack --dry-run` after its preparation step; `--ignore-scripts` alone does not generate missing payload files. Check that the pinned Linux runtime version and checksum match the CLI version. Retain the existing native Windows runtime assets for their separate supported path; the default Windows npm experience prepares managed WSL.
+The npm package must contain the Windows bootstrap payload generated from the existing installer sources. Inspect a real `npm pack --dry-run` after its preparation step; `--ignore-scripts` alone does not generate missing payload files. Check that the pinned Linux runtime version and checksum match the CLI version. Windows npm installation prepares the Linux runtime in managed WSL.
 
 The [shell installation](../development/shell-installation.md) uses the same
 release without npm. Run `node apps/cli/tools/bundle-standalone.mjs --output artifacts`
@@ -27,7 +27,7 @@ Runtime production dependencies include the pinned embedded Postgres distributio
 
 OS-specific binaries from the official [tmux-builds v3.7c](https://github.com/tmux/tmux-builds/releases/tag/v3.7c) are checked against pinned SHA-256 hashes and included as `bin/tmux`. Linux binaries use upstream static builds; macOS binaries may depend only on system libraries. The upstream license archive, sources, origins, and hashes are preserved together in `notices/tmux/`. npm dependencies' own license files are also retained in runtime node_modules.
 
-Windows executables verify the x64/arm64 zip files from [psmux v3.4.0](https://github.com/psmux/psmux/releases/tag/v3.4.0) against pinned SHA-256 hashes and use Windows system tar to extract only `psmux.exe` into `bin/`. `native/windows/process-host.cpp` is compiled with MSVC and included in the executable distribution. `notices/psmux/` preserves the checksum-pinned original MIT text, modified crate notices, Cargo.lock, and a complete `.crate` source archive containing the original notices for 247 locked dependencies. `dependencies.json` records declared licenses, selected permitted licenses, origins, and hashes; packaging stops if a license cannot be selected from the reviewed list.
+The separate native Windows check builds experimental executables. Its packager verifies the x64/arm64 zip files from [psmux v3.4.0](https://github.com/psmux/psmux/releases/tag/v3.4.0) against pinned SHA-256 hashes and uses Windows system tar to extract only `psmux.exe` into `bin/`. `native/windows/process-host.cpp` is compiled with MSVC and included in the executable distribution. `notices/psmux/` preserves the checksum-pinned original MIT text, modified crate notices, Cargo.lock, and a complete `.crate` source archive containing the original notices for 247 locked dependencies. `dependencies.json` records declared licenses, selected permitted licenses, origins, and hashes; packaging stops if a license cannot be selected from the reviewed list.
 
 Internal Windows workspace links are recorded in `runtime-links.json` instead of including symlinks in the archive. The CLI restores only verified `packages/` targets as junctions without administrator privileges. The overall design and current verification scope follow the [Windows Native Contract](../development/windows-native.md).
 
@@ -68,18 +68,12 @@ Before publishing, verify that the full texts of the root `LICENSE` and `apps/cl
 
 `.github/workflows/cli-release.yml` runs in the following order.
 
-The standalone job runs alongside the six runtime builds. The release job
-requires all seven builds and validates exactly eight checksum entries: six
-`mew-runtime-<platform>-<arch>.tar.gz` files, `mew-cli-standalone.tar.gz`, and
-`install.sh`. Existing tagged assets must verify against their manifest; a
-rebuild that changes their bytes is rejected. Reuse the original artifacts or
-bump the version rather than replacing published assets. Before updating the
-public `main/install.sh` entry, publish and accept its matching runtime release.
+1. Match the version in `apps/cli/package.json` to the `mew-cli-v<version>` tag.
+2. Build four Node.js 24 runtimes on Ubuntu 22.04 and macOS 15, each on x64 and arm64. Each job installs the locked dependencies, runs the runtime and CLI tests, builds the app, and packages its archive and checksum. A fifth job tests and packages the standalone CLI and shell installer.
+3. After all five jobs succeed, a tag run can publish through the protected `cli-release` environment. The release contains four runtime archives, `mew-cli-standalone.tar.gz`, `install.sh`, and the `SHA256SUMS` manifest covering those six files. Repeated runs verify existing files against the manifest. Publish a new version if the bytes change. Update the public `main/install.sh` entry after accepting its matching runtime release.
+4. For subsequent npm publications, dispatch the workflow on the same tag with `publish_npm=true`. The job downloads the published files, checks all six entries, and publishes through the protected `npm-publish` environment.
 
-1. Compare the version in `apps/cli/package.json` with the `mew-cli-v<버전>` tag.
-2. Use Node.js 24 on Linux Ubuntu 22.04 x64/arm64, macOS 15 x64/arm64, Windows Server 2025 x64, and Windows 11 arm64. Install dependencies, run isolated tests, build the app, and package for each platform. Windows jobs first produce a verified desktop package as the runtime packager’s explicit input; the independent desktop workflow publishes packages needed by unbundled source/WSL installations. On Windows, prepare the MSVC environment and, after packaging, use `release-windows-verify.ts` to check actual junction extraction; Job Object, psmux, and ConPTY fixtures; and startup in a separate workspace, authentication, HTML responses, and shutdown of the compiled host. Store the generated `mew-runtime-<OS>-<arch>.tar.gz` and individual `.sha256` files as Actions artifacts.
-3. Only tag runs publish the six runtime archives, standalone CLI archive, `install.sh`, and `SHA256SUMS` to GitHub Release after passing the protected `cli-release` environment. Do not overwrite assets for existing versions.
-4. For npm publishing, select the matching tag in `workflow_dispatch` and set `publish_npm=true`. After verifying the 6 already-published runtimes and all checksums, publish to npm through the protected `npm-publish` environment. Do not change the release cache version.
+For native Windows verification, manually dispatch `.github/workflows/windows-native-check.yml`. Its x64 and arm64 runners build with MSVC, package the experimental runtime, run `release-windows-verify.ts`, and upload successful builds as Actions artifacts. The Windows npm bootstrap and signed setup wizard use the Linux runtime in WSL. [Windows native contract](../development/windows-native.md) · [ADR 0190](../decisions/0190-cli-release-platforms.md).
 
 Assign reviewers for `cli-release`, `npm-publish`, `desktop-release`, and the separate `windows-installer-release` environment in the repository settings. The workflow uses the current repository through `${{ github.repository }}`. After a transfer, follow the [Repository Transfer Checks](repository-maintenance.md#transferring-github-ownership) to verify reviewers, allowed tags, protection rules, and settings previously supplied by the organization for every release environment. The [agent execution rules](../development/getting-started.md) require a build after implementation changes and prohibit deployment and server lifecycle operations; agents do not push tags, run workflows, or deploy on the user's behalf.
 
@@ -87,7 +81,7 @@ Assign reviewers for `cli-release`, `npm-publish`, `desktop-release`, and the se
 
 Archive link checks resolve the runtime root and final symlink targets against the same physical directory on macOS. CLI tests check Unix permissions on POSIX hosts, including WSL, where the Windows installer runs managed Postgres.
 
-The source tree prepares version `0.1.4` for the first public CLI release. The matching GitHub runtime release, npm publication, and clean-host acceptance are pending.
+The source tree prepares version `0.1.5` for the first public CLI release. The matching GitHub runtime release, npm publication, and clean-host acceptance are pending.
 
 For the initial publication, verify scope permissions using the responsible person's npm account before proceeding. First create the runtime tag release, then review the package contents in `apps/cli/` and publish.
 
@@ -106,7 +100,7 @@ For the next version, update the CLI package version, its lockfile, and `install
 
 ## Publishing Gates
 
-- Pass actual native module imports, `tmux -V` or `psmux -V`, and runtime relative import and link checks in all six environments. Job Object, CMD shim, psmux attach, output save/cancel, and compiled host fixtures must also pass on both Windows architectures.
+- Pass native module imports, `tmux -V`, and runtime import and link checks on each of the four release platforms. Native Windows verification covers Job Objects, the CMD shim, psmux attach, output save/cancel, and the compiled host in its separate workflow.
 - Verify the required browser-installer manifest entry and file, preparation before host startup, cancellation, missing/invalid overrides, and a clean-host preparation on each supported platform. Browser download time must not consume the host readiness timeout.
 - Verify that distribution files contain no personal data, secrets, or private central service sources and include native component redistribution notices and corresponding sources.
 - In an empty working directory on each supported OS, perform hands-on checks of browser first-owner creation, one-time setup closure, explicit temporary-password automation, editing, terminal use, relaunching, and preservation of account/device registrations. Fixture verification for the current implementation work does not replace these hands-on checks.

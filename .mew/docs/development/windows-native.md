@@ -1,6 +1,6 @@
 ---
 title: "OS execution layer and Windows native support"
-description: "Owns Windows native execution contracts for psmux, Job Objects, private ACLs, authenticated named pipes, runtime installers, and platform releases. Covers the default npm-managed WSL path and Windows acceptance limits."
+description: "Owns Windows native execution contracts for psmux, Job Objects, private ACLs, authenticated named pipes, runtime installers, and manual x64/arm64 CI. Covers the WSL installation route and native Windows acceptance limits."
 updated: "2026-11-18"
 상위파일:
   - "architecture.md"
@@ -56,9 +56,9 @@ Windows file boundaries normalize drives and case according to `path.win32.relat
 
 ## Execution, updates, and scheduling
 
-Windows prebuilt targets are Node.js 24 on x64/arm64 and Windows 10 1809 or later and Windows 11. Git features require Git for Windows on PATH. User working folders, accounts/conversations/device registrations in `%LOCALAPPDATA%/mew/data`, and runtimes in `%LOCALAPPDATA%/mew/cache/runtimes` are kept separate. Locations specified through CLI options or `MEW_DATA_DIR` take precedence.
+Experimental Windows build targets are Node.js 24 on x64/arm64 and Windows 10 1809 or later and Windows 11. Git features require Git for Windows on PATH. User working folders, accounts/conversations/device registrations in `%LOCALAPPDATA%/mew/data`, and runtimes in `%LOCALAPPDATA%/mew/cache/runtimes` are kept separate. Locations specified through CLI options or `MEW_DATA_DIR` take precedence.
 
-The default npm entry point on Windows prepares the managed Linux runtime instead of selecting this native target. Native Windows runtime archives and platform adapters remain available to the release and source verification paths; they do not establish the support scope of the managed installer. No npm or GitHub runtime was published as part of this implementation work.
+The Windows npm installer and x64 setup wizard prepare the Linux runtime in managed WSL. Maintainers can run `windows-native-check.yml` manually to package a native runtime and test its adapters. Successful runs upload native archives as Actions artifacts. Public native Windows delivery is deferred. [CLI release procedure](../operations/cli-release.md#automated-releases).
 
 Native execution uses the existing owner setup flow, loopback server, browser opening, and Mewlink device registration. Windows shutdown requests graceful termination through IPC, then forcibly terminates after the timeout. The CLI does not clone, pull, or rebuild a prebuilt runtime. For source development, a separate Windows release build in an MSVC environment must prepare the process host.
 

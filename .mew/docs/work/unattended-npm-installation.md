@@ -1,6 +1,6 @@
 ---
 title: "Unattended npm installation and remote onboarding"
-description: "Records implementation of the mew-ide npm entry, managed Postgres, background startup, Windows WSL bootstrap, and remote onboarding. Includes local verification for the 0.1.1 release preparation and the 0.1.2–0.1.4 cross-platform fixes and pending publication."
+description: "Records implementation of the mew-ide npm entry, managed Postgres, background startup, Windows WSL bootstrap, and remote onboarding. Includes local verification for the 0.1.1 release preparation and the 0.1.2–0.1.4 cross-platform fixes, and the 0.1.5 release matrix."
 updated: "2026-11-18"
 ---
 
@@ -75,6 +75,12 @@ Both Windows runners passed the CLI test that failed in 0.1.1. The next candidat
 ## 0.1.4 release preparation
 
 Tracing the isolated installer fixture on a macOS ARM64 runner identified Bash interpreting bytes of the ellipsis after a variable name as part of that name. The installer now delimits the variables and uses ASCII punctuation. The Windows dependency staging test resolves both the installed module and its containing directory to physical paths before checking containment.
+
+## 0.1.5 release preparation
+
+Moved the native Windows x64 and arm64 builds into a manually dispatched verification workflow. CLI release and npm verification now use the four Linux/macOS runtime archives, standalone CLI, and installer. The Windows bootstrap and setup wizard consume the Linux runtime in WSL. [Release procedure](../operations/cli-release.md#automated-releases).
+
+On Linux with Node.js 24.16.0, the build and lint passed. All 24 host, lock, and release tests passed. The CLI suite passed 78 tests and skipped the opt-in live PostgreSQL test. The release tests exercised the upload list and rejected incomplete manifests and changed assets. The documentation check passed all 865 descriptions and reported 39 existing broken links outside the changed documents.
 
 ## Remaining gates
 

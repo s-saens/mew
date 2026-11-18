@@ -59,12 +59,6 @@ jobs:
           - runner: macos-15
             platform: darwin
             arch: arm64
-          - runner: windows-2025
-            platform: win32
-            arch: x64
-          - runner: windows-11-arm
-            platform: win32
-            arch: arm64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -72,24 +66,12 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - uses: ilammy/msvc-dev-cmd@v1
-        if: matrix.platform == 'win32'
-        with:
-          arch: ${{ matrix.arch == 'arm64' && 'arm64' || 'x64' }}
       - run: npm ci
       - run: npm ci --prefix apps/cli
       - run: node --test server/release-runtime.test.ts
-        if: matrix.platform != 'win32'
       - run: npm test --prefix apps/cli
       - run: npm run build
       - run: node server/release-runtime.ts --output artifacts
-      - name: Validate Windows native runtime fixtures
-        if: matrix.platform == 'win32'
-        shell: pwsh
-        run: |
-          $env:MEW_TEST_WINDOWS_NATIVE = '1'
-          $env:MEW_DATA_DIR = Join-Path $env:RUNNER_TEMP 'mew-windows-test-data'
-          node server/release-windows-verify.ts artifacts
       - uses: actions/upload-artifact@v4
         with:
           name: mew-runtime-${{ matrix.platform }}-${{ matrix.arch }}
@@ -136,7 +118,12 @@ jobs:
         run: |
           mkdir -p artifacts
           cd artifacts
-          printf '%s\n' mew-runtime-linux-x64.tar.gz mew-runtime-linux-arm64.tar.gz mew-runtime-darwin-x64.tar.gz mew-runtime-darwin-arm64.tar.gz mew-runtime-win32-x64.tar.gz mew-runtime-win32-arm64.tar.gz mew-cli-standalone.tar.gz install.sh | LC_ALL=C sort > expected-assets
+          assets=(
+            mew-runtime-linux-x64.tar.gz mew-runtime-linux-arm64.tar.gz
+            mew-runtime-darwin-x64.tar.gz mew-runtime-darwin-arm64.tar.gz
+            mew-cli-standalone.tar.gz install.sh
+          )
+          printf '%s\n' "${assets[@]}" | LC_ALL=C sort > expected-assets
           expected_assets="$(pwd)/expected-assets"
           verify_assets() {
             (
@@ -162,7 +149,7 @@ jobs:
               echo 'Publish the tagged runtime release before publishing its CLI to npm.' >&2
               exit 1
             fi
-            gh release create "$RELEASE_TAG" --repo "$REPOSITORY" --verify-tag --title "mew CLI ${RELEASE_TAG#mew-cli-v}" --generate-notes ./*.tar.gz install.sh SHA256SUMS
+            gh release create "$RELEASE_TAG" --repo "$REPOSITORY" --verify-tag --title "mew CLI ${RELEASE_TAG#mew-cli-v}" --generate-notes "${assets[@]}" SHA256SUMS
           fi
 
   npm:
