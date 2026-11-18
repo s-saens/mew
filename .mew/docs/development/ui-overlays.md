@@ -1,6 +1,6 @@
 ---
 title: "UI overlays, selection controls, and menus"
-description: "Shared popup positioning, workspace zoom controls, custom selection, layering, viewport-level toasts and agent errors, dismissal, and action menus. Defines History-guard handoffs, settings, deferred dialogs, keyboard/touch behavior, and focus boundaries."
+description: "Shared popup positioning, workspace zoom controls, custom selection, layering, viewport-level toasts and agent errors, dismissal, and action menus. Defines History-guard handoffs in normal and fullscreen views, settings, deferred dialogs, keyboard/touch behavior, and focus boundaries."
 created: "2026-11-03"
 updated: "2026-11-09"
 상위파일: "ui-contracts.md"
@@ -115,11 +115,13 @@ Close, Esc, Back, outside presses, and focus containment/restoration must work d
 
 ## Overlay dismissal rules (`useOverlayDismiss`)
 
+Workspace fullscreen uses the same History guard as the ordinary workspace. Entering or leaving fullscreen adds no separate entry. A browser may use a system close request to exit fullscreen before the page receives a Back event. The panel’s on-screen Close button works inside fullscreen.
+
 Removing the last overlay's browser History guard is asynchronous. Track a pending programmatic `history.back()` until its `popstate` completes. Do not push a new guard during that traversal or deliver its completion to a newly opened panel or dialog. Keep only the required `popstate` listener until completion; remove input listeners when the overlay stack becomes empty. Then rearm for any current overlay. The shared dismissal tests cover a new registration during removal and complete listener cleanup, and the multi-project App fixture covers changing project tools after catalog/modal handoffs.
 
 `DialogFrame` normally restores the invoking element on close. A selection that transfers focus to another retained workspace can provide `restoreFocus: () => HTMLElement | null`; resolve that target at close time. The compact project selector uses the shell's active-panel registry, preventing restoration to the old panel from undoing the new selection. Returning `null` skips restoration when no target remains. Keep the default for ordinary dialogs.
 
-**Whenever you create a popup, modal, or dropdown, you must** `useOverlayDismiss(onClose)`**call this hook.** It collects open overlays into a single app-wide stack so that Esc and **Android hardware Back** always close *only the most recently opened one*. Pressing Back over an unregistered popup closes the terminal or file explorer behind it, or leaves the page, instead of closing that popup.
+**Whenever you create a popup, modal, or dropdown, you must** `useOverlayDismiss(onClose)`**call this hook.** It collects open overlays into a single app-wide stack so that Esc and browser Back close the most recently opened overlay when the browser delivers the event to the page. Pressing Back over an unregistered popup closes the terminal or file explorer behind it, or leaves the page, instead of closing that popup.
 
 - For auxiliary panels whose state App owns (file explorer, chat, terminal, agent panel, browser, Git, Android, and Features), the shared stack in `utils/mobile-panel-stack.ts` owns the front-to-back order and dismissal order of open panels, while mobile navigation history is managed separately. On mobile, selecting an open panel behind another brings it to the front without closing it; only reselecting the frontmost panel closes it. `hooks/use-panel-dismissals.ts` also registers only this frontmost panel as an overlay, keeping Back behavior aligned with z-index. Add new auxiliary panels to `WORKSPACE_PANEL_IDS` and the open/setter registry in `App.tsx`, and use the shared open/close/toggle/layer functions (type checking prevents missing registrations). Modals, popups, and dropdowns register themselves directly in their respective components. On mobile, this device's browser also remembers the **last frontmost window** for each root project, so the last viewed open window returns to the front after a refresh or restart.
 - On mobile, opening a file from the file explorer, chat, terminal, or agent panel closes that window and immediately reveals the selected file's editor pane. The side-by-side panel layout on desktop is preserved.

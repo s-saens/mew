@@ -1,8 +1,8 @@
 ---
 title: "Mobile project panel work record"
-description: "Records the 2026-10-31 replacement of mobile project dropdowns with a full-screen panel, keyboard and nested-menu behavior, isolated browser verification, and the boundary before user build and application."
+description: "Records the full-screen mobile project panel and the November 18 fixes for duplicate safe-area padding and competing fullscreen Back entries. Covers Chromium regressions, build results, and the Android device verification limit."
 created: "2026-10-31"
-updated: "2026-10-31"
+updated: "2026-11-18"
 ---
 
 ## Purpose and result
@@ -23,3 +23,13 @@ The current contract belongs to the [project feature](../features/projects-files
 - The checks use in-memory UI fixtures and leave the running instance and `dist/` untouched.
 
 No app build, deployment, launcher, server start, or restart was performed. The user must build and apply the changes to running instances. Physical-device verification remains outstanding.
+
+
+## Safe-area and fullscreen Back follow-up
+
+On 2026-11-18, the mobile project panel began relying on the shared dialog overlay for device insets. The workspace also stopped adding a fullscreen-only History entry so the [shared dismissal stack](../development/ui-overlays.md#overlay-dismissal-rules-useoverlaydismiss) owns Back events delivered to the page. The [project switcher contract](../development/ui-project-navigation.md#header-project-switcher) defines the panel geometry.
+
+- The App regression in isolated Chromium checked panel bounds with substituted device insets, including zero top inset. Repeated browser Back closed the panel and preserved fullscreen and header coordinates. The shared overlay, panel dismissal, and workspace safe-area suites passed all 21 checks.
+- `npm run build` passed in a clean source snapshot with this change. In the working checkout, unrelated agent runtime type errors blocked the build. Targeted lint reported no errors and existing App warnings.
+- The documentation check passed description validation and reported existing missing links. The older sidebar fixture still failed on its desktop project-menu lookup.
+- No deployment or server lifecycle operation was performed. Physical Android Brave Back and system bar transitions remain unverified.

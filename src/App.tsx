@@ -316,7 +316,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const projectOpeningRef = useRef(false)
   const workspaceReadSequence = useRef(0)
   const workspaceBroadcastPending = useRef(false)
-  const fullscreenGuardRef = useRef(false)
 
   useEffect(() => () => {
     rootProjectSwitchRef.current?.controller.abort()
@@ -1547,27 +1546,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   useEffect(() => {
     normalizeWorkspaceLocation()
   }, [api])
-
-  // 모바일 뒤로가기가 전체화면 종료로 해석되지 않게, 전체화면 진입 중에는 히스토리 한 칸을 지킨다.
-  // 브라우저가 OS 차원에서 fullscreen을 먼저 해제하는 경우는 다시 요청할 사용자 제스처가 없어 막을 수 없지만,
-  // SPA의 popstate·Android WebView 뒤로가기는 여기서 소비된다.
-  useEffect(() => {
-    if (!globalOwner) return
-    const onFullscreenChange = () => {
-      if (document.fullscreenElement && !fullscreenGuardRef.current) {
-        history.pushState({ ...(history.state ?? {}), mewFullscreen: true }, '')
-        fullscreenGuardRef.current = true
-      }
-      if (!document.fullscreenElement) fullscreenGuardRef.current = false
-    }
-    const onPopState = () => {
-      if (!document.fullscreenElement || !fullscreenGuardRef.current) return
-      history.pushState({ ...(history.state ?? {}), mewFullscreen: true }, '')
-    }
-    document.addEventListener('fullscreenchange', onFullscreenChange)
-    window.addEventListener('popstate', onPopState)
-    return () => { document.removeEventListener('fullscreenchange', onFullscreenChange); window.removeEventListener('popstate', onPopState) }
-  }, [globalOwner])
 
   useEffect(() => {
     if (!deviceLayoutRestored || chromeStateLoadedScopeRef.current !== deviceLayoutScope || chromeStateRestorePendingRef.current === deviceLayoutScope) return

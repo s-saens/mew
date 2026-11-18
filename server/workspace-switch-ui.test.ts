@@ -9,7 +9,7 @@ import { applyTaskChanges, type TaskItem } from '../shared/task-list.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 
-for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active', 'remove-last', 'delete-project', 'keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'rapid', 'desktop-layout', 'latency'] as const) test(mode === 'assisted' ? 'App creates a project and opens its agent setup popup' : mode === 'latency' ? 'App prepares fresh editor tabs before handoff and restores warm roots without foreground loading' : mode === 'empty-projects' ? 'App hides project work surfaces for an empty personal list despite a saved active root' : mode === 'missing-active' ? 'App offers project recovery when shortcuts remain without an active root' : mode === 'delete-project' ? 'App permanently deletes a project only after confirmation and restores project setup' : mode === 'remove-last' ? 'App returns to project setup after its last personal shortcut is removed' : mode === 'desktop-layout' ? 'App desktop account layout survives project switches with independent document contents' : mode === 'onboarding' ? 'App first-use onboarding creates a named project without exposing the startup workspace' : mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { timeout: 60_000 }, async () => {
+for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active', 'remove-last', 'delete-project', 'keyboard', 'workspace', 'documents', 'permissions', 'panels', 'worktree', 'swipes', 'fullscreen-back', 'rapid', 'desktop-layout', 'latency'] as const) test(mode === 'assisted' ? 'App creates a project and opens its agent setup popup' : mode === 'latency' ? 'App prepares fresh editor tabs before handoff and restores warm roots without foreground loading' : mode === 'empty-projects' ? 'App hides project work surfaces for an empty personal list despite a saved active root' : mode === 'missing-active' ? 'App offers project recovery when shortcuts remain without an active root' : mode === 'delete-project' ? 'App permanently deletes a project only after confirmation and restores project setup' : mode === 'remove-last' ? 'App returns to project setup after its last personal shortcut is removed' : mode === 'desktop-layout' ? 'App desktop account layout survives project switches with independent document contents' : mode === 'onboarding' ? 'App first-use onboarding creates a named project without exposing the startup workspace' : mode === 'rapid' ? 'App rapid project selections cancel superseded handoffs and restore the latest root' : mode === 'fullscreen-back' ? 'App shares one Back entry for mobile project selection in fullscreen' : mode === 'swipes' ? 'App mobile dock swipes select panels and explorer swipes preserve search mode' : mode === 'worktree' ? 'linked worktree swaps retain project layout and sessions and settle outgoing file saves' : mode === 'panels' ? 'App restores Tasks with Alt+T and task sessions survive close and reload' : mode === 'permissions' ? 'permission invalidation replaces pending workspace metadata and ignores the old response' : mode === 'documents' ? 'Files opens Documents as a filesystem folder with a separate navigation arrow' : mode === 'keyboard' ? 'App keyboard aliases open files and projects and create files and folders in the current explorer scope' : 'App overlaps workspace metadata, restores warm roots and ignores duplicate handoffs', { timeout: 60_000 }, async () => {
   const keyboardOnly = mode === 'keyboard'
   const onboarding = mode === 'onboarding'
   const assisted = mode === 'assisted'
@@ -63,7 +63,10 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
   const taskContent = await fs.readFile(`${root}/src/components/task-panel.tsx`, 'utf8')
   const dateCss = await fs.readFile(`${root}/packages/ui/src/date-field.css`, 'utf8')
-  const css = compiler.build([...new Set((source + content + appSource + taskContent).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g)), ...Array.from(dateCss.matchAll(/--color-([a-z-]+)/g), match => `bg-${match[1]}`)]) + await fs.readFile(`${root}/src/components/task-panel.css`, 'utf8') + dateCss
+  const compiledCss = compiler.build([...new Set((source + content + appSource + taskContent).match(/[A-Za-z0-9_@:/.[\]()%,-]+/g)), ...Array.from(dateCss.matchAll(/--color-([a-z-]+)/g), match => `bg-${match[1]}`)]) + await fs.readFile(`${root}/src/components/task-panel.css`, 'utf8') + dateCss
+  const css = mode === 'fullscreen-back'
+    ? compiledCss.replace(/env\(safe-area-inset-(top|right|bottom|left)(?:,\s*0px)?\)/g, 'var(--test-safe-$1, 0px)')
+    : compiledCss
   const browser = await connectTestBrowser()
   try {
     const page = await browser.newPage({ viewport: { width: 1100, height: 700 }, hasTouch: true })
@@ -378,6 +381,40 @@ for (const mode of ['assisted', 'onboarding', 'empty-projects', 'missing-active'
     }
     releaseUi(); blockUi = false
     await page.locator('[data-test-content]').getByText('Content of /alpha', { exact: true }).waitFor()
+    if (mode === 'fullscreen-back') {
+      await page.setViewportSize({ width: 390, height: 700 })
+      const fullscreen = page.locator('header').getByRole('button', { name: '전체화면', exact: true })
+      const header = page.locator('header')
+      await fullscreen.click()
+      await page.waitForFunction('document.fullscreenElement === document.documentElement')
+      assert.equal(await page.evaluate('history.state?.mewFullscreen'), undefined)
+      const headerBounds = await header.boundingBox()
+      const projectTrigger = page.locator('button[data-project-switcher]')
+      const projectPanel = page.locator('.mew-project-selection-overlay')
+      for (const top of [28, 0]) {
+        await projectTrigger.tap()
+        await projectPanel.waitFor()
+        await page.locator('html').evaluate((element, topInset) => {
+          element.style.setProperty('--test-safe-top', `${topInset}px`)
+          element.style.setProperty('--test-safe-right', '12px')
+          element.style.setProperty('--test-safe-bottom', '16px')
+          element.style.setProperty('--test-safe-left', '12px')
+        }, top)
+        assert.deepEqual(await projectPanel.getByRole('dialog').boundingBox(), { x: 12, y: top, width: 366, height: 684 - top })
+        const heading = projectPanel.locator('.mew-project-sidebar-heading')
+        assert.equal((await heading.boundingBox())?.y, top, 'the heading applies the current top inset once')
+        await page.locator('html').evaluate(element => {
+          for (const edge of ['top', 'right', 'bottom', 'left']) element.style.removeProperty(`--test-safe-${edge}`)
+        })
+        await page.goBack()
+        await projectPanel.waitFor({ state: 'detached' })
+        assert.equal(await page.evaluate('document.fullscreenElement === document.documentElement'), true)
+        assert.deepEqual(await header.boundingBox(), headerBounds)
+        assert.equal(await page.evaluate('history.state?.mewFullscreen'), undefined)
+      }
+      assert.deepEqual(errors, [])
+      return
+    }
     if (mode === 'remove-last' || mode === 'delete-project') {
       await page.keyboard.press('Alt+p')
       const lastProject = page.locator('[data-project-option="/alpha"]')
