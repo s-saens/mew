@@ -65,8 +65,11 @@ test('new task names reserve guides and preserve IDs across duplicate title chan
   const store = new DemoWorkspaceStore(), first: TaskItem = { id: 'new-task', text: 'README', done: false }
   const board = await editTask(store, null, first), saved = board.tasks.find((task: TaskItem) => task.id === first.id)
   assert.equal(saved.path, '.mew/tasks/README (2).md')
+  assert.doesNotMatch(store.readFile(saved.path).content, /^description:/m)
   const again = await editTask(store, saved, { ...saved, text: 'mewlink', done: true })
-  assert.equal(again.tasks.find((task: TaskItem) => task.id === first.id).path, '.mew/tasks/Done/mewlink (2).md')
+  const renamed = again.tasks.find((task: TaskItem) => task.id === first.id)
+  assert.equal(renamed.path, '.mew/tasks/Done/mewlink (2).md')
+  assert.doesNotMatch(store.readFile(renamed.path).content, /^description:/m)
   assert.equal(again.tasks.filter((task: TaskItem) => task.text === 'mewlink').length, 2)
 })
 

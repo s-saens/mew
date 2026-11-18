@@ -2,7 +2,7 @@
 title: "Documents Parent and Child Document Contract"
 created: 2026-10-03
 updated: 2026-11-03
-description: "Documents parent/child storage, explicit selection and opening, inline /page creation and the root README description exception, representative files, and link preservation. Defines title previews, structural mutation ordering, draft and tab lifetimes, and compatibility discovery; links the separate database row-page contract."
+description: "Documents parent/child storage, explicit selection and opening, inline /page creation and wiki-only automatic descriptions, representative files, and link preservation. Defines title previews, structural mutation ordering, draft and tab lifetimes, and compatibility discovery; links the separate database row-page contract."
 상위파일: "MOC.md"
 ---
 
@@ -92,4 +92,4 @@ On 2026-10-04, display name conversion was added so slug filenames appear as nat
 
 ## description-based discovery and new files
 
-AI selects documents by path and description according to the [document rules](../README.md). Existing MOCs are retained for screen representation and link compatibility; creating a new Markdown file does not add an MOC link. Default Documents documents generate a title-based description, which authors refine to match the body’s scope. Creating a project-root `README.md` through the file or page creation path omits the description. File-level commits include only the requested files and do not automatically include other modified MOCs.
+AI selects wiki documents by path and description according to the [document rules](../README.md). Existing MOCs remain available for navigation and link compatibility. New files and generated representative pages receive a title-based description when their destination is in the project wiki. Authors refine wiki descriptions as the content develops. Existing descriptions travel with their documents during copies and moves. File-level commits include only the requested files and do not automatically include other modified MOCs.

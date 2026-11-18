@@ -53,9 +53,9 @@ Explain the source being published. Remote workflows use the selected provider r
 
 ## Maintain Mew documentation
 
-Use the project's Documents entrypoints, then select relevant documents by path and frontmatter `description` before reading their bodies. Follow its existing document structure; no MOC navigation or registration is required by Mew.
+Use the project's Documents entrypoints. Select wiki documents by path and frontmatter `description`. Search paths, headings, or text in other documents. Follow its existing document structure; no MOC navigation or registration is required by Mew.
 
-Document the user's concept, scope, feature requirements, and acceptance criteria in their current owners. Keep usage, implementation contracts, operations, decisions, and work records in the project's established locations. Create a small focused document only when no suitable owner exists. Give each new or changed document an accurate, non-empty `description` and repair affected links.
+Document the user's concept, scope, feature requirements, and acceptance criteria in their current owners. Keep usage, implementation contracts, operations, decisions, and work records in the project's established locations. Create a small focused document only when no suitable owner exists. Give each new or changed wiki document an accurate, nonempty `description` and repair affected links. Mew recognizes `.mew/wiki/`, `.mew/docs/`, and `wiki/` as wiki roots.
 
 Update canonical documentation alongside feature, configuration, or operating changes. Document how users run the configured build/deploy actions and open or download results. Record checks actually performed, unresolved prerequisites, and remaining limitations. Use the enabled documentation workflow matching the project's source language when available; preserve explicit project language requirements.
 

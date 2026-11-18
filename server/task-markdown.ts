@@ -144,7 +144,7 @@ export function writeTaskDocuments(workspace: string, tasks: TaskItem[], commit:
     if (yaml.has('id')) { yaml.delete('id'); changed = true }
     if (!old || old.task.text !== task.text) { yaml.set('title', task.text); changed = true }
     const description = (title: string) => `태스크: ${title.trim() || '제목 없음'}`
-    if (!old || old.task.text !== task.text && yaml.get('description') === description(old.task.text)) {
+    if (old && old.task.text !== task.text && yaml.get('description') === description(old.task.text)) {
       yaml.set('description', description(task.text)); changed = true
     }
     if (!old || old.task.done !== task.done) { yaml.set('done', task.done); changed = true }

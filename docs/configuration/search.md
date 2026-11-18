@@ -1,6 +1,6 @@
 ---
 title: "Project search"
-description: "Explains the explorer's search controls, contiguous literal filename and path matching, explicit wildcards, RE2 regular expressions, scopes, hierarchical results, context tooltips, replacement, and limits. Covers description-based document discovery and the boundaries of removed RAG and Graphify integrations."
+description: "Explains the explorer's search controls, contiguous literal filename and path matching, explicit wildcards, RE2 regular expressions, scopes, hierarchical results, context tooltips, replacement, and limits. Covers wiki-only description discovery and the boundaries of removed RAG and Graphify integrations."
 updated: "2026-10-30"
 상위파일:
   - "../../.mew/docs/MOC.md"
@@ -22,7 +22,7 @@ Server-side file name and body regular expressions and replacements use RE2-comp
 
 ## Document discovery
 
-After checking README files and instructions, the agent uses each document's YAML `description` and path to determine the required scope and reads only relevant body text. `node server/document-descriptions.ts` creates a listing without printing body text, and MOC registration is not required. Follow the [documentation rules](../../.mew/docs/README.md). The RAG panel, API, local CLI, models, index, and automatic guidance were removed under [ADR 0176](../../.mew/docs/history/decisions/0176-mew-remove-local-rag.md). RAG entries remaining in older browsers' dock ordering are ignored, preserving the order of other items.
+After checking README files and instructions, the agent narrows its search by file path. For wiki pages, `node server/document-descriptions.ts` lists paths and frontmatter descriptions before the agent opens relevant sections. For other documentation, agents can search headings and body text. MOC registration is optional. Follow the [documentation rules](../../.mew/docs/README.md). The RAG panel, API, local CLI, models, index, and automatic guidance were removed under [ADR 0176](../../.mew/docs/history/decisions/0176-mew-remove-local-rag.md). RAG entries remaining in older browsers' dock ordering are ignored, preserving the order of other items.
 
 Existing installations' `MEW_DATA_DIR/rag/` and `rag-settings.json` are no longer read or updated. Data in running installations is not automatically deleted; after applying the removal version, you can clean up only those residual files if needed. Do not reintroduce RAG or retry indexing or model downloads without a user request. [Past operations records](../../.mew/docs/history/rag-operations.md) and [measurement results](../../.mew/docs/research/document-discovery-benchmark.md) are preserved as history.
 

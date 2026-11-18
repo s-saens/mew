@@ -2,7 +2,7 @@
 title: "Task panel and Markdown storage contract"
 created: 2026-10-03
 updated: "2026-11-04"
-description: "Historical task panel and Markdown storage contract. ADR 0183 removes the panel; existing task files and the legacy API remain unchanged."
+description: "Historical task panel and Markdown storage contract. ADR 0183 removes the panel; covers the retained task files, legacy API, and handling of existing descriptions."
 상위파일: "MOC.md"
 ---
 
@@ -340,7 +340,7 @@ Validation: `src/utils/task-sort.test.ts` covers defaults, priorities, direction
 
 ## Document Navigation Summary
 
-New task documents automatically write `태스크: 제목` to YAML `description`. When a title changes, an existing value matching the automatic default description is updated with it, while user-written descriptions, body content, and other properties are preserved. Existing external documents are not rewritten during reads or synchronization solely because they lack descriptions. When writing detailed body content, make the description more specific according to the [document rules](../README.md); MOC registration is not required.
+New task documents omit discovery descriptions. When a title changes, an existing description that matches the legacy `태스크: 제목` placeholder is updated with it. User-written descriptions, body content, and other properties are preserved. Tasks live outside the [wiki description scope](../README.md#writing-descriptions).
 
 ## Storage Path Migration — 2026-10-29
 

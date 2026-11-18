@@ -8,6 +8,7 @@ import { isDeniedSegment, projectRoot, resolveProjectPath } from '../paths.ts'
 import { noteFileContentChanged } from '../fileCatalog.ts'
 import { DocumentPages, DocumentPageError } from '../document-pages.ts'
 import { ConflictError } from '../documents.ts'
+import { isProjectWikiDocument } from '../frontmatter.ts'
 import type { DatabaseView } from './databaseService.ts'
 import type { Exec } from './pool.ts'
 import { documentPageTarget, representativeName, remapPagePath, rewritePageLinks, type DocumentPageMove, type DocumentPageMutation } from '../../shared/document-pages.ts'
@@ -237,7 +238,8 @@ export async function syncDatabasePages(project: string, view: DatabaseView, q: 
           if ((next === target || !fs.existsSync(absolute(project, next))) && !fs.existsSync(absolute(project, counterpart))) break
           nextName = `${name} ${++index}`
         }
-        const change = new DocumentPages(projectRoot(project)).rename(record.path, nextName, undo => renameUndos.push(undo))
+        const pages = new DocumentPages(projectRoot(project), undefined, rel => isProjectWikiDocument(project, rel))
+        const change = pages.rename(record.path, nextName, undo => renameUndos.push(undo))
         if (!change.moves.length) continue
         renames.push(change)
         for (const page of previous) page.path = remapPagePath(page.path, change.moves)
@@ -318,7 +320,7 @@ export async function syncDatabasePages(project: string, view: DatabaseView, q: 
         doc.set('_mew_row', row.id)
         if (ownerPath) doc.set('상위파일', path.posix.relative(path.posix.dirname(relative), ownerPath))
         else doc.delete('상위파일')
-        if (!doc.has('description')) doc.set('description', String(row.cells[primary.id]))
+        if (!doc.has('description') && isProjectWikiDocument(project, relative)) doc.set('description', String(row.cells[primary.id]))
         pending.set(relative, `---\n${doc.toString()}---\n${body}`)
         const pathTitle = drafts.getStore() && record ? record.baseline.pathTitle ?? record.baseline.cells?.[primary.id] : row.cells[primary.id]
         const baseline: Baseline = { columns: view.columns.map(({ id, name, type }) => ({ id, name, type })), cells: row.cells, pathTitle: String(pathTitle ?? row.cells[primary.id]) }

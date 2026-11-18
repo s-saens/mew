@@ -1,14 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { DEFAULT_PROJECT, resolveProjectPath } from './paths.ts'
-import { buildFrontmatter } from './frontmatter.ts'
+import { buildFrontmatter, isProjectWikiDocument } from './frontmatter.ts'
 
 export class ConflictError extends Error {}
 
 /**
- * 입력한 경로로 새 파일 생성. 마크다운 이외에는 빈 파일을 만든다.
- * 마크다운은 docs에서 SSoT 규칙대로 frontmatter(title은 본문 H1이 아니라 여기)와
- * description을 생성한다. 기존 MOC는 수정하지 않는다.
+ * Create a file at the requested path. Markdown in Documents uses frontmatter.
+ * Wiki Markdown also includes an initial description.
  */
 export function createDocument(project: string, relPath: string, title: string): { relPath: string; mocRelPath: string | null } {
   const abs = resolveProjectPath(project, relPath)
@@ -18,11 +17,12 @@ export function createDocument(project: string, relPath: string, title: string):
     fs.writeFileSync(abs, '', 'utf-8')
     return { relPath, mocRelPath: null }
   }
-  if (project !== DEFAULT_PROJECT) {
+  const wiki = isProjectWikiDocument(project, relPath)
+  if (project !== DEFAULT_PROJECT && !wiki) {
     fs.writeFileSync(abs, `# ${title}\n`, 'utf-8')
     return { relPath, mocRelPath: null }
   }
-  fs.writeFileSync(abs, buildFrontmatter(title), 'utf-8')
+  fs.writeFileSync(abs, buildFrontmatter(title, wiki), 'utf-8')
   return { relPath, mocRelPath: null }
 }
 

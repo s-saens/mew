@@ -1,6 +1,6 @@
 ---
 title: "Documentation and code quality guidance: implementation and verification"
-description: "Records the original seven documentation presets and the addition of focused document structure, clean-code guidance, and the root README description exception, with source-preserving defaults, settings verification, and server application boundaries."
+description: "Records the original seven documentation presets and the addition of focused document structure, clean-code guidance, and the progression from the root README exception to wiki-only descriptions, with source-preserving defaults, settings verification, and server application boundaries."
 created: "2026-10-26"
 updated: "2026-11-02"
 ---
@@ -46,3 +46,9 @@ Server-side behavior requires the user to apply the code and reopen older agent 
 Keep the project entry point free of generated descriptions. The default guidance now exempts the root README, and page creation omits its description. Documents folder READMEs retain their descriptions for discovery. Project setup explains the distinction. The [guidance contract](../development/agent-guidance.md) covers existing saved defaults.
 
 The 64 focused guidance, document, and project setup tests passed. The existing CLI test for creating a project in a nonexistent directory still fails with a project folder lookup error. The build, lint, and description validation passed. Repository-wide link validation reported 39 existing errors. Local verification did not involve deployment or a server restart.
+
+## 2026-11-18 — Wiki-only descriptions
+
+Apply [ADR 0191](../decisions/0191-wiki-only-descriptions.md) to generated agent defaults, setup templates, new Markdown and representative pages, database row pages, legacy task creation, and the repository description check. Preserve stored account guidance and document metadata. Use path and text search for other documentation.
+
+The build and lint passed with existing warnings. Of 102 tests in the focused run, 99 passed, two reproduced existing failures, and one requires a dedicated Postgres instance. The existing failures are CLI preview for a nonexistent project directory and the demo pet sprite fixture. The scoped rerun passed 99 tests with one Postgres skip. The isolated guidance settings browser test passed. Wiki description validation passed for 783 files. Repository link validation reported the same 39 errors as before the change. Verification was local. Deployment and server lifecycle operations were outside the request.

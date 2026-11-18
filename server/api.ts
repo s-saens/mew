@@ -63,7 +63,7 @@ import { evaluateRules, isArchived } from './rules.ts'
 import { registerPdfRoutes } from './pdf.ts'
 import { copyFile, copyPathInto, createDocument, createFolder, renamePath, deletePath, moveFileInto, ConflictError } from './documents.ts'
 import { lintContent } from './lint.ts'
-import { parseTitle } from './frontmatter.ts'
+import { isProjectWikiDocument, parseTitle } from './frontmatter.ts'
 import { noteAppWrite } from './appWrites.ts'
 import { updateLinkLabelsFor } from './links.ts'
 import { ASSET_DIR, isLocalAssetPath, isTemporaryAssetPath, moveAssetIntoProject } from './localAssets.ts'
@@ -1316,7 +1316,7 @@ export function createApiApp() {
   app.post('/docs/pages/:action', requireAuthenticated, requireFeature('filesWrite'), async (req, res) => {
     try {
       const project = projectOf(req), root = projectRoot(project), auth = authOf(req)
-      const pages = new DocumentPages(root, (rel, recursive = false) => recursive ? subtreeAccess(auth, project, rel, true) : fileAccess(auth, project, rel).edit, project === DEFAULT_PROJECT)
+      const pages = new DocumentPages(root, (rel, recursive = false) => recursive ? subtreeAccess(auth, project, rel, true) : fileAccess(auth, project, rel).edit, rel => isProjectWikiDocument(project, rel))
       const { path: target = '', name = '', destination = '', unique = false } = req.body ?? {}
       if (typeof target !== 'string' || typeof name !== 'string' || typeof destination !== 'string' || typeof unique !== 'boolean') { res.status(400).json({ error: '올바른 문서 경로와 이름을 입력하세요' }); return }
       const result = await mutateDocumentDatabaseReferences(project, req.params.action === 'delete' ? [target] : [], () => {

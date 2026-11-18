@@ -6,6 +6,7 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { descriptionCatalog, readDescription, repositoryDescriptionCatalog } from './document-descriptions.ts'
+import { isWikiDocumentationPath } from '../shared/wiki-documentation.ts'
 
 test('catalog reads YAML descriptions without body fields and excludes cold or linked trees', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-descriptions-'))
@@ -29,36 +30,36 @@ test('catalog reads YAML descriptions without body fields and excludes cold or l
   } finally { fs.rmSync(root, { recursive: true, force: true }) }
 })
 
-test('repository checks cover project knowledge, tasks, public guides and first-party skills only', t => {
+test('repository descriptions require metadata in wiki roots only', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-description-roots-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
   fs.writeFileSync(path.join(root, 'README.md'), '# Project entry point\n')
   const documents = {
     '.mew/docs/current.md': 'Project contract',
     '.mew/docs/history/old.md': 'Historical contract',
-    '.mew/tasks/Task.md': 'Task status',
-    '.mew/notes/Note.md': 'Working note',
-    'docs/guides/usage.md': 'User guide',
-    'resources/skills/example/SKILL.md': 'Bundled skill',
-    'resources/help/commands.md': 'In-app help',
+    '.mew/wiki/README.md': 'Wiki entry',
+    'wiki/topic.md': 'Wiki topic',
   }
   for (const [file, description] of Object.entries(documents)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
     fs.writeFileSync(path.join(root, file), `---\ndescription: ${description}\n---\n`)
   }
-  for (const file of ['.mew/cache/private.md', '.mew/docs/archives/raw.md', 'resources/skills/.vendor/source/SKILL.md', 'resources/images/source.md']) {
+  for (const file of [
+    '.mew/cache/private.md', '.mew/docs/archives/raw.md', '.mew/tasks/Task.md', '.mew/notes/Note.md',
+    'docs/guides/usage.md', 'resources/skills/example/SKILL.md', 'resources/help/commands.md', 'wiki-guide/topic.md',
+  ]) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
     fs.writeFileSync(path.join(root, file), '# Not maintained documentation\n')
   }
   fs.writeFileSync(path.join(root, '.mew/agent-context.json'), JSON.stringify({ version: 1, enabled: true, docsDir: '.mew/docs', entrypoints: [], instructions: '' }))
   assert.deepEqual(repositoryDescriptionCatalog(root).entries.map(([file]) => file).sort(), Object.keys(documents).filter(file => !file.includes('/history/')).sort())
-  assert.equal(repositoryDescriptionCatalog(root, true).entries.length, 7)
+  assert.equal(repositoryDescriptionCatalog(root, true).entries.length, 4)
   assert.deepEqual(repositoryDescriptionCatalog(root, true).errors, [])
-  fs.writeFileSync(path.join(root, '.mew/tasks/Task.md'), '# Missing metadata\n')
-  assert.deepEqual(repositoryDescriptionCatalog(root).errors, ['.mew/tasks/Task.md: Missing frontmatter'])
+  fs.writeFileSync(path.join(root, 'wiki/topic.md'), '# Missing metadata\n')
+  assert.deepEqual(repositoryDescriptionCatalog(root).errors, ['wiki/topic.md: Missing frontmatter'])
 })
 
-test('the CLI discovers configured knowledge by default and preserves explicit directory overrides', t => {
+test('the CLI discovers the wiki and keeps explicit directory inspection available', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-description-cli-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
   for (const directory of ['.mew/docs', 'docs']) fs.mkdirSync(path.join(root, directory), { recursive: true })
@@ -69,5 +70,20 @@ test('the CLI discovers configured knowledge by default and preserves explicit d
   const run = (...args: string[]) => execFileSync(process.execPath, [cli, ...args], { cwd: root, encoding: 'utf8' })
   assert.equal(run(), '"contract.md"\tInternal contract\n')
   assert.equal(run('docs'), '"guide.md"\tPublic guide\n')
-  assert.equal(run('--check', '--repository'), '2 descriptions, 0 errors\n')
+  assert.equal(run('--check', '--repository'), '1 descriptions, 0 errors\n')
+
+  fs.writeFileSync(path.join(root, '.mew/agent-context.json'), JSON.stringify({ version: 1, enabled: true, docsDir: 'docs', entrypoints: [], instructions: '' }))
+  assert.equal(run(), '"contract.md"\tInternal contract\n', 'public Documents settings do not become wiki roots')
+  fs.rmSync(path.join(root, '.mew/docs'), { recursive: true })
+  assert.equal(run('--check'), '0 descriptions, 0 errors\n')
+  assert.equal(run('--check', '--repository'), '0 descriptions, 0 errors\n')
+})
+
+test('wiki path boundaries exclude the project README, public docs and similarly named folders', () => {
+  for (const candidate of ['wiki', 'wiki/topic.md', '.mew/docs/README.md', '.mew/wiki/features/topic.md']) {
+    assert.equal(isWikiDocumentationPath(candidate), true, candidate)
+  }
+  for (const candidate of ['README.md', 'docs/README.md', 'wiki-old/topic.md', 'docs/wiki/topic.md', '.mew/docs-old/topic.md']) {
+    assert.equal(isWikiDocumentationPath(candidate), false, candidate)
+  }
 })

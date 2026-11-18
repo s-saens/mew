@@ -71,7 +71,7 @@ function saveTasks(store: DemoWorkspaceStore, workspace: string, tasks: TaskItem
     }
     const old = previous.get(task.id), yaml = old?.yaml ?? demoDocument('').yaml
     yaml.set('title', task.text); yaml.set('done', task.done)
-    if (!old || yaml.get('description') === `태스크: ${old.task.text.trim() || '제목 없음'}`) yaml.set('description', `태스크: ${task.text.trim() || '제목 없음'}`)
+    if (old && yaml.get('description') === `태스크: ${old.task.text.trim() || '제목 없음'}`) yaml.set('description', `태스크: ${task.text.trim() || '제목 없음'}`)
     for (const field of ['tags', 'assignees', 'startDate', 'date'] as const) {
       const value = task[field]
       if (value == null || Array.isArray(value) && !value.length) yaml.delete(field)

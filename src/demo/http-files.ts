@@ -2,7 +2,7 @@ import { parse as parseYaml } from 'yaml'
 import { demoJson, requireMethod, stringArray, stringField, type DemoHttpHandler } from './http.ts'
 import { DemoError, type DemoWorkspaceStore } from './workspace-store.ts'
 import type { FileFavorite } from '../../shared/file-favorites.ts'
-import { DemoDocumentPages } from './document-pages.ts'
+import { DemoDocumentPages, demoPageContent, demoWikiDocument } from './document-pages.ts'
 
 const nameOf = (path: string) => path.split('/').at(-1) ?? ''
 const directoryOf = (path: string) => path.slice(0, Math.max(0, path.lastIndexOf('/')))
@@ -65,7 +65,10 @@ export const handleDemoFiles: DemoHttpHandler = async ({ store, request, url, bo
       relPath = stringField(body, 'relPath')
       if (store.hasFile(relPath, project)) throw new DemoError('같은 이름의 파일이 있습니다.', 409)
       const title = stringField(body, 'title', nameOf(relPath).replace(/\.md$/, ''))
-      store.writeFile(relPath, relPath.endsWith('.md') ? `# ${title}\n\n` : '', project)
+      const content = /\.md$/i.test(relPath)
+        ? demoWikiDocument(store, project, relPath) ? demoPageContent(title, true) : `# ${title}\n\n`
+        : ''
+      store.writeFile(relPath, content, project)
     } else if (route === '/api/new-folder') relPath = store.createDirectory(stringField(body, 'relPath'), project)
     else if (route === '/api/rename') relPath = store.movePath(stringField(body, 'oldPath'), stringField(body, 'newPath'), project)
     else {

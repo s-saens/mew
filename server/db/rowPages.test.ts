@@ -4,14 +4,43 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { parse, stringify } from 'yaml'
-import { workspaceContext, pathsForWorkspace, resolveProjectPath } from '../paths.ts'
+import { workspaceContext, pathsForWorkspace, resolveProjectPath, WORKSPACE_PROJECT } from '../paths.ts'
 import { projectSchema, quoteIdent } from './identifiers.ts'
-import { closePool, exec } from './pool.ts'
+import { closePool, exec, type Exec } from './pool.ts'
 import * as svc from './databaseService.ts'
 import { saveDatabaseRowPage, refreshDatabaseRowPages, remapDatabaseRowPages } from './rowPageIntegration.ts'
-import { RowPageError } from './rowPages.ts'
+import { RowPageError, syncDatabasePages } from './rowPages.ts'
 import { capturePageMutations } from './page-mutations.ts'
 import { joinFrontmatter, splitFrontmatter } from '../../packages/editor/src/utils/frontmatter.ts'
+
+test('row pages generate a description only inside the Wiki and preserve a database description column', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-row-page-descriptions-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const q: Exec = async () => ({ rows: [], command: '', rowCount: 0, oid: 0, fields: [] })
+  await workspaceContext.run(pathsForWorkspace(root, null), async () => {
+    const cases = [
+      { directory: '.mew/wiki', descriptionColumn: false, expected: 'Row' },
+      { directory: 'docs', descriptionColumn: false, expected: undefined },
+      { directory: 'examples', descriptionColumn: true, expected: 'Database field' },
+    ]
+    for (const { directory, descriptionColumn, expected } of cases) {
+      const ownerPath = `${directory}/MOC.md`
+      fs.mkdirSync(path.join(root, directory), { recursive: true })
+      fs.writeFileSync(path.join(root, ownerPath), '# Table\n')
+      await syncDatabasePages(WORKSPACE_PROJECT, {
+        id: 'table', kind: 'managed', title: 'Table', editable: true, ownerPath,
+        columns: [
+          { id: 'title', name: 'Title', type: 'page', primary: true },
+          ...(descriptionColumn ? [{ id: 'summary', name: 'description', type: 'text' as const }] : []),
+        ],
+        rows: [{ id: 'row', pos: 0, cells: { title: 'Row', summary: 'Database field' } }],
+      }, q)
+      const content = fs.readFileSync(path.join(root, directory, 'Row.md'), 'utf8')
+      const data = parse(/^---\n([\s\S]*?)\n---/.exec(content)![1])
+      assert.equal(data.description, expected, directory)
+    }
+  })
+})
 
 test('database row pages preserve autosaves, permissions and file moves', { skip: !process.env.MEW_DB_TEST_DATABASE_URL }, async t => {
   process.env.DATABASE_URL = process.env.MEW_DB_TEST_DATABASE_URL!

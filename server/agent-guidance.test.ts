@@ -157,7 +157,8 @@ test('description navigation replaces only former default guidance and does not 
   fs.writeFileSync(path.join(root, 'docs/MOC.md'), '# Legacy map')
   fs.writeFileSync(path.join(root, 'docs/README.md'), '# Rules')
   const context = describeAgentContext({ projectRoot: root, docsRoot: path.join(root, 'docs') }, defaultAgentSettings(), root)
-  assert.match(context, /frontmatter description fields/)
+  assert.match(context, /For the project wiki, scan document paths and frontmatter description fields/)
+  assert.match(context, /For other documentation, use paths, headings, and text search/)
   assert.match(context, /no MOC update is required/)
   assert.match(context, /Keep my custom rules and maps unchanged/)
   assert.doesNotMatch(context, /docs\/MOC\.md/)
@@ -364,21 +365,40 @@ test('former fixed documentation defaults cannot override project-only options, 
   }
 })
 
-test('previous default description guidance honors the root README exception without rewriting saved guidance', async () => {
+test('former documentation defaults narrow discovery and descriptions to the wiki without rewriting saved guidance', async () => {
   const { agentGuidanceSettings } = await import('./agent-guidance.ts')
   const previous = 'Give every new or changed documentation file an accurate, non-empty frontmatter description, and update it when the document’s scope or status changes. Describe the subject and coverage so agents can select relevant current documents without reading every body. Preserve the project’s established metadata format.'
-  const block = (text: string) => `<!-- mew:agent-setting:documentDescriptions -->\n${text}\n<!-- /mew:agent-setting:documentDescriptions -->\n`
-  fs.writeFileSync(AGENT_GUIDANCE_PATH, block(previous))
-  const state = agentGuidanceSettings()
-  assert.equal(state.settings.documentDescriptions, 'required')
-  assert.ok(readAgentGuidance().includes(block(guidanceOptions.documentDescriptions.required)))
-  assert.equal(fs.readFileSync(AGENT_GUIDANCE_PATH, 'utf8'), block(previous))
-  assert.equal(agentGuidanceSettings().revision, state.revision)
+  const rootReadmeDefault = 'Keep the project-root README.md free of description frontmatter by default. Give other new or changed documentation files an accurate, non-empty frontmatter description, and update it when the document’s scope or status changes. Describe the subject and coverage so agents can select relevant current documents without reading every body. Preserve the project’s established metadata format.'
+  const oldStructure = 'Organize documentation into small, focused files for a specific topic and intended reader. Separate independently maintained contracts, usage guides, decisions, and historical records when useful, while keeping closely related content together. Keep one canonical source for each fact or contract and link to it instead of duplicating it. Use clear filenames and accurate descriptions so agents can retrieve only the relevant documents. Preserve the project’s established documentation structure and description-first discovery; do not require MOC navigation or registration. Split documents when it improves retrieval or maintenance, without arbitrary line limits or excessive fragmentation.'
+  const oldBoot = 'Before acting, follow applicable project instructions and read the project README. Use Documents entrypoints, then scan document paths and frontmatter description fields to select only the current documents relevant to the task before reading their bodies. Do not use MOC navigation or require map registration. If a referenced path is missing, report it instead of guessing another project.'
+  const block = (key: string, text: string) => `<!-- mew:agent-setting:${key} -->\n${text}\n<!-- /mew:agent-setting:${key} -->\n`
+  for (const text of [previous, rootReadmeDefault]) {
+    const stored = `${oldBoot}\n\n${block('documentStructure', oldStructure)}\n${block('documentDescriptions', text)}`
+    fs.writeFileSync(AGENT_GUIDANCE_PATH, stored)
+    const state = agentGuidanceSettings()
+    const effective = readAgentGuidance()
+    for (const key of ['documentStructure', 'documentDescriptions'] as const) {
+      assert.equal(state.settings[key], 'required')
+      assert.ok(effective.includes(block(key, guidanceOptions[key].required)))
+    }
+    assert.match(effective, /For the project wiki, scan document paths and frontmatter description fields/)
+    assert.match(effective, /For other documentation, use paths, headings, and text search/)
+    assert.match(effective, /under \.mew\/wiki\/, \.mew\/docs\/, or wiki\//)
+    assert.match(effective, /Omit new discovery descriptions elsewhere by default/)
+    assert.ok(!effective.includes(oldBoot))
+    assert.equal(fs.readFileSync(AGENT_GUIDANCE_PATH, 'utf8'), stored)
+    assert.equal(agentGuidanceSettings().revision, state.revision)
+  }
 
-  const custom = block(`${previous} Follow my additional rule.`)
+  const custom = block('documentDescriptions', `${rootReadmeDefault} Follow my additional rule.`)
   fs.writeFileSync(AGENT_GUIDANCE_PATH, custom)
   assert.equal(agentGuidanceSettings().settings.documentDescriptions, 'custom')
   assert.ok(readAgentGuidance().includes(custom))
+
+  for (const preserved of [`${oldBoot} Follow my additional rule.\n`, `\`\`\`text\n${oldBoot}\n\`\`\`\n`, block('instructions', oldBoot)]) {
+    fs.writeFileSync(AGENT_GUIDANCE_PATH, preserved)
+    assert.ok(readAgentGuidance().includes(preserved))
+  }
 })
 
 test('documentation preferences are account-wide and never change another account', async () => {

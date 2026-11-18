@@ -2,7 +2,7 @@
 title: "Development setup and rules"
 created: 2026-09-29
 updated: "2026-11-11"
-description: "Repository execution rules: per-message Build/Deploy authorization, npm build and verification commands, separate launcher/server lifecycle restrictions, and required UI rules. Links isolated browser, Postgres, and CLI checks."
+description: "Repository execution rules: per-message Build/Deploy authorization, npm build, wiki description and link validation, separate launcher/server lifecycle restrictions, and required UI rules. Links isolated browser, Postgres, and CLI checks."
 상위파일:
   - "../MOC.md"
   - "MOC.md"
@@ -39,7 +39,7 @@ Run repository-owned checks from the root:
 npm run check:docs
 ```
 
-This checks descriptions, including history, and local links. MOC registration is optional. Follow the [documentation rules](../README.md) and [feature ownership rules](../features/README.md); use `node server/document-descriptions.ts` to choose current owners before reading bodies. Update affected contracts, descriptions, and links with implementation changes. New decisions belong in [Mew's decision records](../decisions/MOC.md); imported records remain in history.
+This checks wiki descriptions, including wiki history, and local links. MOC registration is optional. Follow the [documentation rules](../README.md) and [feature ownership rules](../features/README.md); use `node server/document-descriptions.ts` to choose current owners before reading bodies. Update affected contracts, wiki descriptions, and links with implementation changes. New decisions belong in [Mew's decision records](../decisions/MOC.md); imported records remain in history.
 
 If this clone still uses a Liiiiv shared hook, remove that local setting with `git config --local --unset core.hooksPath`. Mew owns its rules and checks.
 

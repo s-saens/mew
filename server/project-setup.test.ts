@@ -32,15 +32,19 @@ test('setup preview is read-only, apply preserves existing docs, and repeated se
   assert.equal(projectDocsDir(root, 'docs'), 'notes', 'project choice overrides global fallback')
 })
 
-test('setup distinguishes the project README from the Documents rules README', t => {
+test('setup generates descriptions for Wiki entrypoints only', t => {
   for (const locale of ['en', 'ko', 'ja', 'zh-CN']) {
-    const root = fixture(t)
-    const input = { projectRoot: root, settings: defaultAgentSettings('wiki'), initDocs: true, locale }
-    applyProjectSetup(input, planProjectSetup(input).revision)
-    assert.match(fs.readFileSync(path.join(root, 'README.md'), 'utf8'), /^# /)
-    const rules = fs.readFileSync(path.join(root, 'wiki/README.md'), 'utf8')
-    assert.match(rules, /^---\ndescription:/)
-    assert.match(rules, /README\.md/)
+    for (const docsDir of ['wiki', '.mew/docs', 'docs']) {
+      const root = fixture(t)
+      const input = { projectRoot: root, settings: defaultAgentSettings(docsDir), initDocs: true, locale }
+      applyProjectSetup(input, planProjectSetup(input).revision)
+      assert.match(fs.readFileSync(path.join(root, 'README.md'), 'utf8'), /^# /)
+      for (const name of ['AGENT.md', 'README.md']) {
+        const document = fs.readFileSync(path.join(root, docsDir, name), 'utf8')
+        if (docsDir === 'docs') assert.doesNotMatch(document, /description/)
+        else assert.match(document, /^---\ndescription:/)
+      }
+    }
   }
 })
 
@@ -74,8 +78,8 @@ test('CLI creates a new project only with apply and uses the same setup plan', t
   assert.equal(applied.applied, true)
   assert.match(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), /project%20notes\/AGENT.md/)
   assert.equal(fs.existsSync(path.join(root, 'project notes/MOC.md')), false)
-  assert.match(fs.readFileSync(path.join(root, 'project notes/AGENT.md'), 'utf8'), /^---\ndescription:/)
-  assert.match(fs.readFileSync(path.join(root, 'project notes/README.md'), 'utf8'), /frontmatter description/)
+  assert.match(fs.readFileSync(path.join(root, 'project notes/AGENT.md'), 'utf8'), /^# Agent entrypoint/)
+  assert.match(fs.readFileSync(path.join(root, 'project notes/README.md'), 'utf8'), /targeted text searches/)
   assert.equal(projectDocsDir(root), 'project notes')
   assert.equal(readProjectAgentSettings(root)?.enabled, true)
 })

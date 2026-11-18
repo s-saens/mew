@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseDocument } from 'yaml'
-import { defaultDescriptionRoot, repositoryDocumentRoots } from './document-roots.ts'
+import { defaultDescriptionRoot, repositoryWikiRoots } from './document-roots.ts'
 
 /** Read only the YAML header; document bodies never enter the discovery catalog. */
 export function readDescription(file: string): string {
@@ -47,7 +47,7 @@ export function descriptionCatalog(root: string, includeHistory = false): { entr
 
 export function repositoryDescriptionCatalog(repository: string, includeHistory = false): { entries: [string, string][]; errors: string[] } {
   const entries = new Map<string, string>(), errors = new Set<string>()
-  for (const root of repositoryDocumentRoots(repository)) {
+  for (const root of repositoryWikiRoots(repository)) {
     const catalog = descriptionCatalog(root, includeHistory)
     const prefix = path.relative(repository, root).split(path.sep).join('/')
     for (const [file, description] of catalog.entries) entries.set(`${prefix}/${file}`, description)
@@ -63,9 +63,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   })
   const args = process.argv.slice(2)
   const explicitRoot = args.find(arg => !arg.startsWith('--'))
-  const result = args.includes('--repository')
-    ? repositoryDescriptionCatalog(path.resolve(explicitRoot ?? '.'), args.includes('--all'))
-    : descriptionCatalog(explicitRoot ? path.resolve(explicitRoot) : defaultDescriptionRoot(process.cwd()), args.includes('--all'))
+  const includeHistory = args.includes('--all')
+  const repository = args.includes('--repository')
+  const selected = explicitRoot ? path.resolve(explicitRoot) : repository ? undefined : defaultDescriptionRoot(process.cwd())
+  const result = repository
+    ? repositoryDescriptionCatalog(selected ?? process.cwd(), includeHistory)
+    : selected ? descriptionCatalog(selected, includeHistory) : { entries: [], errors: [] }
   for (const error of result.errors) process.stderr.write(`${error}\n`)
   if (args.includes('--check')) process.stdout.write(`${result.entries.length} descriptions, ${result.errors.length} errors\n`)
   else for (const [file, description] of result.entries) process.stdout.write(`${JSON.stringify(file)}\t${description}\n`)

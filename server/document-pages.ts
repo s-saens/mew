@@ -6,6 +6,7 @@ import { ConflictError } from './documents.ts'
 import { buildFrontmatter } from './frontmatter.ts'
 import { isDeniedSegment } from './paths.ts'
 import { documentPageTarget, pageRepresentative, representativeName, remapPagePath, rewritePageLinks, type DocumentPageMove, type DocumentPageMutation } from '../shared/document-pages.ts'
+import { isWikiDocumentationPath } from '../shared/wiki-documentation.ts'
 
 export class DocumentPageError extends Error { status: number; constructor(message: string, status = 400) { super(message); this.status = status } }
 type Access = (rel: string, recursive?: boolean) => boolean
@@ -26,11 +27,14 @@ function renamedPageContent(content: string, title: string): string {
 export class DocumentPages {
   private root: string
   private allowed: Access
-  private readonly isDocumentsRoot: boolean
-  constructor(root: string, allowed: Access = () => true, isDocumentsRoot = false) {
+  private readonly isWikiDocument: (rel: string) => boolean
+  constructor(root: string, allowed: Access = () => true, isWikiDocument = isWikiDocumentationPath) {
     this.root = fs.realpathSync(root)
     this.allowed = allowed
-    this.isDocumentsRoot = isDocumentsRoot
+    this.isWikiDocument = isWikiDocument
+  }
+  private newPage(title: string, rel: string): string {
+    return buildFrontmatter(title, this.isWikiDocument(rel))
   }
   private abs(rel: string): string {
     if (!rel || rel.startsWith('/') || rel.includes('\\') || rel.includes('\0') || rel.split('/').some(part => part === '..' || isDeniedSegment(part))) throw new DocumentPageError('올바른 문서 경로가 아닙니다')
@@ -103,7 +107,10 @@ export class DocumentPages {
         const copied = to + rep.slice(from.length), canonical = `${to}/${representativeName(to)}`
         copyMoves.unshift({ from: rep, to: canonical })
         if (copied !== canonical) copyRepresentatives.push([copied, canonical])
-      } else if (directory) creations.set(`${to}/${representativeName(to)}`, buildFrontmatter(path.posix.basename(to)))
+      } else if (directory) {
+        const canonical = `${to}/${representativeName(to)}`
+        creations.set(canonical, this.newPage(path.posix.basename(to), canonical))
+      }
       for (const rel of this.markdownFiles().filter(rel => rel === from || directory && rel.startsWith(`${from}/`))) {
         const next = remapPagePath(rel, copyMoves)
         updates.set(next, rewritePageLinks(fs.readFileSync(this.abs(rel), 'utf8'), rel, next, [...copyMoves, ...moves]))
@@ -173,7 +180,7 @@ export class DocumentPages {
         moves.push({ from: parent, to: `${dir}/${representativeName(dir)}` })
       } else {
         const current = this.representative(dir), canonical = `${dir}/${representativeName(dir)}`
-        if (!current) creations.set(canonical, buildFrontmatter(path.posix.basename(dir)))
+        if (!current) creations.set(canonical, this.newPage(path.posix.basename(dir), canonical))
         else if (current !== canonical) moves.push({ from: current, to: canonical })
       }
     }
@@ -185,7 +192,7 @@ export class DocumentPages {
     }
     // A leaf and an existing parent page cannot share the same logical name.
     if (fs.existsSync(this.abs(child.slice(0, -3)))) throw new ConflictError(`같은 이름의 상위 문서가 이미 있습니다: ${name}`)
-    creations.set(child, buildFrontmatter(path.posix.basename(child, '.md'), this.isDocumentsRoot ? undefined : child))
+    creations.set(child, this.newPage(path.posix.basename(child, '.md'), child))
     return this.commit(moves, creations, child)
   }
   private demotion(parent: string, removing: string): DocumentPageMove[] {
@@ -216,7 +223,7 @@ export class DocumentPages {
     if (dir) {
       const oldRep = this.representative(target), canonical = `${next}/${representativeName(next)}`
       if (oldRep) moves.unshift({ from: oldRep, to: canonical })
-      else creations.set(canonical, buildFrontmatter(name))
+      else creations.set(canonical, this.newPage(name, canonical))
     }
     const resultPath = dir ? `${next}/${representativeName(next)}` : next
     return this.commit(moves, creations, resultPath, undefined, dir ? [[target, next]] : [], [], { path: resultPath, title: name }, retainRollback)
@@ -238,7 +245,7 @@ export class DocumentPages {
         moves.push({ from: destination, to: `${dest}/${representativeName(dest)}` })
       } else {
         const rep = this.representative(dest), canonical = `${dest}/${representativeName(dest)}`
-        if (!rep) creations.set(canonical, buildFrontmatter(path.posix.basename(dest)))
+        if (!rep) creations.set(canonical, this.newPage(path.posix.basename(dest), canonical))
         else if (rep !== canonical) moves.push({ from: rep, to: canonical })
       }
     }
@@ -256,7 +263,7 @@ export class DocumentPages {
       if (directory) {
         const rep = this.representative(source), canonical = `${target}/${representativeName(target)}`
         if (rep && `${target}${rep.slice(source.length)}` !== canonical) moves.push({ from: rep, to: canonical })
-        else if (!rep) creations.set(canonical, buildFrontmatter(originalName))
+        else if (!rep) creations.set(canonical, this.newPage(originalName, canonical))
       }
       moves.push({ from: source, to: target, directory })
       moves.push(...this.demotion(path.posix.dirname(source), source))

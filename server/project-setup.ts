@@ -5,14 +5,21 @@ import crypto from 'node:crypto'
 import { defaultAgentSettings, normalizeAgentSettings, ProjectSetupError, readProjectAgentSettings, safeProjectPath, SETTINGS_PATH, writeProjectAgentSettings } from './project-agent-settings.ts'
 import { describeAgentContext } from './project-context-text.ts'
 import type { ProjectSetupInput, ProjectSetupPlan } from '../shared/project-agent-context.ts'
+import { isWikiDocumentationPath } from '../shared/wiki-documentation.ts'
 
 function templates(input: ProjectSetupInput): Map<string, string> {
   const docs = input.settings.docsDir
   const link = (p: string) => p.split('/').map(encodeURIComponent).join('/')
   const files = new Map<string, string>()
   if (input.initDocs) {
-    files.set(`${docs}/AGENT.md`, '---\ndescription: "Agent entrypoint for project instructions and selecting canonical documents by description."\n---\n\n# Agent entrypoint\n\nRead [documentation rules](README.md) and existing project instructions. Scan document paths and frontmatter description fields before reading the bodies of only the current documents needed for the task. MOC navigation and registration are not required. Update the canonical source before reporting completion.\n')
-    files.set(`${docs}/README.md`, '---\ndescription: "Documentation rules for description-based discovery, canonical ownership, write-back and historical preservation."\n---\n\n# Documentation rules\n\n[Agent entrypoint](AGENT.md)\n\nKeep one canonical source per fact. Link to existing project documentation instead of copying it. Keep current guidance separate from history and raw research; preserve historical originals.\n\nBefore work, read the project README and relevant instructions. Scan document paths and frontmatter description fields to select the current documents for your scope, then read only their bodies. Follow existing decision records; record a new decision before reversing an established contract. Do not load the entire document tree. MOC navigation and registration are not required.\n\nWhen code, features, or operating procedures change, update the owning document in the same task. Keep the project-root README.md free of description frontmatter. Give every document in the Documents folder an accurate frontmatter description that distinguishes its content, and update it when the content changes. Fix existing links when documents move. Never store secrets or temporary debug logs in documentation.\n')
+    const wiki = isWikiDocumentationPath(docs)
+    const frontmatter = (description: string) => wiki ? `---\ndescription: ${JSON.stringify(description)}\n---\n\n` : ''
+    const discovery = wiki
+      ? 'Scan Wiki paths and frontmatter description fields before reading the relevant current documents.'
+      : 'Use paths and targeted text searches to select the relevant current documents.'
+    const descriptions = wiki ? ' Give new or changed Wiki documents accurate frontmatter descriptions that distinguish their content.' : ''
+    files.set(`${docs}/AGENT.md`, `${frontmatter('Agent entrypoint for project instructions and selecting canonical documents by description.')}# Agent entrypoint\n\nRead [documentation rules](README.md) and existing project instructions. ${discovery} MOC navigation and registration are optional. Update the canonical source before reporting completion.\n`)
+    files.set(`${docs}/README.md`, `${frontmatter('Documentation rules for description-based discovery, canonical ownership, write-back and historical preservation.')}# Documentation rules\n\n[Agent entrypoint](AGENT.md)\n\nKeep one canonical source per fact. Link to existing project documentation. Keep current guidance separate from history and raw research. Preserve historical originals.\n\nBefore work, read the project README and relevant instructions. ${discovery} Follow existing decision records and record a new decision before reversing an established contract. Read only the relevant bodies. MOC navigation and registration are optional.\n\nWhen code, features, or operating procedures change, update the owning document in the same task.${descriptions} Fix existing links when documents move. Keep secrets and temporary debug logs out of documentation.\n`)
     files.set('README.md', `# Project\n\nDocument the purpose, setup, required configuration, validation commands, and runtime invariants here.\n\nDocumentation: [rules](${link(docs)}/README.md) · [agent entrypoint](${link(docs)}/AGENT.md).\n`)
   }
   if (input.exportAgents) {

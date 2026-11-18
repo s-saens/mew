@@ -1,6 +1,6 @@
 ---
 title: "Mew documentation rules"
-description: "Ownership, English-language policy, description-based discovery, and concise authoring rules for Mew documentation. Defines current versus historical records, same-task write-back, metadata, the root README exception, links, and validation."
+description: "Ownership, English-language policy, wiki-only description discovery, and concise authoring rules for Mew documentation. Defines current versus historical records, same-task write-back, metadata, the root README exception, links, and validation."
 created: "2026-10-06"
 updated: "2026-11-03"
 ---
@@ -20,17 +20,17 @@ This policy does not change UI languages, language skills, or another project's 
 ## Finding the documents you need
 
 1. Read the project README, agent instructions, and [execution rules](development/getting-started.md).
-2. Select a topic from document paths and frontmatter `description` values.
+2. Select wiki topics by path and frontmatter `description`. For other documents, search paths, headings, and relevant text.
 3. Read only the selected current bodies and relevant decisions. Load history or research only when provenance is needed.
 
 ```bash
 node server/document-descriptions.ts                         # Project knowledge
 node server/document-descriptions.ts .mew/docs/development  # One scope
-node server/document-descriptions.ts --repository           # All maintained roles
+node server/document-descriptions.ts --repository           # All wiki roots
 npm run check:docs
 ```
 
-The catalog reads YAML headers, not bodies. It defaults to `.mew/docs` and excludes hidden entries, symlinks, `history/`, and `archives/`. `--all` includes history; archives remain excluded and read-only. `--repository` also covers public guides, tasks, notes, and first-party skills/help, excluding pinned `.vendor` sources. No catalog file or MOC registration is required. This preserves the [description-discovery decision](history/decisions/0199-mew-description-discovery.md).
+The catalog reads YAML headers and defaults to the selected wiki when available. Mew stores its wiki in `.mew/docs/`. The repository description check includes `.mew/wiki/`, `.mew/docs/`, and `wiki/` when present. Historical pages enter the catalog with `--all`. Hidden entries, symlinks, and archives are skipped. Link validation has its own scope. MOC registration is optional. Follow the [wiki description decision](decisions/0191-wiki-only-descriptions.md).
 
 Descriptions guide selection; the body establishes facts and status. Do not recursively load the document tree or infer implementation from a title or modification date.
 
@@ -62,9 +62,9 @@ Use relative paths in frontmatter `상위파일`, as one string or a string arra
 
 ## Writing descriptions
 
-Keep the repository-root `README.md` free of `description` frontmatter. It serves as the project entry point and sits outside the documentation catalog. Within the catalog’s scope, every directly maintained Markdown document needs a nonempty `description` in its first YAML block. Use **one or two sentences** that identify the owning topic, coverage, and relevant status. Include distinguishing terms an agent would search for; leave exhaustive behavior lists in the body.
+Give each maintained wiki Markdown document a nonempty `description` in its first YAML block. The root README, public guides, tasks, notes, and other project documents do not require descriptions for discovery. Preserve existing metadata and follow any format-specific requirements, such as skill manifests. Use **one or two sentences** that identify the owning topic, coverage, and relevant status. Include distinguishing terms an agent would search for; leave exhaustive behavior lists in the body.
 
-Missing descriptions, empty values, invalid YAML, and the legacy `desc` key fail validation. Update the description when the body's scope or status changes. Task-panel placeholders use `태스크: 제목` until edited; automatic title updates preserve manually refined descriptions.
+Missing descriptions, empty values, invalid YAML, and the legacy `desc` key fail validation. Update the description when the body's scope or status changes. These checks apply within the wiki.
 
 ## Ownership and updates
 
@@ -72,7 +72,7 @@ Keep current requirements and detailed acceptance criteria in the owning feature
 
 | Change | Write-back |
 | --- | --- |
-| Code, feature, configuration, or operating behavior | Update the owning current documents and descriptions in the same task |
+| Code, feature, configuration, or operating behavior | Update the owning current documents and wiki descriptions in the same task |
 | Architecture, technology choice, shared contract, or established decision reversal | Record the decision in `decisions/`; link superseded decisions and retain history |
 | Implementation or verification work | Record purpose, resulting behavior, actual checks, outcomes, and remaining limits in the existing work/change record |
 | Routine prose edit | Update the current owner; no duplicate permanent log is needed |

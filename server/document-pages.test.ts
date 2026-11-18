@@ -5,6 +5,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { parseDocument } from 'yaml'
 import { DocumentPages } from './document-pages.ts'
+import { isProjectWikiDocument } from './frontmatter.ts'
+import { DEFAULT_PROJECT, workspaceContext } from './paths.ts'
 import { documentPageLabel, rewritePageLinks, pageRepresentative } from '../shared/document-pages.ts'
 
 function fixture(t: test.TestContext) {
@@ -15,13 +17,20 @@ function fixture(t: test.TestContext) {
   return { root, write, read, pages: new DocumentPages(root) }
 }
 
-test('creating a README omits description only at the project root', t => {
-  const { root, read, pages } = fixture(t)
+test('new page and representative descriptions are generated only inside the Wiki', t => {
+  const { root, write, read, pages } = fixture(t)
   assert.doesNotMatch(read(pages.create('', 'README').path), /^description:/m)
-  assert.match(read(pages.create(pages.create('', 'docs').path, 'README').path), /^description: "README"$/m)
-  fs.mkdirSync(path.join(root, 'wiki'))
-  const documents = new DocumentPages(path.join(root, 'wiki'), () => true, true)
-  assert.match(read(`wiki/${documents.create('', 'README').path}`), /^description: "README"$/m)
+  write('docs/public/source.txt', '')
+  write('wiki/internal/source.txt', '')
+  assert.doesNotMatch(read(pages.create('docs/public', 'README').path), /^description:/m)
+  assert.doesNotMatch(read('docs/public/_public.md'), /^description:/m)
+  assert.match(read(pages.create('wiki/internal', 'README').path), /^description: "README"$/m)
+  assert.match(read('wiki/internal/_internal.md'), /^description: "internal"$/m)
+  const docsRoot = path.join(root, 'wiki')
+  workspaceContext.run({ root, docsDir: 'wiki', docsRoot, account: null }, () => {
+    const documents = new DocumentPages(docsRoot, () => true, rel => isProjectWikiDocument(DEFAULT_PROJECT, rel))
+    assert.match(read(`wiki/${documents.create('', 'README').path}`), /^description: "README"$/m)
+  })
 })
 
 test('document page labels present slug paths as natural names', () => {

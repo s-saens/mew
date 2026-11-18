@@ -3,9 +3,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
-import { DEFAULT_PROJECT } from './paths.ts'
-import { resolveProjectPath } from './paths.ts'
+import { DEFAULT_PROJECT, WORKSPACE_PROJECT, resolveProjectPath, workspaceContext } from './paths.ts'
 import { ConflictError, copyPathInto, createDocument, writeFileInto } from './documents.ts'
 
 const rand = () => `ztest${process.pid}${Math.random().toString(36).slice(2, 6)}`
@@ -30,11 +30,34 @@ test('createDocument: 확장자를 보존하고 일반 파일은 빈 내용으�
       assert.deepEqual(createDocument(DEFAULT_PROJECT, relPath, 'Note'), { relPath, mocRelPath: null })
       assert.match(fs.readFileSync(path.join(rootAbs, name), 'utf-8'), /title: "Note"/)
       assert.equal(fs.readFileSync(path.join(rootAbs, 'MOC.md'), 'utf-8'), moc)
-      assert.match(fs.readFileSync(path.join(rootAbs, name), 'utf-8'), /description: "Note"/)
     }
   } finally {
     fs.rmSync(rootAbs, { recursive: true, force: true })
   }
+})
+
+test('new Markdown descriptions follow the Wiki path through each project scope', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-wiki-files-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  fs.mkdirSync(path.join(root, 'project'))
+  const docsDir = '.mew/wiki'
+  const docsRoot = path.join(root, docsDir)
+  workspaceContext.run({ root, docsDir, docsRoot, account: null }, () => {
+    createDocument(DEFAULT_PROJECT, 'README.md', 'Wiki')
+    createDocument(WORKSPACE_PROJECT, 'README.md', 'Project')
+    createDocument('project', 'wiki/README.md', 'Project Wiki')
+    createDocument('project', 'docs/README.md', 'Public Docs')
+    assert.match(fs.readFileSync(path.join(docsRoot, 'README.md'), 'utf8'), /^description: "Wiki"$/m)
+    assert.equal(fs.readFileSync(path.join(root, 'README.md'), 'utf8'), '# Project\n')
+    assert.match(fs.readFileSync(path.join(root, 'project/wiki/README.md'), 'utf8'), /^description: "Project Wiki"$/m)
+    assert.equal(fs.readFileSync(path.join(root, 'project/docs/README.md'), 'utf8'), '# Public Docs\n')
+  })
+  workspaceContext.run({ root, docsDir: 'docs', docsRoot: path.join(root, 'docs'), account: null }, () => {
+    createDocument(DEFAULT_PROJECT, 'README.md', 'Public Docs')
+    const content = fs.readFileSync(path.join(root, 'docs/README.md'), 'utf8')
+    assert.match(content, /^title: "Public Docs"$/m)
+    assert.doesNotMatch(content, /^description:/m)
+  })
 })
 
 test('copyPathInto: 파일을 다른 폴더로 복사하면 원래 이름을 유지하고, 같은 폴더면 " copy"를 붙인다', () => {

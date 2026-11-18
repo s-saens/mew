@@ -1,3 +1,7 @@
+import path from 'node:path'
+import { isWikiDocumentationPath } from '../shared/wiki-documentation.ts'
+import { DEFAULT_PROJECT, projectRoot, resolveProjectPath, workspacePaths } from './paths.ts'
+
 function quote(raw: string): string {
   return JSON.stringify(raw)
 }
@@ -26,10 +30,15 @@ export function todayDate(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-/** 새 문서용 YAML frontmatter 블록 — tags는 정책상 넣지 않는다 (.mew/docs/README.md 참고).
-    description은 제목으로 시작하고 작성자가 본문 범위에 맞춰 구체화한다. */
-export function buildFrontmatter(title: string, projectRelativePath = ''): string {
+export function isProjectWikiDocument(project: string, relativePath: string): boolean {
+  const file = resolveProjectPath(project, relativePath)
+  const root = project === DEFAULT_PROJECT ? workspacePaths.root : projectRoot(project)
+  return isWikiDocumentationPath(path.relative(root, file).split(path.sep).join('/'))
+}
+
+/** Initialize Wiki descriptions from the title until the author can describe the body. */
+export function buildFrontmatter(title: string, includeDescription: boolean): string {
   const today = todayDate()
-  const description = /^readme\.md$/i.test(projectRelativePath) ? '' : `description: ${quote(title.trim() || "제목 없는 문서")}\n`
+  const description = includeDescription ? `description: ${quote(title.trim() || "제목 없는 문서")}\n` : ''
   return `---\ntitle: ${quote(title)}\ncreated: ${today}\nupdated: ${today}\n${description}---\n\n`
 }

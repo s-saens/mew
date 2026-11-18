@@ -69,6 +69,19 @@ test('new, rename, copy and delete appear in the shared explorer', async () => {
   assert.equal((await data(store, '/api/tree?path=notes&v=1')).entries.length, 1)
 })
 
+test('demo file and page creation adds descriptions only inside the Wiki', async () => {
+  const store = new DemoWorkspaceStore()
+  await data(store, '/api/new-document', write('POST', { relPath: 'wiki/README.md', title: 'Wiki', project: '.workspace' }))
+  await data(store, '/api/new-document', write('POST', { relPath: 'public.md', title: 'Public', project: 'docs' }))
+  assert.match(store.readFile('wiki/README.md').content, /^description: "Wiki"$/m)
+  assert.doesNotMatch(store.readFile('public.md', 'docs').content, /^description:/m)
+
+  const wiki = await data(store, '/api/docs/pages/create', write('POST', { path: 'wiki', name: 'Guide', project: '.workspace' }))
+  const publicDoc = await data(store, '/api/docs/pages/create', write('POST', { path: '', name: 'Guide', project: 'docs' }))
+  assert.match(store.readFile(wiki.path).content, /^description: "Guide"$/m)
+  assert.doesNotMatch(store.readFile(publicDoc.path, 'docs').content, /^description:/m)
+})
+
 test('external file paths and agent directories remain absolute after a nested workspace switch', async () => {
   const store = new DemoWorkspaceStore(), docs = `${store.workspacePath}/docs`
   store.openWorkspace(docs)

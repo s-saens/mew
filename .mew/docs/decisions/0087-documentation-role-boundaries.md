@@ -1,6 +1,6 @@
 ---
 title: "Documentation roles and storage boundaries for project materials"
-description: "Defines owning paths, discovery, checks, deployment, and compatibility with existing paths for project knowledge, tasks, public guidance, product resources, and production source assets. Extends the placement rules from the existing documentation ownership decision."
+description: "Defines owning paths, discovery, checks, deployment, and compatibility with existing paths for project knowledge, tasks, public guidance, product resources, and production source assets. Extends earlier placement rules and links the decision that narrowed description discovery to the wiki."
 created: "2026-10-29"
 updated: "2026-10-29"
 ---
@@ -8,6 +8,8 @@ updated: "2026-10-29"
 ## Status
 
 Accepted. Replaces the arrangement that grouped all roles under repository-root `docs/` while preserving content-based ownership and the distinction between current content and records from [0040](0040-document-gardening.md). Retains the existing decision not to separate feature-specific specifications into a separate Specs area.
+
+The historical discovery and description-check scope below is superseded by [ADR 0191](0191-wiki-only-descriptions.md).
 
 ## Background
 

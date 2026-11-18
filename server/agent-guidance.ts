@@ -65,7 +65,7 @@ function effectiveGuidance(content: string, locale?: string, execution?: AgentEx
     const retry = isolatedRegion(content, 'capacityRetry')
     if (retry) content = content.slice(0, retry.from) + content.slice(retry.to)
   } catch { /* Preserve handwritten text surrounding damaged markers. */ }
-  let defaults = withDocumentationDefaults(currentDocumentationGuidance(content))
+  let defaults = withDocumentationDefaults(content)
   defaults = withBuildVerificationDefault(withTestingDefault(withDebuggerDefault(withCommitLanguageDefault(defaults))))
   defaults = withCodeQualityDefault(defaults)
   if (execution) {
@@ -171,14 +171,6 @@ function resolveCommitLanguage(content: string, locale?: string): string {
   } catch { return content }
 }
 
-/** Update only the former default wording; handwritten guidance and stored settings stay intact. */
-function currentDocumentationGuidance(content: string): string {
-  return content
-    .replace('Use Documents entrypoints and maps to find only the current documents relevant to the task.', 'Use Documents entrypoints, then scan document paths and frontmatter description fields to select only the current documents relevant to the task before reading their bodies. Do not use MOC navigation or require map registration.')
-    .replace('Update map links for new or moved documents.', 'For new or moved documents, no MOC update is required.')
-    .replace('using the supplied Change intent recorder, after updating canonical docs.', 'using the supplied Change intent recorder, after any required canonical documentation updates.')
-}
-
 export class GuidanceError extends Error {
   status: number
   constructor(message: string, status = 400) { super(message); this.status = status }
@@ -189,14 +181,28 @@ type GuidanceRegionKey = GuidanceKey | 'branch' | 'instructions' | 'capacityRetr
 const regionKeys: GuidanceRegionKey[] = [...Object.keys(guidanceOptions) as GuidanceKey[], 'branch', 'instructions', 'capacityRetry', 'buildVerification']
 const markers = (key: GuidanceRegionKey) => [`<!-- mew:agent-setting:${key} -->`, `<!-- /mew:agent-setting:${key} -->`]
 
-const previousDescriptionDefault = 'Give every new or changed documentation file an accurate, non-empty frontmatter description, and update it when the document’s scope or status changes. Describe the subject and coverage so agents can select relevant current documents without reading every body. Preserve the project’s established metadata format.'
+const formerDocumentationDefaults = {
+  documentStructure: [
+    'Organize documentation into small, focused files for a specific topic and intended reader. Separate independently maintained contracts, usage guides, decisions, and historical records when useful, while keeping closely related content together. Keep one canonical source for each fact or contract and link to it instead of duplicating it. Use clear filenames and accurate descriptions so agents can retrieve only the relevant documents. Preserve the project’s established documentation structure and description-first discovery; do not require MOC navigation or registration. Split documents when it improves retrieval or maintenance, without arbitrary line limits or excessive fragmentation.',
+  ],
+  documentDescriptions: [
+    'Give every new or changed documentation file an accurate, non-empty frontmatter description, and update it when the document’s scope or status changes. Describe the subject and coverage so agents can select relevant current documents without reading every body. Preserve the project’s established metadata format.',
+    'Keep the project-root README.md free of description frontmatter by default. Give other new or changed documentation files an accurate, non-empty frontmatter description, and update it when the document’s scope or status changes. Describe the subject and coverage so agents can select relevant current documents without reading every body. Preserve the project’s established metadata format.',
+  ],
+}
+
+function isFormerDocumentationDefault(key: GuidanceKey, text: string): boolean {
+  return (key === 'documentStructure' || key === 'documentDescriptions') && formerDocumentationDefaults[key].includes(text)
+}
 
 function withDocumentationDefaults(content: string): string {
   try {
-    const block = isolatedRegion(content, 'documentDescriptions')
-    if (block?.text === previousDescriptionDefault) {
-      const current = content.slice(block.from, block.to).replace(previousDescriptionDefault, guidanceOptions.documentDescriptions.required)
-      content = content.slice(0, block.from) + current + content.slice(block.to)
+    for (const key of ['documentStructure', 'documentDescriptions'] as const) {
+      const block = isolatedRegion(content, key)
+      if (block && isFormerDocumentationDefault(key, block.text)) {
+        const current = content.slice(block.from, block.to).replace(block.text, guidanceOptions[key].required)
+        content = content.slice(0, block.from) + current + content.slice(block.to)
+      }
     }
   } catch { /* Preserve damaged settings blocks. */ }
 
@@ -222,6 +228,13 @@ function withDocumentationDefaults(content: string): string {
       const text = line.replace(/\r$/, '')
       if (text === legacy) return 'Preserve historical sources; keep secrets and temporary debugging logs out of docs.'
       if (text === legacyMetadata) return ''
+      if (text === 'Before acting, follow applicable project instructions and read the project README. Use Documents entrypoints, then scan document paths and frontmatter description fields to select only the current documents relevant to the task before reading their bodies. Do not use MOC navigation or require map registration. If a referenced path is missing, report it instead of guessing another project.' || text === 'Use Documents entrypoints and maps to find only the current documents relevant to the task.') {
+        return 'Before acting, follow applicable project instructions and read the project README. Use Documents entrypoints. For the project wiki, scan document paths and frontmatter description fields before reading relevant sections. For other documentation, use paths, headings, and text search. Select only relevant current documents without requiring MOC navigation or registration. If a referenced path is missing, report it instead of guessing another project.'
+      }
+      if (text === 'Update map links for new or moved documents.') return 'For new or moved documents, no MOC update is required.'
+      if (text.startsWith('Before an authorized commit, record a brief task purpose and explicit changed file paths ')) {
+        return line.replace('using the supplied Change intent recorder, after updating canonical docs.', 'using the supplied Change intent recorder, after any required canonical documentation updates.')
+      }
       return line
     }).join('\n')
   }
@@ -325,7 +338,7 @@ function snapshot(content: string): GuidanceSnapshot {
   for (const key of Object.keys(guidanceOptions) as GuidanceKey[]) {
     try {
       const block = region(content, key)
-      if (key === 'documentDescriptions' && block?.text === previousDescriptionDefault) {
+      if (block && isFormerDocumentationDefault(key, block.text)) {
         settings[key] = 'required'
         continue
       }
