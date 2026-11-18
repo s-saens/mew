@@ -60,7 +60,9 @@ async function fixture(t, { unsafe = false, bundleVersion = '0.1.0' } = {}) {
 test('curl bootstrap installs privately without npm, preserves argument boundaries, and reuses downloads', posix, async t => {
   const f = await fixture(t)
   const args = ['--workspace', "a folder's $value", '--no-open', '--no-autostart']
-  await f.run(args)
+  const { stderr } = await f.run(args)
+  assert.match(stderr, /Preparing Mew 0\.1\.0 for linux\/x64\.\.\./)
+  assert.match(stderr, /Installing private Node\.js 24\.21\.0\.\.\./)
   const record = JSON.parse((await fs.readFile(f.env.MEW_TEST_LAUNCH_RECORD, 'utf8')).trim())
   assert.deepEqual(record.args, args)
   assert.equal(record.cwd, await fs.realpath(f.project))
@@ -93,6 +95,15 @@ test('a staging failure preserves its exit status and releases the installer loc
   const f = await fixture(t)
   await fs.writeFile(path.join(f.directory, 'mocks', 'mktemp'), '#!/bin/sh\nexit 43\n', { mode: 0o700 })
   await assert.rejects(f.run(), { code: 43 })
+  await assert.rejects(fs.stat(path.join(f.installRoot, '.install-lock')), { code: 'ENOENT' })
+})
+
+test('an unexpected zero exit during staging reports an incomplete install', posix, async t => {
+  const f = await fixture(t)
+  const installer = path.join(f.directory, 'install.sh')
+  const script = await fs.readFile(installer, 'utf8')
+  await fs.writeFile(installer, script.replace('  release_base=', '  exit 0\n  release_base='))
+  await assert.rejects(f.run(), { code: 1 })
   await assert.rejects(fs.stat(path.join(f.installRoot, '.install-lock')), { code: 'ENOENT' })
 })
 

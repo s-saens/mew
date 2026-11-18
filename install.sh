@@ -2,7 +2,7 @@
 # Install the prebuilt launcher in the current user's environment.
 set -euo pipefail
 
-MEW_INSTALL_VERSION_DEFAULT="0.1.3"
+MEW_INSTALL_VERSION_DEFAULT="0.1.4"
 
 mew_fail() { printf '[mew] %s\n' "$*" >&2; exit 1; }
 mew_log() { printf '[mew] %s\n' "$*" >&2; }
@@ -21,6 +21,16 @@ mew_check_wrapper() {
     [ ! -L "$1" ] && [ -f "$1" ] && [ "$(sed -n '2p' "$1")" = '# Mew bootstrap launcher' ] || \
       mew_fail "Preserving an existing command at $1. Set MEW_INSTALL_BIN_DIR to another directory."
   fi
+}
+
+mew_cleanup_failed_install() {
+  local status=$?
+  rm -rf "${mew_tmp:-}"
+  rmdir "$mew_lock" 2>/dev/null || true
+  # A complete install disarms this trap. Older macOS Bash can report an
+  # unbound-variable failure here with the previous command's zero status.
+  if [ "$status" -eq 0 ]; then status=1; fi
+  exit "$status"
 }
 
 mew_download() {
@@ -109,12 +119,12 @@ HELP
   mew_lock="$install_root/.install-lock"
   mkdir "$mew_lock" 2>/dev/null || mew_fail "Another installation is active. If it was interrupted, remove only $mew_lock and retry."
   mew_tmp=''
-  trap 'mew_status=$?; rm -rf "${mew_tmp:-}"; rmdir "$mew_lock" 2>/dev/null || true; exit "$mew_status"' EXIT
+  trap mew_cleanup_failed_install EXIT
   trap 'exit 130' INT
   trap 'exit 143' HUP TERM
   mew_tmp=$(mktemp -d "$install_root/.download.XXXXXXXX")
   release_base="https://github.com/s-saens/mew/releases/download/mew-cli-v$version"
-  mew_log "Preparing Mew $version for $platform/$arch…"
+  mew_log "Preparing Mew $version for $platform/${arch}..."
   mew_download "$release_base/SHA256SUMS" "$mew_tmp/SHA256SUMS" || mew_fail "Mew $version is not published or could not be downloaded. Retry when the matching release is available."
   expected=$(awk '$2 == "mew-cli-standalone.tar.gz" {print $1}' "$mew_tmp/SHA256SUMS")
   [[ "$expected" =~ ^[a-fA-F0-9]{64}$ ]] || mew_fail 'The release must contain exactly one standalone launcher checksum.'
@@ -123,7 +133,7 @@ HELP
   cli_dir="$install_root/cli/$version"
   [ ! -L "$node_dir" ] && [ ! -L "$cli_dir" ] || mew_fail 'Preserving an unexpected versioned installation symlink.'
   if [ ! -e "$node_dir" ]; then
-    mew_log "Installing private Node.js $node_version…"
+    mew_log "Installing private Node.js ${node_version}..."
     mew_download "https://nodejs.org/dist/v$node_version/node-v$node_version-$platform-$arch.tar.gz" "$mew_tmp/node.tar.gz"
     mew_verify "$mew_tmp/node.tar.gz" "$node_sha" 'Node.js'
     mkdir "$mew_tmp/node"

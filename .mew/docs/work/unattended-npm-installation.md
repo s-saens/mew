@@ -1,6 +1,6 @@
 ---
 title: "Unattended npm installation and remote onboarding"
-description: "Records implementation of the mew-ide npm entry, managed Postgres, background startup, Windows WSL bootstrap, and remote onboarding. Includes local verification for the 0.1.1 release preparation and the 0.1.2–0.1.3 cross-platform fixes and pending publication."
+description: "Records implementation of the mew-ide npm entry, managed Postgres, background startup, Windows WSL bootstrap, and remote onboarding. Includes local verification for the 0.1.1 release preparation and the 0.1.2–0.1.4 cross-platform fixes and pending publication."
 updated: "2026-11-18"
 ---
 
@@ -71,6 +71,10 @@ On Linux with Node 24.16.0, the build and lint passed. Of 77 CLI tests, 76 passe
 ## 0.1.3 release preparation
 
 Both Windows runners passed the CLI test that failed in 0.1.1. The next candidate resolves Windows workspace junctions against the physical runtime root and extracts the pinned psmux executable with Windows system tar. On macOS it supports long daemon socket paths, resolves staged dependency paths, and preserves shell errors and quoted paths in Bash 3.2. The installer fixtures passed with Bash 3.2.57 and bsdtar on Linux. The Windows junction regression also passed on Linux. Native packaging and clean-host acceptance require separate verification.
+
+## 0.1.4 release preparation
+
+Tracing the isolated installer fixture on a macOS ARM64 runner identified Bash interpreting bytes of the ellipsis after a variable name as part of that name. The installer now delimits the variables and uses ASCII punctuation. The Windows dependency staging test resolves both the installed module and its containing directory to physical paths before checking containment.
 
 ## Remaining gates
 

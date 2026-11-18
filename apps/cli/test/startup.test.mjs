@@ -66,9 +66,12 @@ test('the real CLI dependency closure can load after staging outside npm storage
   await fs.symlink(root, alias, process.platform === 'win32' ? 'junction' : 'dir')
   const staged = await stagePersistentCli({ packageRoot, dataDir: path.join(alias, 'accounts'), version: metadata.version })
   const require = createRequire(path.join(staged.directory, 'package.json'))
-  const canonical = await fs.realpath(staged.directory)
-  assert.ok(require.resolve('qrcode-terminal').startsWith(canonical + path.sep))
-  assert.ok(require.resolve('tar').startsWith(canonical + path.sep))
+  for (const name of ['qrcode-terminal', 'tar']) {
+    const owner = await fs.realpath(path.join(staged.directory, 'node_modules', name))
+    const entry = await fs.realpath(require.resolve(name))
+    const relative = path.relative(owner, entry)
+    assert.ok(relative && !path.isAbsolute(relative) && relative !== '..' && !relative.startsWith('..' + path.sep), entry)
+  }
   const launcher = await import(pathToFileURL(path.join(staged.directory, 'src/launcher.mjs')).href)
   assert.equal(typeof launcher.launch, 'function')
 })
