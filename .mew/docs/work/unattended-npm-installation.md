@@ -82,6 +82,8 @@ Moved the native Windows x64 and arm64 builds into a manually dispatched verific
 
 On Linux with Node.js 24.16.0, the build and lint passed. All 24 host, lock, and release tests passed. The CLI suite passed 78 tests and skipped the opt-in live PostgreSQL test. The release tests exercised the upload list and rejected incomplete manifests and changed assets. The documentation check passed all 865 descriptions and reported 39 existing broken links outside the changed documents.
 
+The [0.1.5 tag run](https://github.com/s-saens/mew/actions/runs/44251423119) passed all four runtime jobs and the standalone job. The downloaded installer and standalone archive matched their SHA-256 checksums. The release job reached the protected `cli-release` review. Public downloads and clean-host acceptance were still pending at that point.
+
 ## Remaining gates
 
 The initial npm package and matching runtime releases are not published by this
