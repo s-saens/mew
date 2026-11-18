@@ -2449,6 +2449,9 @@ function AgentSessionView({
   }, [startupQueue, cancelStartupFeedback])
   const { feedback: clearFeedback, request: requestClear, complete: completeClear, observeQueue: observeClearQueue, cancel: cancelClear } = useAgentClearFeedback()
   const [draft, setDraft] = useAgentInputDraft(tabId, inputScope)
+  const replyScope = JSON.stringify([cacheAccount, inputScope.projectPath, fileWorkspace, tabId, runtime, cwd])
+  const [selectedReply, setReplyTarget] = useState<{ scope: string; text: string; kind: 'user' | 'turn' } | null>(null)
+  const replyTarget = selectedReply?.scope === replyScope ? selectedReply : null
   const [cliMode, setCliMode] = useState(false)
   const [commandPopupId, setCommandPopupId] = useState<string | null>(null)
   const [attaching, setAttaching] = useState(false)
@@ -2594,12 +2597,18 @@ function AgentSessionView({
   const composerRef = useRef<HTMLDivElement>(null)
   const composerSettingsRef = useRef<HTMLDivElement>(null)
   const composerEditorRef = useRef<HTMLDivElement>(null)
+  const composerReplyRef = useRef<HTMLDivElement>(null)
   const composerActionsRef = useRef<HTMLDivElement>(null)
   const [minInputHeight, setMinInputHeight] = useState(0)
+  // original = 고치기 시작할 때 보고 있던 원본. 서버가 이 항목을 잠가 앞 턴이 끝나도 큐를 당기지 않는다.
+  const [expandedQueued, setExpandedQueued] = useState<{ index: number; text: string } | null>(null)
+  const [editingQueued, setEditingQueued] = useState<QueuedEdit | null>(null)
+  const showReplyPreview = !!replyTarget && !editingQueued && !cliMode && !historyPreview && !loadingSession
   useLayoutEffect(() => {
     const composer = composerRef.current
     const settings = composerSettingsRef.current
     const editor = composerEditorRef.current
+    const reply = composerReplyRef.current
     const actions = composerActionsRef.current
     if (!composer || !settings || !editor || !actions) return
     const measure = () => {
@@ -2607,8 +2616,9 @@ function AgentSessionView({
       const contentStyle = getComputedStyle(settings.parentElement!)
       const actionInset = Math.ceil(actions.getBoundingClientRect().height) + 4
       editor.style.setProperty('--agent-composer-bottom-inset', `${actionInset}px`)
+      const gap = parseFloat(contentStyle.rowGap) || 0
       const contentHeight = settings.getBoundingClientRect().height
-        + (parseFloat(contentStyle.rowGap) || 0)
+        + gap + (reply ? reply.getBoundingClientRect().height + gap : 0)
         + (parseFloat(getComputedStyle(editor).minHeight) || 0)
         + actionInset
       const height = Math.ceil(contentHeight + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
@@ -2619,10 +2629,11 @@ function AgentSessionView({
     observer.observe(composer)
     observer.observe(settings)
     observer.observe(editor)
+    if (reply) observer.observe(reply)
     observer.observe(actions)
     measure()
     return () => observer.disconnect()
-  }, [auth])
+  }, [auth, showReplyPreview])
   // 탭을 바꾸거나 세션 뷰가 다시 붙어도 작성 영역이 최소 높이로 되돌아가지 않는다.
   const [inputHeight, setInputHeight] = useState(initialAgentInputHeight)
   const inputResizeCleanupRef = useRef<(() => void) | null>(null)
@@ -3075,6 +3086,7 @@ function AgentSessionView({
             // 인증 뒤 새 세션이 생긴 경우처럼 replay 없이 sessionId만 바뀌어도 옛 전사를 남기지 않는다.
             setEvents([])
           }
+          if (cacheSessionIdRef.current && cacheSessionIdRef.current !== event.meta.sessionId) setReplyTarget(null)
           cacheSessionIdRef.current = event.meta.sessionId
           resumeSessionIdRef.current = event.meta.sessionId
           return setMeta(event.meta)
@@ -3359,7 +3371,10 @@ function AgentSessionView({
   }, [scrollToQuestion])
 
   const send = useCallback((payload: Record<string, unknown>) => {
-    if (payload.type === 'clear_session' || payload.type === 'close_session' || payload.type === 'load_session') clearStartupPrompts()
+    if (payload.type === 'clear_session' || payload.type === 'close_session' || payload.type === 'load_session') {
+      clearStartupPrompts()
+      setReplyTarget(null)
+    }
     const socket = wsRef.current
     if (socket?.readyState !== WebSocket.OPEN) return false
     try {
@@ -3475,9 +3490,6 @@ function AgentSessionView({
   const queued = queueMeta?.queued ?? []
   const usage = meta?.usage ?? null
 
-  // original = 고치기 시작할 때 보고 있던 원본. 서버가 이 항목을 잠가 앞 턴이 끝나도 큐를 당기지 않는다.
-  const [expandedQueued, setExpandedQueued] = useState<{ index: number; text: string } | null>(null)
-  const [editingQueued, setEditingQueued] = useState<QueuedEdit | null>(null)
   const [execution, setExecution] = useAgentExecutionOptions(cacheAccount, notificationWorkspace, tabId, runtime)
   const { toast: defaultsToast, showToast: showDefaultsToast } = useToast()
   const [savingDefaults, setSavingDefaults] = useState(false)
@@ -3656,8 +3668,9 @@ function AgentSessionView({
     if (!text || !connected && !canQueueStartup || loadingSession || attaching || /\[\[mew-upload:/.test(text)) return
     // CLI 슬래시 명령으로 넘기면 런타임은 세션을 비워도 Mew가 전사·캐시를 새 세션으로 바꿨다는
     // 사실을 알 수 없다. 서버 큐의 세션 경계로 처리해 뒤 메시지는 새 대화에서 실행한다.
-    if (written === '/clear' && draftAttachments.length === 0) {
+    if (!replyTarget && written === '/clear' && draftAttachments.length === 0) {
       clearStartupPrompts()
+      setReplyTarget(null)
       if (connected) send({ type: 'clear_session' })
       recordAgentInputHistory(tabId, written, inputScope)
       historyIndexRef.current = null
@@ -3680,7 +3693,8 @@ function AgentSessionView({
       onInfo(tabId, runtime, cwd, { busy: meta.busy, awaitingApproval: false, sessionId: meta.sessionId })
     }
     // 진행 중이어도 막지 않는다 — 서버가 줄을 세웠다가 턴이 끝나면 이어서 돈다
-    const prompt: StartupPrompt = { type: 'prompt', text, displayText: text, images, imageRefs,
+    const promptText = replyTarget ? quoteAgentReply(replyTarget.text, text) : text
+    const prompt: StartupPrompt = { type: 'prompt', text: promptText, displayText: promptText, images, imageRefs,
       attachments: draftAttachments.map(({ image: _image, ...file }) => queuedAttachmentInput(file)),
       skills: selectedSkillNames(text, skills), settings: messageSettings }
     if (canQueueStartup || startupQueue.snapshot().length > 0) {
@@ -3696,6 +3710,7 @@ function AgentSessionView({
     historyDraftRef.current = ''
     setDraft('')
     setAttachments([])
+    setReplyTarget(null)
     // 내가 말을 걸었으면 답을 보겠다는 뜻이다 — 다시 바닥에 붙인다
     stickRef.current = true
   }
@@ -3781,7 +3796,7 @@ function AgentSessionView({
       tab: tabId,
       cwd,
       sessionId: meta.sessionId,
-      text: message,
+      text: replyTarget ? quoteAgentReply(replyTarget.text, message) : message,
       execution,
       skills: selectedSkillNames(message, skills),
       at: new Date(at).toISOString(),
@@ -3792,6 +3807,7 @@ function AgentSessionView({
     historyDraftRef.current = ''
     setDraft('')
     setAttachments([])
+    setReplyTarget(current => current === replyTarget ? null : current)
     await refreshScheduled().catch(() => {})
   }
 
@@ -4306,8 +4322,11 @@ function AgentSessionView({
           ? <AgentCommandBubble key={item.key} command={item.command} onOpen={() => setCommandPopupId(item.command.id)} />
           : (() => {
             const replyText = item.kind === 'user' ? withoutAttachmentTokens(item.text).trim() : item.kind === 'turn' ? item.children.filter(child => child.kind === 'agent').map(child => child.kind === 'agent' ? child.text : '').join('\n\n').trim() : ''
-            const reply = replyText && !historyPreview && !editingQueued && !cliMode
-              ? () => { setDraft(current => quoteAgentReply(replyText, current)); requestAnimationFrame(() => agentInputRef.current?.focus()) }
+            const reply = replyText && (item.kind === 'user' || item.kind === 'turn') && !historyPreview && !loadingSession && !editingQueued && !cliMode
+              ? () => {
+                setReplyTarget({ scope: replyScope, text: replyText, kind: item.kind })
+                agentInputRef.current?.focus()
+              }
               : undefined
             const content = <AgentConversationItem item={item} expanded={expanded} showSettings={settingsChanges.has(item.key)}
             workError={workErrors[item.key]} onLoadWork={loadWorkDetails}
@@ -4624,6 +4643,20 @@ function AgentSessionView({
           </div>
         </div>
           {defaultsToast}
+          {showReplyPreview && replyTarget && <div ref={composerReplyRef} data-agent-reply-preview
+            className="flex min-w-0 shrink-0 items-center gap-2 rounded border-l-2 border-accent bg-surface-raised py-0.5 pl-2 pr-0.5">
+            <div className="min-w-0 flex-1" role="status">
+              <div className="truncate text-xs font-semibold text-ink">{replyTarget.kind === 'user' ? uiText('내 메시지에 답장') : uiText('에이전트에게 답장')}</div>
+              <div className="truncate text-xs text-ink-secondary">{replyTarget.text.replace(/\s+/g, ' ')}</div>
+            </div>
+            <HoverTipLayer className="shrink-0">
+              <button type="button" aria-label={uiText('답장 취소')} data-tip={uiText('답장 취소')}
+                onPointerDown={keepFocusOnPress} onClick={() => { setReplyTarget(null); focusComposerInput() }}
+                className="flex h-9 w-9 items-center justify-center rounded text-ink-secondary hover:bg-surface hover:text-ink focus-visible:outline-2 focus-visible:outline-accent">
+                <Xmark width={16} height={16} aria-hidden="true" />
+              </button>
+            </HoverTipLayer>
+          </div>}
           <div data-agent-input className={`relative flex min-h-0 flex-1 rounded bg-surface ${composerCliMode ? 'ring-1 ring-inset ring-accent/40' : ''}`}>
           <div ref={composerEditorRef} className="flex min-h-8 flex-1">
           <MentionTextarea
@@ -4649,7 +4682,7 @@ function AgentSessionView({
               }
               historyIndexRef.current = null
               historyDraftRef.current = ''
-              if (!cliModeDisabled && next.startsWith('! ') && !draft.startsWith('! ')) {
+              if (!cliModeDisabled && (!replyTarget || cliMode) && next.startsWith('! ') && !draft.startsWith('! ')) {
                 const caret = agentInputRef.current?.selectionStart ?? 2
                 // CodeMirror may report document and selection updates before React renders.
                 // Set the target mode so duplicate notifications cannot toggle it back.
@@ -4737,6 +4770,7 @@ function AgentSessionView({
               onRestore={prompt => {
                 historyIndexRef.current = null
                 historyDraftRef.current = ''
+                setReplyTarget(null)
                 setDraft(prompt.text)
                 setCliMode(prompt.cliMode && allowTerminal)
                 setAttachments(prompt.attachments.map(file => ({

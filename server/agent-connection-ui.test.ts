@@ -14,7 +14,9 @@ async function composerValue(input: Locator): Promise<string> {
   return (await input.locator('.cm-line').allTextContents()).join('\n')
 }
 
-test('agent loading and clear feedback cover connection, history and startup queues, preserve drafts and respect reduced motion', { timeout: 60_000 }, async () => {
+for (const replyOnly of [true, false]) test(replyOnly
+  ? 'agent reply previews preserve the draft and quote the selected message only on submit'
+  : 'agent loading and clear feedback cover connection, history and startup queues, preserve drafts and respect reduced motion', { timeout: 60_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentPanel} from '${root}/src/components/AgentPanel.tsx';
@@ -72,7 +74,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const browser = await connectTestBrowser()
   try {
     for (const width of [1100, 390]) for (const dark of [true, false]) {
-      const page = await browser.newPage({ viewport: { width, height: 844 } })
+      const page = await browser.newPage({ viewport: { width, height: 844 }, hasTouch: replyOnly && width === 390 })
       page.setDefaultTimeout(4000)
       await page.addInitScript(`(() => {
         const open = indexedDB.open.bind(indexedDB);
@@ -151,6 +153,49 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.equal(await overlay.isVisible(), true, 'socket open still waits for the conversation')
       await page.evaluate('window.sockets.first.open()')
       await overlay.waitFor({ state: 'hidden' })
+      if (replyOnly) {
+        const original = session.getByText('Saved conversation', { exact: true })
+        await original.waitFor()
+        const preview = session.locator('[data-agent-reply-preview]')
+        const bounds = (await original.boundingBox())!
+        const x = Math.round(bounds.x + bounds.width / 2)
+        const y = Math.round(bounds.y + bounds.height / 2)
+        if (width === 390) {
+          const touch = await page.context().newCDPSession(page)
+          await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] })
+          await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - 65, y }] })
+          await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+          await touch.detach()
+        } else {
+          await page.mouse.move(x, y)
+          await page.mouse.down()
+          await page.mouse.move(x - 65, y, { steps: 4 })
+          await page.mouse.up()
+        }
+        await preview.getByText('Saved conversation', { exact: true }).waitFor()
+        assert.equal(await composerValue(draft), 'Draft before first connection')
+        assert.equal(await draft.evaluate(el => el.ownerDocument.activeElement === el), true)
+        assert.ok((await preview.boundingBox())!.y < (await draft.boundingBox())!.y)
+        await preview.getByRole('button', { name: '답장 취소' }).click()
+        await preview.waitFor({ state: 'hidden' })
+        assert.equal(await composerValue(draft), 'Draft before first connection')
+
+        const replyButton = session.locator('[data-agent-reply-button]').first()
+        await replyButton.focus()
+        await replyButton.press('Enter')
+        await preview.waitFor()
+        await draft.fill('')
+        assert.equal(await send.isDisabled(), true, 'a reply target alone cannot be sent')
+        await draft.fill('! Keep this in the reply')
+        assert.equal(await composerValue(draft), '! Keep this in the reply')
+        await send.click()
+        assert.equal(await page.evaluate('window.messages.at(-1).text'), '> Saved conversation\n\n! Keep this in the reply')
+        assert.equal(await composerValue(draft), '')
+        await preview.waitFor({ state: 'hidden' })
+        assert.deepEqual(errors, [])
+        await page.close()
+        continue
+      }
       assert.equal(await composerValue(draft), 'Draft before first connection')
       await draft.fill('Keep this unsent draft')
       await session.getByText('Saved conversation', { exact: true }).waitFor()

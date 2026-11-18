@@ -8,7 +8,7 @@ updated: "2026-11-11"
 status_hash: "b325d279cf16e291b2bcddda7cc0d70268647e336403acba780cb1081da44668"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-startup-queue.tsx", "src/utils/agent-startup-queue.ts", "src/hooks/use-agent-event-state.ts", "src/hooks/use-agent-work-history.ts", "src/utils/agent-work-loader.ts", "src/hooks/use-agent-tab-previews.ts", "src/hooks/use-agent-session-previews.ts", "src/utils/agent-tab-previews.ts", "src/utils/agentFold.ts", "src/hooks/useGridDrag.ts", "server/agentHost.ts", "server/agentWs.ts", "server/agentTranscript.ts", "server/agent-history-preview.ts", "server/agent-tab-preview.ts", "server/user-ui-routes.ts", "server/agent-session-search-service.ts", "server/agent-transcript-search.ts", "server/agent-runtime-history-search.ts"]
 commits: []
-description: "Agent conversation feedback, collapsed summaries, expanded answer controls and hover behavior, swipe-to-reply quoting, history search, queues, drafts, session conflicts, and restoration. Covers recovery indicators and relay liveness."
+description: "Agent conversation feedback, collapsed summaries, expanded answer controls and hover behavior, swipe-to-reply previews, history search, queues, drafts, session conflicts, and restoration. Covers recovery indicators and relay liveness."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -56,7 +56,11 @@ description: "Agent conversation feedback, collapsed summaries, expanded answer 
 
 ### Reply to a message
 
-Swipe a user question or agent answer left with touch or a mouse to insert the full text as a Markdown block quote at the start of the composer draft. User questions also have a Reply button; agent answers show one in the top bar when expanded. Messages without text, such as attachment-only messages, cannot be quoted. The quote is editable and removable like other draft text and follows the normal sending and queue behavior. Reply is unavailable in CLI mode, while editing a queued message, and in history previews.
+Swipe a user question or agent answer left to select it as the reply target. User questions also have a Reply button, and expanded agent answers show Reply in their top bar. Messages without text, such as attachment-only messages, cannot be selected.
+
+The composer shows the source and a single-line excerpt above the input. Selecting another message replaces the preview. Cancel reply removes the preview and keeps the draft. A preview alone cannot be sent. When you send, queue, or schedule the reply, Mew includes the full selected text as a Markdown quote. A successful submission clears the selection.
+
+The selection is local to the conversation and clears when you reset it or load a conversation from history. The preview is hidden in CLI mode, while editing a queued message, and in history previews.
 
 ### Immediate message and reply feedback
 
