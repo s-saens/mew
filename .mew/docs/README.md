@@ -1,6 +1,6 @@
 ---
 title: "Mew documentation rules"
-description: "Ownership, English-language policy, description-based discovery, and concise authoring rules for Mew documentation. Defines current versus historical records, same-task write-back, metadata, links, and validation."
+description: "Ownership, English-language policy, description-based discovery, and concise authoring rules for Mew documentation. Defines current versus historical records, same-task write-back, metadata, the root README exception, links, and validation."
 created: "2026-10-06"
 updated: "2026-11-03"
 ---
@@ -62,7 +62,7 @@ Use relative paths in frontmatter `상위파일`, as one string or a string arra
 
 ## Writing descriptions
 
-Every directly maintained Markdown document needs a nonempty `description` in its first YAML block. Use **one or two sentences** that identify the owning topic, coverage, and relevant status. Include distinguishing terms an agent would search for; leave exhaustive behavior lists in the body.
+Keep the repository-root `README.md` free of `description` frontmatter. It serves as the project entry point and sits outside the documentation catalog. Within the catalog’s scope, every directly maintained Markdown document needs a nonempty `description` in its first YAML block. Use **one or two sentences** that identify the owning topic, coverage, and relevant status. Include distinguishing terms an agent would search for; leave exhaustive behavior lists in the body.
 
 Missing descriptions, empty values, invalid YAML, and the legacy `desc` key fail validation. Update the description when the body's scope or status changes. Task-panel placeholders use `태스크: 제목` until edited; automatic title updates preserve manually refined descriptions.
 

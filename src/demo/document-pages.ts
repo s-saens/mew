@@ -4,9 +4,10 @@ import { DemoError, type DemoWorkspaceStore } from './workspace-store.ts'
 const parentOf = (path: string) => path.slice(0, Math.max(0, path.lastIndexOf('/')))
 const nameOf = (path: string) => path.split('/').at(-1) ?? ''
 const join = (parent: string, name: string) => parent ? `${parent}/${name}` : name
-const pageContent = (title: string) => {
+const pageContent = (title: string, path: string) => {
   const today = new Date().toISOString().slice(0, 10)
-  return `---\ntitle: ${JSON.stringify(title)}\ncreated: ${today}\nupdated: ${today}\ndescription: ${JSON.stringify(title)}\n---\n\n`
+  const description = /^readme\.md$/i.test(path) ? '' : `description: ${JSON.stringify(title)}\n`
+  return `---\ntitle: ${JSON.stringify(title)}\ncreated: ${today}\nupdated: ${today}\n${description}---\n\n`
 }
 type Origin = { path: string; content: string; moves: DocumentPageMove[] }
 
@@ -65,7 +66,7 @@ export class DemoDocumentPages {
       this.directories.add(directory)
     }
   }
-  private createFile(path: string, title: string): void { this.available(path); this.ensureParents(path); this.files.set(path, pageContent(title)) }
+  private createFile(path: string, title: string): void { this.available(path); this.ensureParents(path); this.files.set(path, pageContent(title, this.project === 'docs' ? '' : path)) }
   private transfer(source: string, target: string, duplicate = false, copiedMoves: DocumentPageMove[] = []): void {
     this.require(source); this.available(target)
     if (target.startsWith(`${source}/`)) throw new DemoError('문서를 자기 자신 안으로 옮길 수 없습니다.')

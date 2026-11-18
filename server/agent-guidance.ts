@@ -189,7 +189,17 @@ type GuidanceRegionKey = GuidanceKey | 'branch' | 'instructions' | 'capacityRetr
 const regionKeys: GuidanceRegionKey[] = [...Object.keys(guidanceOptions) as GuidanceKey[], 'branch', 'instructions', 'capacityRetry', 'buildVerification']
 const markers = (key: GuidanceRegionKey) => [`<!-- mew:agent-setting:${key} -->`, `<!-- /mew:agent-setting:${key} -->`]
 
+const previousDescriptionDefault = 'Give every new or changed documentation file an accurate, non-empty frontmatter description, and update it when the document’s scope or status changes. Describe the subject and coverage so agents can select relevant current documents without reading every body. Preserve the project’s established metadata format.'
+
 function withDocumentationDefaults(content: string): string {
+  try {
+    const block = isolatedRegion(content, 'documentDescriptions')
+    if (block?.text === previousDescriptionDefault) {
+      const current = content.slice(block.from, block.to).replace(previousDescriptionDefault, guidanceOptions.documentDescriptions.required)
+      content = content.slice(0, block.from) + current + content.slice(block.to)
+    }
+  } catch { /* Preserve damaged settings blocks. */ }
+
   // Replace only complete former default paragraphs outside setting blocks.
   // The stored file, custom prose, examples, and explicit settings stay intact.
   const legacy = 'When code, features, or operating procedures change, update the owning canonical documentation in the same task. Give every new or changed document an accurate frontmatter description, and update existing links when paths move; no MOC update is required. Preserve historical sources; keep secrets and temporary debugging logs out of docs.'
@@ -315,6 +325,10 @@ function snapshot(content: string): GuidanceSnapshot {
   for (const key of Object.keys(guidanceOptions) as GuidanceKey[]) {
     try {
       const block = region(content, key)
+      if (key === 'documentDescriptions' && block?.text === previousDescriptionDefault) {
+        settings[key] = 'required'
+        continue
+      }
       settings[key] = block ? Object.entries(guidanceOptions[key]).find(([, text]) => text === block.text)?.[0] ?? 'custom' : key === 'testing' || key === 'codeQuality' || documentationGuidanceKeys.some(docKey => docKey === key) ? 'required' : key === 'debugger' ? 'enabled' : key === 'commitLanguage' ? 'en' : 'inherit'
     } catch { settings[key] = 'custom' }
   }

@@ -15,6 +15,15 @@ function fixture(t: test.TestContext) {
   return { root, write, read, pages: new DocumentPages(root) }
 }
 
+test('creating a README omits description only at the project root', t => {
+  const { root, read, pages } = fixture(t)
+  assert.doesNotMatch(read(pages.create('', 'README').path), /^description:/m)
+  assert.match(read(pages.create(pages.create('', 'docs').path, 'README').path), /^description: "README"$/m)
+  fs.mkdirSync(path.join(root, 'wiki'))
+  const documents = new DocumentPages(path.join(root, 'wiki'), () => true, true)
+  assert.match(read(`wiki/${documents.create('', 'README').path}`), /^description: "README"$/m)
+})
+
 test('document page labels present slug paths as natural names', () => {
   assert.equal(documentPageLabel('development/document-pages.md'), 'Document Pages')
   assert.equal(documentPageLabel('configuration/api-reference.md'), 'API Reference')

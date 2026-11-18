@@ -32,6 +32,18 @@ test('setup preview is read-only, apply preserves existing docs, and repeated se
   assert.equal(projectDocsDir(root, 'docs'), 'notes', 'project choice overrides global fallback')
 })
 
+test('setup distinguishes the project README from the Documents rules README', t => {
+  for (const locale of ['en', 'ko', 'ja', 'zh-CN']) {
+    const root = fixture(t)
+    const input = { projectRoot: root, settings: defaultAgentSettings('wiki'), initDocs: true, locale }
+    applyProjectSetup(input, planProjectSetup(input).revision)
+    assert.match(fs.readFileSync(path.join(root, 'README.md'), 'utf8'), /^# /)
+    const rules = fs.readFileSync(path.join(root, 'wiki/README.md'), 'utf8')
+    assert.match(rules, /^---\ndescription:/)
+    assert.match(rules, /README\.md/)
+  }
+})
+
 test('setup rejects outside paths, symlinks, stale previews and corrupt settings without overwriting', t => {
   const root = fixture(t), outside = fixture(t)
   fs.mkdirSync(path.join(root, 'docs'))

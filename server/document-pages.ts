@@ -26,7 +26,12 @@ function renamedPageContent(content: string, title: string): string {
 export class DocumentPages {
   private root: string
   private allowed: Access
-  constructor(root: string, allowed: Access = () => true) { this.root = fs.realpathSync(root); this.allowed = allowed }
+  private readonly isDocumentsRoot: boolean
+  constructor(root: string, allowed: Access = () => true, isDocumentsRoot = false) {
+    this.root = fs.realpathSync(root)
+    this.allowed = allowed
+    this.isDocumentsRoot = isDocumentsRoot
+  }
   private abs(rel: string): string {
     if (!rel || rel.startsWith('/') || rel.includes('\\') || rel.includes('\0') || rel.split('/').some(part => part === '..' || isDeniedSegment(part))) throw new DocumentPageError('올바른 문서 경로가 아닙니다')
     const absolute = path.resolve(this.root, rel)
@@ -180,7 +185,7 @@ export class DocumentPages {
     }
     // A leaf and an existing parent page cannot share the same logical name.
     if (fs.existsSync(this.abs(child.slice(0, -3)))) throw new ConflictError(`같은 이름의 상위 문서가 이미 있습니다: ${name}`)
-    creations.set(child, buildFrontmatter(path.posix.basename(child, '.md')))
+    creations.set(child, buildFrontmatter(path.posix.basename(child, '.md'), this.isDocumentsRoot ? undefined : child))
     return this.commit(moves, creations, child)
   }
   private demotion(parent: string, removing: string): DocumentPageMove[] {

@@ -1,6 +1,6 @@
 ---
 title: "Documentation and code quality guidance: implementation and verification"
-description: "Records the original seven documentation presets and the addition of focused document structure and clean-code guidance, with source-preserving defaults, settings verification, and server application boundaries."
+description: "Records the original seven documentation presets and the addition of focused document structure, clean-code guidance, and the root README description exception, with source-preserving defaults, settings verification, and server application boundaries."
 created: "2026-10-26"
 updated: "2026-11-02"
 ---
@@ -40,3 +40,9 @@ Local verification:
 - `npm run build` passed TypeScript and production bundling, with the existing chunk-size warning. `npm run lint` passed with existing warnings; changed-file lint was clean. Documentation description and link checks and `git diff --check` passed.
 
 Server-side behavior requires the user to apply the code and reopen older agent tabs; the build updates served UI assets without replacing a running server or supervisor. No deployment, launcher execution, or server lifecycle operation was performed.
+
+## 2026-11-18 — Root README descriptions
+
+Keep the project entry point free of generated descriptions. The default guidance now exempts the root README, and page creation omits its description. Documents folder READMEs retain their descriptions for discovery. Project setup explains the distinction. The [guidance contract](../development/agent-guidance.md) covers existing saved defaults.
+
+The 64 focused guidance, document, and project setup tests passed. The existing CLI test for creating a project in a nonexistent directory still fails with a project folder lookup error. The build, lint, and description validation passed. Repository-wide link validation reported 39 existing errors. Local verification did not involve deployment or a server restart.

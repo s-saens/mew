@@ -69,7 +69,7 @@ export const guidanceOptions = {
     project: 'Follow the project’s documentation structure and decomposition conventions. Mew adds no separate document structure requirement in this mode.',
   },
   documentDescriptions: {
-    required: 'Give every new or changed documentation file an accurate, non-empty frontmatter description, and update it when the document’s scope or status changes. Describe the subject and coverage so agents can select relevant current documents without reading every body. Preserve the project’s established metadata format.',
+    required: 'Keep the project-root README.md free of description frontmatter by default. Give other new or changed documentation files an accurate, non-empty frontmatter description, and update it when the document’s scope or status changes. Describe the subject and coverage so agents can select relevant current documents without reading every body. Preserve the project’s established metadata format.',
     project: 'Follow the project’s documentation metadata requirements. Mew adds no separate frontmatter description requirement in this mode.',
   },
   documentLinks: {

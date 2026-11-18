@@ -364,6 +364,23 @@ test('former fixed documentation defaults cannot override project-only options, 
   }
 })
 
+test('previous default description guidance honors the root README exception without rewriting saved guidance', async () => {
+  const { agentGuidanceSettings } = await import('./agent-guidance.ts')
+  const previous = 'Give every new or changed documentation file an accurate, non-empty frontmatter description, and update it when the document’s scope or status changes. Describe the subject and coverage so agents can select relevant current documents without reading every body. Preserve the project’s established metadata format.'
+  const block = (text: string) => `<!-- mew:agent-setting:documentDescriptions -->\n${text}\n<!-- /mew:agent-setting:documentDescriptions -->\n`
+  fs.writeFileSync(AGENT_GUIDANCE_PATH, block(previous))
+  const state = agentGuidanceSettings()
+  assert.equal(state.settings.documentDescriptions, 'required')
+  assert.ok(readAgentGuidance().includes(block(guidanceOptions.documentDescriptions.required)))
+  assert.equal(fs.readFileSync(AGENT_GUIDANCE_PATH, 'utf8'), block(previous))
+  assert.equal(agentGuidanceSettings().revision, state.revision)
+
+  const custom = block(`${previous} Follow my additional rule.`)
+  fs.writeFileSync(AGENT_GUIDANCE_PATH, custom)
+  assert.equal(agentGuidanceSettings().settings.documentDescriptions, 'custom')
+  assert.ok(readAgentGuidance().includes(custom))
+})
+
 test('documentation preferences are account-wide and never change another account', async () => {
   const { agentGuidanceSettings, updateAgentGuidance } = await import('./agent-guidance.ts')
   runWithAgentAccount('documentation-a@example.test', () => {

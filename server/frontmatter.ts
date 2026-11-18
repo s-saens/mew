@@ -28,7 +28,8 @@ export function todayDate(): string {
 
 /** 새 문서용 YAML frontmatter 블록 — tags는 정책상 넣지 않는다 (.mew/docs/README.md 참고).
     description은 제목으로 시작하고 작성자가 본문 범위에 맞춰 구체화한다. */
-export function buildFrontmatter(title: string): string {
+export function buildFrontmatter(title: string, projectRelativePath = ''): string {
   const today = todayDate()
-  return `---\ntitle: ${quote(title)}\ncreated: ${today}\nupdated: ${today}\ndescription: ${quote(title.trim() || "제목 없는 문서")}\n---\n\n`
+  const description = /^readme\.md$/i.test(projectRelativePath) ? '' : `description: ${quote(title.trim() || "제목 없는 문서")}\n`
+  return `---\ntitle: ${quote(title)}\ncreated: ${today}\nupdated: ${today}\n${description}---\n\n`
 }

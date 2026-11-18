@@ -29,7 +29,7 @@ Organize documentation into small, focused files for a specific topic and intend
 <!-- /mew:agent-setting:documentStructure -->
 
 <!-- mew:agent-setting:documentDescriptions -->
-Give every new or changed documentation file an accurate, non-empty frontmatter description, and update it when the document’s scope or status changes. Describe the subject and coverage so agents can select relevant current documents without reading every body. Preserve the project’s established metadata format.
+Keep the project-root README.md free of description frontmatter by default. Give other new or changed documentation files an accurate, non-empty frontmatter description, and update it when the document’s scope or status changes. Describe the subject and coverage so agents can select relevant current documents without reading every body. Preserve the project’s established metadata format.
 <!-- /mew:agent-setting:documentDescriptions -->
 
 <!-- mew:agent-setting:documentLinks -->

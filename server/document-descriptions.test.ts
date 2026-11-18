@@ -32,6 +32,7 @@ test('catalog reads YAML descriptions without body fields and excludes cold or l
 test('repository checks cover project knowledge, tasks, public guides and first-party skills only', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-description-roots-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  fs.writeFileSync(path.join(root, 'README.md'), '# Project entry point\n')
   const documents = {
     '.mew/docs/current.md': 'Project contract',
     '.mew/docs/history/old.md': 'Historical contract',
