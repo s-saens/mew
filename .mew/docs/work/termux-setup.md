@@ -16,3 +16,9 @@ Local verification: six prerequisite regression checks passed with mocked packag
 `install-termux.sh` downloads a pinned source archive, verifies its SHA-256 checksum, and runs the existing setup with terminal input. It remembers the installed source revision so users can retry setup after a failure. The [Termux installation guide](../../../docs/guides/getting-started-en.md#termux-on-android) owns the public command.
 
 The local build and lint passed. The CLI suite passed 79 tests and skipped one optional PostgreSQL test. The Termux bootstrap fixture verified terminal input, checksums, retry, and preservation of an existing directory. Document metadata passed. The global link checker reported 39 existing broken links. Full setup and browser preparation on Android still require a device test.
+
+The [Termux prerelease](https://github.com/s-saens/mew/releases/tag/mew-termux-v0.1.5) contains the installer and its pinned source archive. Both assets downloaded without authentication. The installer matched the committed script, and the archive matched the script's SHA-256 checksum.
+
+## Unattended Termux setup
+
+The updated installer uses the source setup defaults and preserves existing settings. It uses Termux PostgreSQL with a private Unix socket when no external database is configured. It skips server-side browser preparation on Android and loads Playwright only when a supported host starts a browser session.

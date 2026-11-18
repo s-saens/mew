@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -69,4 +71,57 @@ test('Termux reports an unusable Node after package installation', () => {
 test('Termux detection excludes ordinary Linux with a similar prefix', () => {
   const result = run('if is_termux; then exit 1; fi', { os: 'GNU/Linux' })
   assert.equal(result.status, 0, result.stderr)
+})
+
+test('unattended Termux installs missing packages without asking', () => {
+  const result = run('unattended=true; need_node; need_build_tools', { interactive: 1, accept: 1 })
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /<nodejs-lts> <npm>/)
+  assert.match(result.stdout, /<clang> <make> <python> <tmux>/)
+})
+
+test('Termux setup omits browser preparation while Linux keeps it', () => {
+  const browserSetup = source.slice(source.indexOf('prepare_source_browsers() {'), source.indexOf('cmd_update() {'))
+  const body = `${browserSetup}
+npm() { echo "$*"; }
+prepare_source_browsers install
+prepare_source_browsers check`
+  assert.equal(run(body).stdout, '')
+  assert.equal(run(body, { os: 'GNU/Linux' }).stdout, 'run browsers:install\nrun browsers:check\n')
+})
+
+test('Android can load browser routes without importing Playwright', () => {
+  const browserRoutes = new URL('./dom-browser.ts', import.meta.url).href
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+    Object.defineProperty(process, 'platform', { value: 'android' });
+    await import(${JSON.stringify(browserRoutes)});
+  `], { encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stderr)
+})
+
+test('Termux PostgreSQL uses a private socket and reuses its cluster', t => {
+  const state = mkdtempSync(path.join(os.tmpdir(), 'mew-termux-pg-'))
+  t.after(() => rmSync(state, { recursive: true, force: true }))
+  const helper = readFileSync(new URL('../tools/termux-postgres.sh', import.meta.url), 'utf8')
+  const result = run(`${helper}
+STATE_DIR=$TEST_STATE
+AVAILABLE='pg_ctl'
+initdb() { echo init; printf '18\\n' > "$2/PG_VERSION"; }
+pg_ctl() {
+  case "${'$'}{*: -1}" in
+    status) [ -f "$STATE_DIR/running" ] ;;
+    start) printf '%s\\n' "$*"; touch "$STATE_DIR/running" ;;
+    stop) rm "$STATE_DIR/running" ;;
+  esac
+}
+start_termux_postgres
+start_termux_postgres
+printf '%s\\n' "$DATABASE_URL"
+stop_termux_postgres`.replace('$TEST_STATE', JSON.stringify(state)))
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stdout.match(/^init$/gm)?.length, 1)
+  assert.match(result.stdout, /-h '' -k .*\/postgres\/socket start/)
+  const connection = new URL(result.stdout.trim().split('\n').at(-1)!)
+  assert.equal(connection.searchParams.get('host'), path.join(state, 'postgres/socket'))
+  assert.equal(statSync(path.join(state, 'postgres/socket')).mode & 0o777, 0o700)
 })

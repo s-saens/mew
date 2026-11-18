@@ -1,7 +1,7 @@
 ---
 title: "Getting started with mew"
 updated: "2026-11-17"
-description: "Covers npm, the WSL/Linux/macOS curl bootstrap, source setup, and the Termux source installer. Includes platform prerequisites, data preservation, initial setup, and remote access."
+description: "Covers npm, the WSL/Linux/macOS curl bootstrap, source setup, and the Termux source installer. Includes platform prerequisites, data preservation, initial setup, remote access, and Mewlink two-factor sign-in."
 ---
 
 # Getting started with mew
@@ -168,14 +168,14 @@ On other distributions, install the equivalent packages first. Follow [Finish se
 From a native Termux terminal, download the pinned Mew source and run setup in one command:
 
 ```bash
-pkg install -y curl && curl -fsSL https://github.com/s-saens/mew/releases/download/mew-termux-v0.1.5/install-termux.sh | bash
+pkg install -y curl && curl -fsSL https://github.com/s-saens/mew/releases/download/mew-termux-v0.1.6/install-termux.sh | bash
 ```
 
-Setup uses `~/.local/opt/mew-termux` and prompts in your terminal. Run the same command again to resume setup. Use `~/.local/opt/mew-termux/mew status` to check the instance. This download has no Git history, so `./mew update` is unavailable with this installation.
+Setup installs source in `~/.local/opt/mew-termux-0.1.6` and uses defaults without prompting. A fresh setup uses `~/mew-workspace` and picks a port starting at 5000. It preserves existing configuration and prepares a local PostgreSQL database when no external `DATABASE_URL` is configured. Open the printed setup link in your phone browser to create the first administrator.
 
 Termux is experimental and full setup has not been verified. When running the source setup directly in Termux, it offers to install a missing Node LTS and npm, compiler, make, Python, and tmux using `pkg` without sudo. If Node fails to start because of mismatched Termux libraries, update the installed Termux packages with `pkg update` and `pkg upgrade`, then check `node --version` before retrying.
 
-These prerequisite steps do not establish Android support. Native npm dependencies and the mandatory Chrome and Playwright browser preparation may still fail on Android; the latter currently supports Linux, macOS, and Windows hosts. Use a supported host if setup cannot finish.
+Run the same command again to retry setup. Use `bash ~/.local/opt/mew-termux-0.1.6/mew status` to check the instance. The downloaded source has no Git history. Server-side Chrome and Playwright features are unavailable on native Termux.
 
 ### Finish setup
 
@@ -212,6 +212,8 @@ Use Mewlink to connect from another browser, or choose Tailscale or Cloudflare T
 4. Open that URL from another PC or phone. It connects without a Mewlink sign-in and shows the host's mew login screen. Sign in with **that computer's local mew email and password**. Connecting browsers need no registration. A valid saved local session can resume on later visits.
 
 Open [Mewlink](https://link.mew.run/) to sign in; a signed-in account enters its private `/{username}` device dashboard. The public [Mew homepage](https://mew.run/) introduces the product. Mewlink sign-in is used for registration, your device list and device removal. To give someone access, create their local mew account and configure its role, features and file permissions; a Mewlink account is not needed for local password sign-in. Application data remains blocked until local sign-in succeeds.
+
+To protect your Mewlink account, open your profile in the Mewlink dashboard and find **2단계 인증** (Two-factor authentication). Register a passkey on a supported browser, or scan the QR code in your authenticator app and enter its six-digit code. You can register both and use either at sign-in. Generate and save the one-time recovery codes if you need a way to sign in after losing your authentication device. At your next sign-in, complete this step after your usual email or provider sign-in. Changes to these settings require a recent sign-in.
 
 The host must stay running and online. Networks that block direct connections show an error. Run `./mew remote-access account` to see the registration instructions again. Operators should follow [Central service setup](../../.mew/docs/operations/remote-central.md). Applying this authentication change requires updating local mew and redeploying Mewlink; real external-network validation is separate.
 

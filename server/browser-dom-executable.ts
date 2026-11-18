@@ -1,7 +1,9 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { chromium } from 'playwright-core'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
 
 function isExecutable(file: string): boolean {
   try {
@@ -31,8 +33,9 @@ function explicitExecutable(env: NodeJS.ProcessEnv, keys: string[], browser: str
 
 /** Resolve Chromium for localhost apps and automated UI tests. */
 export function domBrowserExecutable({
-  env = process.env, platform = process.platform, home = os.homedir(), bundledExecutable = chromium.executablePath(),
+  env = process.env, platform = process.platform, home = os.homedir(), bundledExecutable,
 }: BrowserExecutableOptions = {}): string | undefined {
+  if (platform === 'android') return undefined
   const explicit = explicitExecutable(env, ['MEW_CHROMIUM_EXECUTABLE', 'MEW_BROWSER_EXECUTABLE'], 'Chromium')
   if (explicit) return explicit
   const system = platform === 'win32' ? [] : platform === 'darwin'
@@ -40,13 +43,15 @@ export function domBrowserExecutable({
     : ['/usr/bin/chromium', '/usr/bin/chromium-browser']
   // Playwright chooses the bundled executable for the host OS and architecture.
   // Keep that tested binary first; launching app bundle internals needs no shell/open -a.
-  return [bundledExecutable, ...system].find(isExecutable)
+  const bundled = bundledExecutable ?? require('playwright-core').chromium.executablePath() as string
+  return [bundled, ...system].find(isExecutable)
 }
 
 /** Resolve ordinary installed Google Chrome for login and external websites. */
 export function externalBrowserExecutable({
   env = process.env, platform = process.platform, home = os.homedir(),
 }: BrowserExecutableOptions = {}): string | undefined {
+  if (platform === 'android') return undefined
   const explicit = explicitExecutable(env, ['MEW_CHROME_EXECUTABLE', 'MEW_BROWSER_EXECUTABLE'], 'Chrome')
   if (explicit) return explicit
   const system = platform === 'win32'
