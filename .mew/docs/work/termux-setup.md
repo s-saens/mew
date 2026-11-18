@@ -22,3 +22,5 @@ The [Termux prerelease](https://github.com/s-saens/mew/releases/tag/mew-termux-v
 ## Unattended Termux setup
 
 The updated installer uses the source setup defaults and preserves existing settings. It uses Termux PostgreSQL with a private Unix socket when no external database is configured. It skips server-side browser preparation on Android and loads Playwright only when a supported host starts a browser session.
+
+The [0.1.6 prerelease](https://github.com/s-saens/mew/releases/tag/mew-termux-v0.1.6) installer and source archive passed anonymous download and checksum verification. A clean Linux extraction passed dependency installation, the project build, and all 28 focused tests. The local CLI suite passed 79 tests and skipped the optional live PostgreSQL test. Lint passed with existing warnings. The documentation checker reported 39 existing broken links. No Android device was available to verify end-to-end setup.
