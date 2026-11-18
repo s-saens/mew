@@ -1,6 +1,6 @@
 ---
 title: "Mewlink device registration and locally authenticated P2P access contract"
-description: "Defines the link.mew.run entry, Mewlink registration, authentication, browser trust, UI resources, signaling, and transport limits. Covers the shared Mewlink, Tailscale, and Cloudflare Tunnel popup shown after first-owner agent setup and from the owner menu, with separate host/central verification boundaries."
+description: "Defines the link.mew.run entry, Mewlink registration, central two-factor authentication, browser trust, UI resources, signaling, and transport limits. Covers the shared Mewlink, Tailscale, and Cloudflare Tunnel popup shown after first-owner agent setup and from the owner menu, with separate host/central verification boundaries."
 created: 2026-10-07
 updated: "2026-11-17"
 ---
@@ -24,7 +24,7 @@ Execution uses `https://app.mew.run`, a separate origin on the management site t
 
 New registrations default to `https://link.mew.run`. Host address lookup maps both previous public origins directly to it, but saved registration origins and proof audiences remain unchanged. Central host-only cookies and origin-scoped trusted-device keys do not migrate automatically; renewed central/local sign-in can be required. Do not transfer raw credentials in redirects or broaden cookie scope.
 
-Legacy provider callbacks use `OAUTH_ORIGIN=https://mew.saens.kr`. A single-use proof, valid 60 seconds and bound to the new origin's browser verification cookie, issues the new management session only after origin/cookie/expiry checks. The app origin exposes no such route. See the [migration decision](../decisions/0005-mewlink-domain-and-private-dashboard.md).
+Legacy provider callbacks use `OAUTH_ORIGIN=https://mew.saens.kr`. A single-use proof, valid 60 seconds and bound to the new origin's browser verification cookie, completes the first sign-in step only after origin, cookie, and expiry checks. The app origin exposes no such route. See the [migration decision](../decisions/0005-mewlink-domain-and-private-dashboard.md).
 
 ## Launcher touch zoom
 
@@ -241,13 +241,23 @@ Provider identities, admin sessions, and device ownership retain immutable centr
 
 Central email login appears only with Cloudflare `EMAIL` and valid `EMAIL_FROM`: email → send code → verify → first-use username → original registration/device path. Missing config hides it; Google/GitHub/Apple/email-OIDC remain independent. See [sending/deployment](../operations/email-login.md) and [ADR 0206](../history/decisions/0206-mewlink-email-code-login.md).
 
-`POST /central/email/start` checks central origin/email in a bounded body, then sets per-browser host-only Secure/HttpOnly `__Host-mew_email`. Cryptographic 6-digit codes last 10 minutes. D1 `email_logins` stores challenge hash and code hash bound to the raw challenge, never plaintext. Send success marks `ready`; failure deletes the request. Same-browser requests replace previous challenges.
+`POST /central/email/start` accepts only the canonical origin and checks the email address in a bounded body, then sets per-browser host-only Secure/HttpOnly `__Host-mew_email`. Cryptographic 6-digit codes last 10 minutes. D1 `email_logins` stores challenge hash and code hash bound to the raw challenge, never plaintext. Send success marks `ready`; failure deletes the request. Same-browser requests replace previous challenges.
 
-`POST /central/email/verify` requires cookie/code, atomically increments D1 attempts (maximum 5), compares fixed-length hashes timing-safely, then atomically DELETE-consumes success against replay/concurrent winners. Only consumption creates accounts/sessions with existing cookie security. Send limits: 10/IP/minute, 1/normalized-email/minute; verify: 30/IP/minute. Codes, cookies, and email bodies are never logged. Hourly cleanup removes expiry.
+`POST /central/email/verify` requires cookie/code, atomically increments D1 attempts (maximum 5), compares fixed-length hashes timing-safely, then atomically DELETE-consumes success against replay/concurrent winners. Only consumption creates accounts and completes the first sign-in step. Send limits: 10/IP/minute, 1/normalized-email/minute; verify: 30/IP/minute. Codes, cookies, and email bodies are never logged. Hourly cleanup removes expiry.
 
 Email trims whitespace and lowercases all ASCII, with 64-character local and 254-character total limits. Dot/plus aliases never merge. Identity uses `email-code:<central-origin>` + verified normalized address and retains immutable account ID, without merging same-email OAuth/OIDC/local accounts. Email ownership grants no extra device-management/work permission.
 
 Send failures return 502, rate limits 429, invalid cookie/code 401, and expired/exhausted/consumed codes 410. UI retains input/errors, allows resend/email changes, blocks duplicate resend/verify, and clears countdowns on refresh/navigation. Initial username setup returns only to a safely validated original central path. Tests mock sending; actual delivery, domain activation, and deployment need user confirmation.
+
+## Central two-factor sign-in
+
+In the canonical dashboard's **2단계 인증** (Two-factor authentication) settings, an account can register one passkey and one authenticator app. Registering either enables the second step. For an enrolled account, a successful email or OAuth sign-in, including a legacy OAuth bridge handoff, creates a five-minute pending login and a host-only secure HTTP-only cookie. The pending login grants no account access. Completion creates the seven-day management session and returns to the validated original central path. Unenrolled accounts still receive a session after the first step.
+
+The passkey requires WebAuthn user verification and is bound to the canonical HTTPS origin and its exact hostname as relying party ID. Registration challenges are bound to the current management session. Sign-in challenges are bound to the pending login. The authenticator app uses six-digit TOTP with a 30-second step and one step of clock tolerance in either direction. An accepted step cannot be reused, including the step used to confirm enrollment. Recovery codes are optional, generated in sets of ten, displayed once, and stored as hashes. Reissuing the set invalidates the previous set.
+
+Each pending login allows five verification attempts. Temporary per-account and per-IP counters also apply across requests. D1 transactions bind session creation to consumption of the pending login and the verified factor state. Settings changes require a management session issued within the previous ten minutes. Adding or deleting a factor or reissuing recovery codes revokes other central sessions and pending sign-ins. Removing the last registered factor turns off the second step and deletes its recovery codes.
+
+These settings protect the Mewlink account. Public device addresses still allow a connection to a host's local sign-in screen. Access to the host workspace follows its own local session and permissions. See the [decision](../decisions/0211-mewlink-two-factor-authentication.md) and [central service runbook](../operations/remote-central.md#state-keys-and-recovery).
 
 ## Central login and device selection UI
 
