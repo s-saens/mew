@@ -39,6 +39,16 @@ async function npmLatest(name: string): Promise<string> {
   if (typeof data.version !== 'string') throw new Error('최신 버전을 읽지 못했습니다')
   return data.version
 }
+async function codexStandaloneLatest(): Promise<string> {
+  const versionAt = async (url: string) => {
+    const data = await remoteJson(url)
+    const version = typeof data.tag_name === 'string' && data.tag_name.match(/^rust-v(\d+\.\d+\.\d+)$/)?.[1]
+    if (!version) throw new Error('Codex 최신 안정 버전을 읽지 못했습니다')
+    return version
+  }
+  try { return await versionAt('https://releases.openai.com/codex/channels/latest') }
+  catch { return versionAt('https://api.github.com/repos/openai/codex/releases/latest') }
+}
 async function primeLatest(): Promise<string> {
   if (process.env.PRIME_AGENT_VERSION) return primeReleaseVersion(process.env.PRIME_AGENT_VERSION)
   const installer = await fetch('https://app.primeintellect.ai/prime-agent/install.sh', { signal: AbortSignal.timeout(15_000) })
@@ -104,6 +114,21 @@ function inDirectory(directory: string, file: string): boolean {
 function isPackageExecutable(root: string, pkg: string, executable: string): boolean {
   try {
     return inDirectory(fs.realpathSync(path.join(root, pkg)), fs.realpathSync(executable))
+  } catch { return false }
+}
+
+function isCodexStandaloneExecutable(executable: string): boolean {
+  try {
+    const real = fs.realpathSync(executable)
+    if (real === executable || !/^codex(?:\.exe)?$/.test(path.basename(real))) return false
+    const binaryDir = path.dirname(real)
+    const releaseDir = path.basename(binaryDir) === 'bin' ? path.dirname(binaryDir) : binaryDir
+    const releases = path.dirname(releaseDir)
+    const standalone = path.dirname(releases)
+    if (path.basename(releases) !== 'releases' || path.basename(standalone) !== 'standalone' ||
+        path.basename(path.dirname(standalone)) !== 'packages') return false
+    const relativeBinary = path.relative(releaseDir, real)
+    return fs.realpathSync(path.join(standalone, 'current', relativeBinary)) === real
   } catch { return false }
 }
 
@@ -198,12 +223,18 @@ async function agents(): Promise<UpdateCandidate[]> {
     if (!executable) continue
     const npm = npmInstallation(id, executable)
     let current: string | null = npm?.version ?? null
-    try { current ??= (await output(command, [...cli.args, '--version'])).match(/\d+\.\d+\.\d+/)?.[0] ?? null } catch { /* Unknown */ }
+    try { current ??= (await output(executable, [...cli.args, '--version'])).match(/\d+\.\d+\.\d+(?:-[\w.-]+)?/)?.[0] ?? null } catch { /* Unknown */ }
     const row = item(`cli:${id}`, id === 'claude' ? 'Claude Code CLI' : 'Codex CLI', 'agent', current)
     row.lookup = () => npmLatest(pkg)
     if (npm) row.command = npmAgentUpdateSpec(id, pkg, npm.prefix)
     else if (id === 'claude' && cli.args.length === 0) row.command = { cmd: command, args: ['update'] }
-    else row.error = '설치 경로를 자동으로 업데이트할 수 없습니다'
+    else if (id === 'codex' && isCodexStandaloneExecutable(executable)) {
+      row.lookup = codexStandaloneLatest
+      try {
+        await output(executable, ['update', '--help'])
+        row.command = { cmd: executable, args: ['update'] }
+      } catch { row.error = '현재 Codex CLI에서 자동 업데이트를 지원하지 않습니다' }
+    } else row.error = '설치 경로를 자동으로 업데이트할 수 없습니다'
     rows.push(row)
   }
   for (const [id, packages] of Object.entries(npmAgents)) {

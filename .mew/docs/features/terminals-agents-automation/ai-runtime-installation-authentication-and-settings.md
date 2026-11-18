@@ -8,7 +8,7 @@ updated: "2026-11-18"
 status_hash: "ce50d3fa70fce93520dfd200e419db9b718cebd2b370a52a9250e624fc80aed1"
 files: ["src/components/RuntimeInstallProgress.tsx", "src/components/AgentPanel.tsx", "src/components/RuntimeSettingsModal.tsx", "src/components/agentRuntimes.tsx", "server/agentRuntimes.ts", "server/agentRuntimeInstall.ts", "server/agentDefaults.ts"]
 commits: []
-description: "Feature contract for background runtime installation, the picker’s installation and update terminal buttons, executable readiness, authentication, and model, effort, and permission defaults. Covers failed attempts, provider-specific installers, and runtime settings."
+description: "Feature contract for background runtime installation, the picker’s installation and update terminal buttons, executable readiness, authentication, and model, effort, and permission defaults. Covers failed attempts, provider-specific installers, and host CLI updates for Codex and Claude."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -36,7 +36,7 @@ description: "Feature contract for background runtime installation, the picker�
 <!-- mew:implementation:start -->
 ## Implementation details
 
-- The runtime picker renders before the separate update check completes. Installed rows offer available, automatically supported individual updates. Codex and Claude map to their host CLI updates. The update action becomes a terminal button when a session starts. It stays available after completion while the session exists. The [update contract](../appearance-accounts-operations/application-updates-and-operations.md) owns session access and execution.
+- The runtime picker renders before the separate update check completes. Installed rows offer available, automatically supported individual updates. Codex and Claude map to their host CLI updates, including supported official standalone Codex installations. The update action becomes a terminal button when a session starts. It stays available after completion while the session exists. The [update contract](../appearance-accounts-operations/application-updates-and-operations.md) owns version discovery, session access, and execution.
 
 - Installation starts a server-side command and replaces the install action with a terminal button. The read-only popup polls output approximately once per second, follows new output, and preserves the scroll position while the user reads earlier output. Closing it leaves the attempt running. The picker stays open after installation so the user can inspect the result or select the installed runtime. Failed attempts retain their output and offer a retry.
 - The server acknowledges background starts independently of installer completion. Attempt-specific reads return the outcome of the accepted installation even if a client connection is interrupted. The server keeps the latest attempt and its last 12,000 characters per runtime in memory. A retry replaces that attempt. See [ADR 0188](../../decisions/0188-agent-runtime-installation-attempts.md).

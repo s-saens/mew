@@ -1,9 +1,47 @@
 import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
 import test from 'node:test'
-import { newer, selectUpdates, runUpdateQueue, type UpdateCandidate } from './updates.ts'
+import { newer, selectUpdates, runUpdateQueue, updatesStatus, type UpdateCandidate } from './updates.ts'
 import type { UpdateJob } from '../shared/updates.ts'
 test('version ordering avoids downgrades and compares prerelease identifiers numerically', () => {
   for (const [current, latest, result] of [['1.9.0', '1.10.0', true], ['2.0.0', '1.9.0', false], ['1.0.0', '1.0.0-beta', false], ['1.0.0-beta.2', '1.0.0-beta.10', true], ['1.0.0-beta', '1.0.0', true], ['1.0.0', '1.0.0', false], [null, '1.0.0', false], ['unknown', '1.0.0', false], ['2026.09.20-ab12', '2026.09.28-cd34', true]] as const) assert.equal(newer(current, latest), result)
+})
+
+test('the runtime picker catalog offers the official standalone Codex update', { skip: process.platform === 'win32' }, async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-codex-update-'))
+  const previous = process.env.MEW_AGENT_CODEX_CLI_CMD
+  t.after(async () => {
+    if (previous === undefined) delete process.env.MEW_AGENT_CODEX_CLI_CMD
+    else process.env.MEW_AGENT_CODEX_CLI_CMD = previous
+    await fs.rm(dir, { recursive: true, force: true })
+  })
+  const standalone = path.join(dir, 'packages', 'standalone')
+  const release = path.join(standalone, 'releases', '0.169.0-linux')
+  await fs.mkdir(path.join(release, 'bin'), { recursive: true })
+  const binary = path.join(release, 'bin', 'codex')
+  await fs.writeFile(binary, '#!/bin/sh\nif [ "$1" = --version ]; then echo "codex-cli 0.169.0"; else [ "$1 $2" = "update --help" ]; fi\n', { mode: 0o755 })
+  await fs.symlink(release, path.join(standalone, 'current'))
+  const launcher = path.join(dir, 'codex')
+  await fs.symlink(path.join(standalone, 'current', 'bin', 'codex'), launcher)
+  process.env.MEW_AGENT_CODEX_CLI_CMD = launcher
+  const fetch = t.mock.method(globalThis, 'fetch', async (url: string) => {
+    if (url === 'https://releases.openai.com/codex/channels/latest') return Response.json({ tag_name: 'rust-v0.170.0' })
+    if (url === 'https://registry.npmjs.org/%40openai%2Fcodex/latest') return Response.json({ version: '0.169.0' })
+    return new Response(null, { status: 404 })
+  })
+  const standaloneStatus = (await updatesStatus(true)).items.find(row => row.id === 'cli:codex')
+  assert.deepEqual(standaloneStatus, {
+    id: 'cli:codex', label: 'Codex CLI', category: 'agent', current: '0.169.0',
+    latest: '0.170.0', available: true, canUpdate: true, error: null, session: null,
+  })
+  assert.ok(fetch.mock.calls.some(call => call.arguments[0] === 'https://releases.openai.com/codex/channels/latest'))
+
+  process.env.MEW_AGENT_CODEX_CLI_CMD = binary
+  const pinnedStatus = (await updatesStatus(true)).items.find(row => row.id === 'cli:codex')
+  assert.equal(pinnedStatus?.canUpdate, false)
+  assert.equal(pinnedStatus?.latest, '0.169.0')
 })
 const row = (id: string): UpdateCandidate => ({ id, label: id, category: 'agent', current: '1.0.0', latest: '2.0.0', available: true, canUpdate: true, error: null, command: { cmd: 'test', args: [id] } })
 test('update requests accept registered installed updatable ids only and deduplicate', () => {

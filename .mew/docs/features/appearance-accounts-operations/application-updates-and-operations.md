@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "App updates and operations access"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-20"
+updated: "2026-11-18"
 status_hash: "24b9ec9b4721cf44a384c60d727d8f59e62a1ffb0c0e48aad1304d2d19c99816"
 files: ["server/mewUpdate.ts", "server/runMewUpdate.ts", "server/updates.ts", "server/updateSessions.ts", "server/runUpdates.ts", "server/updateProcess.ts", "src/components/updates-modal.tsx", "shared/updates.ts"]
 commits: []
-description: "Feature contract for the update screen, source update jobs, standalone agent and system-tool updates, and preserved command output. Covers release distributions requiring their original npm or curl installer instead of source build/restart jobs."
+description: "Feature contract for the update screen, source update jobs, standalone agent and system-tool updates, and preserved command output. Covers Codex standalone release discovery and prebuilt Mew updates through the original installer."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -25,6 +25,7 @@ description: "Feature contract for the update screen, source update jobs, standa
 - Display Mew, installed standalone agent CLIs, and system tools in the unified update screen.
 - Allow only individual updates for standalone agents, and block updates while they are running. Run system tool batch updates sequentially, and provide progress, failure reasons, and Retry buttons.
 - For installation methods that cannot be updated automatically, display the reason and exclude them from batch updates.
+- For Codex CLI installed through the official standalone installer, resolve the launcher to the active release and verify that the CLI supports `update`. Compare against the OpenAI stable channel, with GitHub Releases as a fallback, and run `codex update` through the selected launcher. Identified npm installations continue to use their npm prefix and the npm registry.
 - Run the Mew update last, after all dependency tasks succeed.
 
 - Run Mew, agent, and tool updates in dedicated tmux sessions, and retain output and results in those sessions. Tasks continue when the update screen is closed; reopen a session using the item's terminal icon.
