@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "Agent Scheduled Messages"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-04"
+updated: "2026-11-18"
 status_hash: "333669f522d259fe25acbfd4326c1e55deca98f9f89df6cb5443d61057d19e0a"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-schedule-input.tsx", "src/hooks/use-scheduled-prompts.ts", "src/utils/agent-scheduled-cache.ts", "server/agentScheduledPrompts.ts"]
 commits: []
-description: "One-time agent messages scheduled through floating inline hours/minutes controls, with a smooth entrance, reduced-motion support, confirmation, cancellation, and time editing. Covers document tags, device-stored list restoration, server synchronization, and queued execution in the original session."
+description: "One-time agent messages scheduled through inline hours and minutes controls, with reduced-motion support, cancellation, and text and time edits. Covers document tags, linked replies, device list restoration, and queued execution in the original session."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -42,6 +42,8 @@ While registration is pending, lock the fields and both actions to prevent dupli
 View unexecuted scheduled messages in the **pending queue list** directly above the input bar. They appear only after regular pending messages, ordered by send time ascending. Click a message body once to edit it in place. Like the input, pending and scheduled message editors can be resized by dragging the top border up or down, or with the up and down arrow keys when the border has keyboard focus. Click the date/time text to replace the composer clock with the same relative-time fields and update that message's send time. Initialize them from the remaining time, rounding partial minutes up and using at least one minute for elapsed times. A time edit preserves the message body and current composer draft. Scheduled messages cannot be reordered relative to one another and can also be deleted. Regular pending messages lock queue execution until editing is completed or canceled ([ADR 0118](../../history/decisions/0118-mew-agent-queue-edit-lock.md)).
 
 Display ordinary document references as compact document tags in the scheduled list and its inline editor. Preview tags are passive parts of the message edit button, so clicking the body still starts editing. The editor supports `@` candidates, filename actions, and atomic reference removal and undo through the shared [agent input contract](agent-input-mentions-skills-and-attachments.md). Saving preserves exact scoped reference strings, including repeated references; changing the presentation does not alter scheduled payloads.
+
+A scheduled reply keeps its source reference in the original conversation. Changing its text or send time preserves the reference. [Reply behavior](agent-conversations-queue-and-restoration.md#reply-to-a-message).
 
 Scheduled messages remain in the server data folder. At the scheduled time, the original ACP session is reconnected to send the message; if that session is working, the message executes at the end of the server queue. Separate cron-based [scheduled tasks](../../../../docs/guides/commands.md) are independent agent tasks and do not appear in this list. Storage and session restoration follow [ADR 0091](../../history/decisions/0091-mew-agent-tab-scheduled-prompts.md).
 

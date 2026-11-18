@@ -36,6 +36,7 @@ import { createTmuxManager } from '@mew/tmux-term/server'
 import { AgentCommandStore, type AgentCommandInput } from './agent-commands.ts'
 import { queueAgentCommand } from './agent-command-queue.ts'
 import type { AgentCommandRecord } from '../shared/agent-command.ts'
+import type { AgentReplyReference } from '../shared/agent-reply.ts'
 
 const TAB_ID = /^[A-Za-z0-9_-]{1,64}$/
 const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/
@@ -46,7 +47,7 @@ const REQUEST_TIMEOUT_MS = 30_000
 const MAX_LINE_BYTES = 64 * 1024 * 1024
 
 export type AgentHostCommand =
-  | { type: 'prompt'; text: string; promptText: string; images?: AgentImage[]; imageRefs?: AgentImageRef[]; settings?: AgentMessageSettings; automatic?: boolean; attachments?: AgentAttachmentInput[] }
+  | { type: 'prompt'; text: string; promptText: string; images?: AgentImage[]; imageRefs?: AgentImageRef[]; settings?: AgentMessageSettings; automatic?: boolean; attachments?: AgentAttachmentInput[]; reply?: AgentReplyReference }
   | { type: 'cancel' }
   | { type: 'permission'; id: string; optionId: string | null }
   | { type: 'authenticate'; methodId: string; secret?: string }
@@ -533,7 +534,7 @@ async function handleHostMessage(
     try {
       const request = message.request
       const value = request.type === 'history'
-        ? session.historyPage(validHistoryRequest({ ...request.range, deferWork: peer.history?.deferWork === true, turns: request.range.turns ?? peer.history?.turns }))
+        ? session.historyPage(validHistoryRequest({ ...request.range, deferWork: !request.range.targetId && peer.history?.deferWork === true, turns: request.range.turns ?? peer.history?.turns }))
         : request.type === 'history_details'
         ? session.historyDetails(request.range)
         : request.type === 'list_sessions'
@@ -553,7 +554,7 @@ async function handleHostMessage(
   try {
     if (command.type === 'prompt') {
       chooseFallback()
-      session.prompt(String(command.text), String(command.promptText), command.images, command.imageRefs, command.settings, command.automatic === true, command.attachments)
+      session.prompt(String(command.text), String(command.promptText), command.images, command.imageRefs, command.settings, command.automatic === true, command.attachments, command.reply)
     }
     else if (command.type === 'cancel') session.cancel()
     else if (command.type === 'permission') session.answerPermission(String(command.id), command.optionId ?? null)

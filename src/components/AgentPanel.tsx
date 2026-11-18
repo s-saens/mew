@@ -6,7 +6,9 @@ import { useAgentPromptFeedback } from '../hooks/use-agent-prompt-feedback'
 import { HeaderSelect } from './agent-header-select'
 import { AgentPromptDrafts } from './agent-prompt-drafts'
 import { AgentExecutionToggles } from './agent-execution-toggles'
-import { AgentReplyPreview } from './agent-reply-preview'
+import { AgentReplyLink, AgentReplyPreview } from './agent-reply-preview'
+import { agentBubbleId, agentReplyReference } from '../utils/agent-replies'
+import type { AgentReplyReference } from '../../shared/agent-reply'
 import { usesTouchKeyboard } from '@mew/ui/virtual-keyboard'
 import { useAgentExecutionOptions } from '../hooks/use-agent-execution-options'
 import { useAgentInputDraft } from '../hooks/use-agent-input-draft'
@@ -33,6 +35,7 @@ import { ConfirmDialog, DialogFrame, HoverTipLayer, PanelNotice, useToast, canAu
 import { historyCacheKey, readHistoryCache, writeHistoryCache, readQueueCache, writeQueueCache, type CachedQueue, type CachedHistory } from '../utils/agent-history-cache'
 import { mergeHistoryPage, appendHistoryEventInPlace } from '../utils/agent-history-state'
 import { useAgentWorkHistory } from '../hooks/use-agent-work-history'
+import { useAgentMessageJump } from '../hooks/use-agent-message-jump'
 import { AgentStartupQueue } from '../utils/agent-startup-queue'
 import { AgentStartupQueueView } from './agent-startup-queue'
 import { AgentCapacityRetryNotice } from './agent-capacity-retry-notice'
@@ -374,13 +377,9 @@ type AgentAttachment = {
 
 type QueuedEdit = { index: number; text: string; original: string; attachments: AgentAttachment[]; settings: AgentMessageSettings }
 
-function quoteAgentReply(text: string, draft: string): string {
-  const quote = text.trim().split(/\r?\n/).map(line => `> ${line}`).join('\n')
-  return `${quote}\n\n${draft}`
-}
-
 type StartupPrompt = {
   type: 'prompt'; text: string; displayText: string
+  reply?: AgentReplyReference
   images: { data: string; mimeType: string }[]
   imageRefs: { path: string; mimeType: string }[]
   attachments: AgentAttachmentInput[]; skills: string[]; settings: AgentMessageSettings
@@ -2393,8 +2392,8 @@ function AgentSessionView({
   const { feedback: clearFeedback, request: requestClear, complete: completeClear, observeQueue: observeClearQueue, cancel: cancelClear } = useAgentClearFeedback()
   const [draft, setDraft] = useAgentInputDraft(tabId, inputScope)
   const replyScope = JSON.stringify([cacheAccount, inputScope.projectPath, fileWorkspace, tabId, runtime, cwd])
-  const [selectedReply, setReplyTarget] = useState<{ scope: string; text: string; kind: 'user' | 'turn' } | null>(null)
-  const replyTarget = selectedReply?.scope === replyScope ? selectedReply : null
+  const [selectedReply, setReplyTarget] = useState<{ scope: string; reply: AgentReplyReference } | null>(null)
+  const replyTarget = selectedReply?.scope === replyScope ? selectedReply.reply : null
   const [cliMode, setCliMode] = useState(false)
   const [commandPopupId, setCommandPopupId] = useState<string | null>(null)
   const [attaching, setAttaching] = useState(false)
@@ -2536,6 +2535,7 @@ function AgentSessionView({
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const questionScrollRef = useRef<{ key: string; top: number } | null>(null)
+  const messageJumpTopRef = useRef<number | null>(null)
   const sessionRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLDivElement>(null)
   const composerSettingsRef = useRef<HTMLDivElement>(null)
@@ -2767,6 +2767,22 @@ function AgentSessionView({
       return [...snapshot, ...errors]
     })
   }, [setEvents])
+  const liveDisplayItems = useMemo(() => historyPreview ? foldEvents(historyPreview.events, uiLocale, historyPreview.start) : promptItems,
+    [historyPreview, promptItems, uiLocale])
+  const expandMessage = useCallback((key: string) => {
+    setExpanded(previous => previous.has(key) ? previous : new Set(previous).add(key))
+  }, [])
+  const rememberMessageJump = useCallback((top: number) => {
+    questionScrollRef.current = null
+    messageJumpTopRef.current = top
+    stickRef.current = false
+  }, [])
+  const { jump: jumpToMessage, accept: acceptMessageJump, reset: resetMessageJump, targetItems: targetView,
+    highlightedKey: highlightedMessageKey, notice: messageJumpNotice, anchorPrefix: messageAnchorPrefix } = useAgentMessageJump({
+    container: scrollRef, history: historyRef, socket: wsRef, liveItems: liveDisplayItems,
+    previewSessionId: historyPreview?.sessionId, sessionId: meta?.sessionId ?? null,
+    expand: expandMessage, beforeScroll: rememberMessageJump,
+  })
   const { accept: acceptWorkDetails, reset: resetWorkDetails, load: loadWorkDetails, errors: workErrors } = useAgentWorkHistory({
     history: historyRef, socket: wsRef, items, expanded,
     enabled: visible && connected && !historyPreview && !loadingSession,
@@ -2800,6 +2816,7 @@ function AgentSessionView({
     const source = `${runtimeOf(runtime).label} · ${cwd.split('/').filter(Boolean).at(-1) ?? cwd}`
     const trackNotice = createAgentNoticeTracker(source, target)
     pendingRef.current = []
+    resetMessageJump()
     replayRef.current = null
     previewTargetRef.current = resumeSessionIdRef.current
     const saved = savedPreviewRef.current
@@ -2849,6 +2866,7 @@ function AgentSessionView({
       resetSelection()
       setStartupReady(false)
       resetWorkDetails()
+      resetMessageJump()
       resetSessionPreviews()
       setSessionPreviewsSupported(false)
       cancelClear()
@@ -2918,6 +2936,10 @@ function AgentSessionView({
           acceptWorkDetails(event)
           return
         }
+        if (event.type === 'history_target') {
+          acceptMessageJump(event)
+          return
+        }
         if (event.type === 'history_preview') {
           if (event.preview.sessionId === previewTargetRef.current
             && Number.isSafeInteger(event.preview.start) && event.preview.start >= 0) {
@@ -2949,7 +2971,10 @@ function AgentSessionView({
           if (event.page.mode === 'prepend' && scrollRef.current) {
             prependScrollRef.current = { height: scrollRef.current.scrollHeight, top: scrollRef.current.scrollTop }
           }
-          if (historyRef.current?.generation !== next.generation) resetWorkDetails(next.generation)
+          if (historyRef.current?.generation !== next.generation) {
+            resetWorkDetails(next.generation)
+            resetMessageJump()
+          }
           historyRef.current = next
           clearAgentEventCache(runtime, tabId, cwd)
           cacheSessionIdRef.current = next.sessionId
@@ -3109,6 +3134,7 @@ function AgentSessionView({
         if (event.type === 'reset') {
           setStartupReady(false)
           resetWorkDetails()
+          resetMessageJump()
           completeClear('cleared')
           clearPreview()
           historyRef.current = null
@@ -3196,7 +3222,7 @@ function AgentSessionView({
     }
     // 런타임을 바꾸면 저쪽 세션으로 갈아탄다 — 이쪽 세션은 서버에 그대로 남아 돌아오면 이어진다
     // (queueEvent는 값이 바뀌지 않는 useCallback이라 여기 있어도 재접속을 부르지 않는다)
-  }, [cacheKey, runtime, tabId, cwd, notificationWorkspace, preset?.modelId, preset?.thinkingId, preset?.thinkingConfigId, preset?.role, queueEvent, setEvents, adoptModels, adoptModes, adoptThinking, closeAuthBrowser, closeAcpLoginSessions, observeClearQueue, completeClear, cancelClear, acceptWorkDetails, resetWorkDetails, acceptSessionPreview, resetSessionPreviews, clearStartupPrompts, resetSelection, acknowledgePromptQueue, replacePromptFeedback, disconnectPromptFeedback, openSocket])
+  }, [cacheKey, runtime, tabId, cwd, notificationWorkspace, preset?.modelId, preset?.thinkingId, preset?.thinkingConfigId, preset?.role, queueEvent, setEvents, adoptModels, adoptModes, adoptThinking, closeAuthBrowser, closeAcpLoginSessions, observeClearQueue, completeClear, cancelClear, acceptWorkDetails, resetWorkDetails, acceptMessageJump, resetMessageJump, acceptSessionPreview, resetSessionPreviews, clearStartupPrompts, resetSelection, acknowledgePromptQueue, replacePromptFeedback, disconnectPromptFeedback, openSocket])
 
   // 경과 시간만 흐르게 한다 — 나머지 값은 서버 meta가 밀어 준다
   useEffect(() => {
@@ -3211,10 +3237,9 @@ function AgentSessionView({
   // Info는 대화 흐름을 밀지 않는 팝업이다. 트리거까지 같은 경계에 넣어 버튼을 다시 눌러 닫을 수 있다.
   useOverlayDismiss(showInfo ? closeInfo : false, { outside: () => infoOverlayRef.current })
 
-  const displayItems = useMemo(() => historyPreview ? foldEvents(historyPreview.events, uiLocale, historyPreview.start) : promptItems,
-    [historyPreview, promptItems, uiLocale])
-  const timeline = useMemo(() => historyPreview ? displayItems : commandTimeline(displayItems, cli.records, usersBefore),
-    [historyPreview, displayItems, cli.records, usersBefore])
+  const displayItems = targetView ?? liveDisplayItems
+  const timeline = useMemo(() => historyPreview || targetView ? displayItems : commandTimeline(displayItems, cli.records, usersBefore),
+    [historyPreview, targetView, displayItems, cli.records, usersBefore])
   const settingsChanges = useMemo(() => {
     const keys = new Set<string>()
     let previous: AgentMessageSettings | undefined
@@ -3240,44 +3265,54 @@ function AgentSessionView({
   // 바닥까지 내려가도 사라진다
   const scrollToBottom = useCallback(() => {
     questionScrollRef.current = null
+    messageJumpTopRef.current = null
     const el = scrollRef.current
     if (el) el.scrollTop = el.scrollHeight
     stickRef.current = true
     setShowScrollToBottom(false)
   }, [])
 
+  const scrollToLatest = useCallback(() => {
+    if (targetView) scrollRef.current?.focus({ preventScroll: true })
+    resetMessageJump()
+    scrollToBottom()
+  }, [resetMessageJump, scrollToBottom, targetView])
+
   useLayoutEffect(() => {
     const anchor = prependScrollRef.current
     if (anchor && scrollRef.current) {
-      scrollRef.current.scrollTop = anchor.top + scrollRef.current.scrollHeight - anchor.height
+      if (!targetView && messageJumpTopRef.current === null) scrollRef.current.scrollTop = anchor.top + scrollRef.current.scrollHeight - anchor.height
       prependScrollRef.current = null
     }
-  }, [timeline])
+  }, [timeline, targetView])
 
   useEffect(() => {
-    if (stickRef.current) scrollToBottom()
-  }, [timeline, scrollToBottom])
+    if (!targetView && stickRef.current) scrollToBottom()
+  }, [timeline, targetView, scrollToBottom])
 
   // 안 보이는 탭은 display:none이라 scrollHeight가 0이다 — 그동안 온 말은 못 따라 내려간 것이므로
   // 이 탭이 보이게 될 때 한 번 더 바닥으로 붙인다(위로 올려 두고 나간 탭은 그 자리를 지킨다)
   useEffect(() => {
-    if (active && stickRef.current) scrollToBottom()
-  }, [active, scrollToBottom])
+    if (active && !targetView && stickRef.current) scrollToBottom()
+  }, [active, targetView, scrollToBottom])
 
   // 스트리밍으로 한두 줄씩 늘어나는 동안 붙었다 떨어졌다 하지 않게 바닥 판정에 여유를 둔다
   const handleScroll = useCallback(() => {
     const el = scrollRef.current
     if (!el) return
     if (questionScrollRef.current && Math.abs(questionScrollRef.current.top - el.scrollTop) > 1) questionScrollRef.current = null
+    if (targetView) return
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    stickRef.current = distanceFromBottom <= 48
     setShowScrollToBottom(distanceFromBottom > 30)
+    if (messageJumpTopRef.current === el.scrollTop) return
+    messageJumpTopRef.current = null
+    stickRef.current = distanceFromBottom <= 48
     const history = historyRef.current
     if (!previewTargetRef.current && el.scrollTop < 80 && history && history.start > 0 && !historyPendingRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
       historyPendingRef.current = true
       wsRef.current.send(JSON.stringify({ type: 'history', range: { generation: history.generation, before: history.start } }))
     }
-  }, [])
+  }, [targetView])
 
   const scrollToQuestion = useCallback((key: string) => {
     const el = scrollRef.current
@@ -3323,9 +3358,10 @@ function AgentSessionView({
     try {
       if (payload.type === 'clear_session') requestClear(socket)
       else socket.send(JSON.stringify(payload))
+      if (payload.type === 'load_session' || payload.type === 'close_session') resetMessageJump()
       return true
     } catch { return false }
-  }, [requestClear, clearStartupPrompts])
+  }, [requestClear, clearStartupPrompts, resetMessageJump])
 
   const searchSessions = useCallback((query: string) => {
     const request = { query, requestId: uuid() }
@@ -3506,7 +3542,8 @@ function AgentSessionView({
     })
   }, [codeRunDisabled, submitCodeCommand, tabId, codeAfterUserCount, inputScope])
   const startQueuedEdit = (index: number, text: string) => {
-    if (!connected || !meta || editingQueued || text === '/clear' || queueMeta?.queuedKinds?.[index] === 'cli') return
+    const kind = queueMeta?.queuedKinds?.[index] ?? (text === '/clear' ? 'clear' : 'prompt')
+    if (!connected || !meta || editingQueued || kind !== 'prompt') return
     send({ type: 'begin_edit_queued', index, expect: text })
     queuedEditVersionRef.current++
     setScheduleOpen(false)
@@ -3598,7 +3635,8 @@ function AgentSessionView({
         historyIndexRef.current = null
         historyDraftRef.current = ''
         setDraft(current => current === command ? '' : current)
-        stickRef.current = true
+        if (targetView) scrollToLatest()
+        else stickRef.current = true
       })
       return
     }
@@ -3636,17 +3674,16 @@ function AgentSessionView({
       onInfo(tabId, runtime, cwd, { busy: meta.busy, awaitingApproval: false, sessionId: meta.sessionId })
     }
     // 진행 중이어도 막지 않는다 — 서버가 줄을 세웠다가 턴이 끝나면 이어서 돈다
-    const promptText = replyTarget ? quoteAgentReply(replyTarget.text, text) : text
-    const prompt: StartupPrompt = { type: 'prompt', text: promptText, displayText: promptText, images, imageRefs,
+    const prompt: StartupPrompt = { type: 'prompt', text, displayText: text, reply: replyTarget ?? undefined, images, imageRefs,
       attachments: draftAttachments.map(({ image: _image, ...file }) => queuedAttachmentInput(file)),
       skills: selectedSkillNames(text, skills), settings: messageSettings }
     if (canQueueStartup || startupQueue.snapshot().length > 0) {
       const id = startupQueue.enqueue(prompt)
-      if (!busy) beginPrompt(prompt, items.at(-1)?.key ?? null, queued, id)
+      if (!busy) beginPrompt(prompt, items.at(-1)?.key ?? null, queueMeta, id)
       setStartupPrompts(startupQueue.snapshot())
     } else {
       if (!send(prompt)) return
-      if (!busy) beginPrompt(prompt, items.at(-1)?.key ?? null, queued)
+      if (!busy) beginPrompt(prompt, items.at(-1)?.key ?? null, queueMeta)
     }
     recordAgentInputHistory(tabId, written, inputScope)
     historyIndexRef.current = null
@@ -3655,7 +3692,11 @@ function AgentSessionView({
     setAttachments([])
     setReplyTarget(null)
     // 내가 말을 걸었으면 답을 보겠다는 뜻이다 — 다시 바닥에 붙인다
-    stickRef.current = true
+    if (targetView) scrollToLatest()
+    else {
+      resetMessageJump()
+      stickRef.current = true
+    }
   }
 
   const focusComposerInput = () => agentInputRef.current?.focus()
@@ -3739,7 +3780,8 @@ function AgentSessionView({
       tab: tabId,
       cwd,
       sessionId: meta.sessionId,
-      text: replyTarget ? quoteAgentReply(replyTarget.text, message) : message,
+      text: message,
+      reply: replyTarget ?? undefined,
       execution,
       skills: selectedSkillNames(message, skills),
       at: new Date(at).toISOString(),
@@ -3750,7 +3792,7 @@ function AgentSessionView({
     historyDraftRef.current = ''
     setDraft('')
     setAttachments([])
-    setReplyTarget(current => current === replyTarget ? null : current)
+    setReplyTarget(current => current?.reply === replyTarget ? null : current)
     await refreshScheduled().catch(() => {})
   }
 
@@ -3807,8 +3849,8 @@ function AgentSessionView({
     setExpanded(previous => new Set([...previous, ...turns]))
   }, [items, meta?.busy])
   useEffect(() => {
-    if (active && pending && stickRef.current) scrollToBottom()
-  }, [active, pending, expanded, scrollToBottom])
+    if (active && pending && !targetView && stickRef.current) scrollToBottom()
+  }, [active, pending, expanded, targetView, scrollToBottom])
   const toggle = useCallback((key: string) => setExpanded((prev) => {
     const next = new Set(prev)
     if (next.has(key)) next.delete(key)
@@ -3845,7 +3887,7 @@ function AgentSessionView({
         thinkingConfigId: prompt.settings.thinkingConfigId, modeId: prompt.settings.modeId }
       const knownSkills = [...new Set([...prompt.skills, ...selectedSkillNames(prompt.text, skills)])]
       socket.send(JSON.stringify({ ...prompt, settings, skills: knownSkills }))
-      if (!meta.busy) beginPrompt({ ...prompt, settings }, items.at(-1)?.key ?? null, meta.queued)
+      if (!meta.busy) beginPrompt({ ...prompt, settings }, items.at(-1)?.key ?? null, meta)
       markPromptSent(prompt.text)
       return true
     })
@@ -3861,7 +3903,7 @@ function AgentSessionView({
     const prompt: StartupPrompt = { type: 'prompt', text: initialPrompt.text, displayText,
       images: [], imageRefs: [], attachments: [], skills: selectedSkillNames(initialPrompt.text, skills), settings: messageSettings }
     if (!send(prompt)) { initialPromptSent.current = false; return }
-    beginPrompt({ ...prompt, text: displayText }, items.at(-1)?.key ?? null, meta.queued)
+    beginPrompt({ ...prompt, text: displayText }, items.at(-1)?.key ?? null, meta)
     markPromptSent(displayText)
     stickRef.current = true
   }, [initialPrompt, startupReady, connected, meta, auth, loadingSession, historyPreview, items, skills, messageSettings, send, beginPrompt, markPromptSent])
@@ -3910,6 +3952,8 @@ function AgentSessionView({
   const conversationLoading = !connectionFailed && !historyPreview && (loadingSession !== null || (!!resumeSessionIdRef.current
     && !newConversationPending && !historyRef.current && (!connected
     || (!meta && !auth && !hasError))))
+  const showLatestMessageButton = !!targetView || showScrollToBottom
+  const latestMessageLabel = targetView ? uiText("최신 메시지로 돌아가기") : uiText("에이전트 맨 아래로")
   useLayoutEffect(() => {
     const el = scrollRef.current
     if (!el || !active || conversationLoading) return
@@ -4264,18 +4308,28 @@ function AgentSessionView({
         {timeline.map(item => item.kind === 'command'
           ? <AgentCommandBubble key={item.key} command={item.command} onOpen={() => setCommandPopupId(item.command.id)} />
           : (() => {
-            const replyText = item.kind === 'user' ? withoutAttachmentTokens(item.text).trim() : item.kind === 'turn' ? item.children.filter(child => child.kind === 'agent').map(child => child.kind === 'agent' ? child.text : '').join('\n\n').trim() : ''
-            const reply = replyText && (item.kind === 'user' || item.kind === 'turn') && !historyPreview && !loadingSession && !editingQueued && !cliMode
+            const bubbleId = agentBubbleId(item)
+            const reply = bubbleId && !historyPreview && !loadingSession && !editingQueued && !cliMode
               ? () => {
-                setReplyTarget({ scope: replyScope, text: replyText, kind: item.kind })
-                agentInputRef.current?.focus()
+                const reference = agentReplyReference(item, meta?.sessionId)
+                if (reference) {
+                  setReplyTarget({ scope: replyScope, reply: reference })
+                  agentInputRef.current?.focus()
+                }
               }
               : undefined
-            return <div key={item.key}><AgentConversationItem item={item} expanded={expanded} showSettings={settingsChanges.has(item.key)}
+            const highlighted = highlightedMessageKey === item.key
+            return <div key={item.key}
+              id={bubbleId ? `${messageAnchorPrefix}-${bubbleId}` : undefined}
+              data-agent-message-id={bubbleId} data-agent-item-key={bubbleId ? item.key : undefined}
+              data-agent-message-kind={bubbleId ? item.kind : undefined} tabIndex={highlighted ? -1 : undefined}
+              data-agent-message-highlighted={highlighted ? '' : undefined}
+              className={highlighted ? 'rounded-lg ring-2 ring-accent' : undefined}
+            ><AgentConversationItem item={item} expanded={expanded} showSettings={settingsChanges.has(item.key)}
             workError={workErrors[item.key]} onLoadWork={loadWorkDetails}
-            project={project} readOnly={!!historyPreview} loadingActive={visible} busy={item.key === pendingReplyKey ? null : !historyPreview && item.kind === 'turn' && !item.done ? meta?.activeTask === 'cli' ? false : meta?.busy ?? null : false}
+            project={project} readOnly={!!historyPreview || !!targetView} loadingActive={visible} busy={item.key === pendingReplyKey ? null : !historyPreview && !targetView && item.kind === 'turn' && !item.done ? meta?.activeTask === 'cli' ? false : meta?.busy ?? null : false}
             now={item.kind === 'turn' && !item.done ? now : 0} toggle={toggle} send={send} onOpenFile={onOpenFile} onOpenError={setErrorDetail}
-            onRunCommand={allowTerminal ? runCodeCommand : undefined} codeRunDisabled={codeRunDisabled || (item.kind === 'turn' && !item.done)} onReply={reply} /></div>
+            onRunCommand={allowTerminal ? runCodeCommand : undefined} codeRunDisabled={codeRunDisabled || (item.kind === 'turn' && !item.done && !targetView)} onReply={reply} onJumpToReply={jumpToMessage} /></div>
           })())}
       </div>
       {!conversationLoading && timeline.length > 0 && (
@@ -4283,18 +4337,21 @@ function AgentSessionView({
           <button
             type="button"
             data-agent-scroll-to-bottom
-            onClick={scrollToBottom}
-            inert={!showScrollToBottom}
-            aria-hidden={!showScrollToBottom}
-            tabIndex={showScrollToBottom ? 0 : -1}
-            className={`mew-overlay-surface flex size-8 items-center justify-center rounded-full border border-edge-bright bg-surface-raised text-white shadow-lg transition-opacity duration-150 ease-out motion-reduce:transition-none hover:border-ink-secondary focus-visible:outline-2 focus-visible:outline-accent ${showScrollToBottom ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
-            aria-label={uiText("에이전트 맨 아래로")}
-            data-tip={uiText("에이전트 맨 아래로")}
+            onClick={scrollToLatest}
+            inert={!showLatestMessageButton}
+            aria-hidden={!showLatestMessageButton}
+            tabIndex={showLatestMessageButton ? 0 : -1}
+            className={`mew-overlay-surface flex size-8 items-center justify-center rounded-full border border-edge-bright bg-surface-raised text-white shadow-lg transition-opacity duration-150 ease-out motion-reduce:transition-none hover:border-ink-secondary focus-visible:outline-2 focus-visible:outline-accent ${showLatestMessageButton ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
+            aria-label={latestMessageLabel}
+            data-tip={latestMessageLabel}
           >
             <CaretGlyph dir="down" />
           </button>
         </HoverTipLayer>
       )}
+      {messageJumpNotice && <PanelNotice tone={messageJumpNotice === 'loading' ? 'status' : 'error'}>
+        {messageJumpNotice === 'loading' ? uiText("답장 원문을 불러오는 중…") : uiText("답장 원문을 찾을 수 없습니다.")}
+      </PanelNotice>}
 
       {conversationLoading && <div data-agent-loading className="absolute inset-0 overflow-hidden">
         <AgentLoadingBubbles label={t('common.loading')} active={visible} />
@@ -4325,6 +4382,7 @@ function AgentSessionView({
             const expanded = expandedQueued?.index === index && expandedQueued.text === text
             const queuedFiles = queueMeta?.queuedAttachments?.[index] ?? []
             const queuedSettings = editing?.settings ?? queueMeta?.queuedSettings?.[index]
+            const queuedReply = queueMeta?.queuedReplies?.[index]
             return (
               <div
                 key={`${index}-${text}`}
@@ -4423,6 +4481,7 @@ function AgentSessionView({
                     <XGlyph small />
                   </button>}
                 </div>
+                {queuedReply && <AgentReplyLink reply={queuedReply} onJump={jumpToMessage} />}
               </div>
             )
           })}
@@ -4430,7 +4489,10 @@ function AgentSessionView({
             <div className={queued.length > 0 ? 'border-t border-edge pt-1.5' : ''} aria-label={uiText("예약된 메시지")}>
               {scheduled.map((job) => {
                 const editing = editingScheduled?.id === job.id ? editingScheduled : null
-                return <div key={job.id} className="flex items-center gap-2 py-0.5">
+                return <div key={job.id} className="min-w-0">
+                  {job.reply && <AgentReplyLink reply={job.reply}
+                    onJump={!job.reply.sessionId || job.reply.sessionId === meta?.sessionId ? jumpToMessage : undefined} />}
+                  <div className="flex items-center gap-2 py-0.5">
                   {editing ? (
                     <>
                       <ResizableQueueTextarea
@@ -4483,6 +4545,7 @@ function AgentSessionView({
                   >
                     <XGlyph small />
                   </button>}
+                  </div>
                 </div>
               })}
             </div>
@@ -4584,6 +4647,7 @@ function AgentSessionView({
         </div>
           {defaultsToast}
           <AgentReplyPreview ref={composerReplyRef} target={showReplyPreview ? replyTarget : null}
+            onJump={jumpToMessage}
             onDismiss={() => {
               setReplyTarget(null)
               if (!usesTouchKeyboard()) focusComposerInput()
@@ -5087,7 +5151,7 @@ const AgentMarkdownText = memo(function AgentMarkdownText({ text, onOpenFile, on
 })
 
 const AgentConversationItem = memo(function AgentConversationItem({ item, expanded, showSettings, project, busy, now, loadingActive,
-  toggle, send, onOpenFile, onOpenError, readOnly, onRunCommand, codeRunDisabled, workError, onLoadWork, onReply }: {
+  toggle, send, onOpenFile, onOpenError, readOnly, onRunCommand, codeRunDisabled, workError, onLoadWork, onReply, onJumpToReply }: {
   item: Item
   expanded: Set<string>
   showSettings: boolean
@@ -5105,14 +5169,19 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
   workError?: string
   onLoadWork: (turn: Extract<Item, { kind: 'turn' }>) => void
   onReply?: () => void
+  onJumpToReply: (reply: AgentReplyReference) => void
 }) {
   const { rawUrl } = useWorkspaceApi()
   useUiLocale()
   const { t } = useI18n()
   const [preview, setPreview] = useState<AgentAttachment | null>(null)
-  const replyButton = onReply && <HoverTipLayer className="shrink-0">
+  const questionText = item.kind === 'user' ? withoutAttachmentTokens(item.text).trim() : ''
+  const replyAvailable = onReply && (item.kind === 'user'
+    ? !!questionText
+    : item.kind === 'turn' && item.children.some(child => child.kind === 'agent' && /\S/.test(child.text)))
+  const replyButton = replyAvailable && <HoverTipLayer className="shrink-0">
     <button type="button" data-agent-reply-button
-      onClick={event => { event.stopPropagation(); onReply() }}
+      onClick={event => { event.stopPropagation(); onReply?.() }}
       aria-label={t('comment.reply')} data-tip={t('comment.reply')}
       className="flex size-8 items-center justify-center rounded text-ink-muted hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-ink">
       <Undo width={16} height={16} aria-hidden="true" />
@@ -5125,7 +5194,6 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
     }))
     // 내가 쓴 말이라 이미 아는 내용이다 — 턴 버블과 같게 접어 두고, 눌러야 다 보인다
     const open = expanded.has(item.key)
-    const questionText = withoutAttachmentTokens(item.text).trim()
     const hasReferences = files.length > 0 || documentReferenceTokens(item.text).length > 0
     const toggleQuestion = () => {
       if (!hasSelection()) toggle(item.key)
@@ -5142,6 +5210,7 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
         {/* 설정줄은 작업 버블과 같은 전체 폭, 사용자 발화만 오른쪽으로 들여쓴다. */}
         <div className="ml-6 space-y-2">
         {preview && <AgentMediaPreviewDialog kind={preview.isImage ? 'image' : 'video'} src={rawUrl(preview.relPath, preview.project)} name={preview.relPath.split('/').pop() ?? preview.relPath} onClose={() => setPreview(null)} />}
+        {item.reply && <div className="mx-9"><AgentReplyLink reply={item.reply} onJump={onJumpToReply} /></div>}
         {(questionText || files.length > 0) && (
           <div className="flex items-start gap-1">
             {questionText && <CopyButton text={questionText} label={uiText("이 질문 복사")} />}
@@ -5208,7 +5277,7 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
     const detailsKey = `${item.key}:details`
     const detailsOpen = expanded.has(detailsKey)
     const canStop = busy === true && !item.done
-    const actionSpace = (canStop ? 32 : 0) + (onReply ? 32 : 0)
+    const actionSpace = (canStop ? 32 : 0) + (replyAvailable ? 32 : 0)
     return (
       <div data-agent-turn className="min-w-0 rounded-lg rounded-tl-none border border-edge bg-surface">
         {open && <div data-agent-turn-header className="sticky -top-3 z-20 flex h-8 items-center rounded-tr-lg border-b border-edge bg-surface">
@@ -5233,7 +5302,7 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
                   ? <AgentReplyPending label={t('common.loading')} active={loadingActive} /> : summary}</span>
               </span>
           </button>
-          {(canStop || onReply) && <div className="absolute right-0 top-0.5 flex items-center">
+          {(canStop || replyAvailable) && <div className="absolute right-0 top-0.5 flex items-center">
             {canStop && <button type="button" onClick={() => send({ type: 'cancel' })}
               className="flex size-8 items-center justify-center rounded text-ink-secondary hover:bg-surface-raised hover:text-ink"
               aria-label={uiText("중단")} title={uiText("중단")} data-tip={uiText("중단")}>

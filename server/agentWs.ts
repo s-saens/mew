@@ -7,6 +7,7 @@ import { agentDisplayMessage } from '../shared/agent-display.ts'
 import { isAgentExecutionOptions } from '../shared/agent-execution-options.ts'
 import { validAgentConnectionProbeId, type AgentConnectionPing, type AgentConnectionPong, type AgentConnectionReady } from '../shared/agent-connection.ts'
 import { attachmentPrompt, type AgentAttachmentInput } from '../shared/agent-attachment.ts'
+import { validAgentReply, type AgentReplyReference } from '../shared/agent-reply.ts'
 import { watchSocketAccess } from './access-socket.ts'
 import { webSocketOriginAllowed } from './websocket-origin.ts'
 // 에이전트 창 WS 릴레이 — ACP 세션의 이벤트를 브라우저로 흘리고, 브라우저의 프롬프트·취소·승인을 되돌려 준다.
@@ -40,8 +41,9 @@ const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/
 type ClientMessage = MewcatClientMessage
   | AgentConnectionPing
   | { type: 'history'; range: HistoryRequest }
+  | { type: 'history_target'; requestId: string; generation: string; targetId: string }
   | ({ type: 'history_details'; requestId: string } & HistoryDetailsRequest)
-  | { type: 'prompt'; text: string; displayText?: string; images?: AgentImage[]; imageRefs?: AgentImageRef[]; skills?: string[]; settings?: AgentMessageSettings; attachments?: AgentAttachmentInput[] }
+  | { type: 'prompt'; text: string; displayText?: string; images?: AgentImage[]; imageRefs?: AgentImageRef[]; skills?: string[]; settings?: AgentMessageSettings; attachments?: AgentAttachmentInput[]; reply?: AgentReplyReference }
   | { type: 'cancel' }
   | { type: 'permission'; id: string; optionId: string | null }
   | { type: 'authenticate'; methodId: string; secret?: string }
@@ -127,6 +129,7 @@ function validSettings(value: unknown): AgentMessageSettings | undefined {
 
 type ServerMessage =
   | { type: 'history'; page: HistoryPage<AgentEvent>; restoreFailure?: { sessionId: string; message: string } }
+  | { type: 'history_target'; requestId: string; page: HistoryPage<AgentEvent> | null }
   | { type: 'history_preview'; preview: HistoryPreview<AgentEvent> }
   | { type: 'session_preview'; requestId: string; preview: HistoryPreview<AgentEvent> | null }
   | { type: 'history_event'; event: AgentEvent; position: HistoryPosition }
@@ -213,6 +216,7 @@ async function handleConnection(
   const early: ClientMessage[] = []
   let detach = () => {}
   let previewReads = 0
+  let targetReads = 0
 
   const handle = (msg: ClientMessage) => {
     if (accessChecks.get(ws)?.() === false) { ws.terminate(); return }
@@ -254,6 +258,21 @@ async function handleConnection(
         .finally(() => { previewReads-- })
       return
     }
+    if (msg.type === 'history_target') {
+      if (!validAgentConnectionProbeId(msg.requestId)) return
+      const range = validHistoryRequest({ generation: msg.generation, targetId: msg.targetId, turns: 3 })
+      const respond = (page: HistoryPage<AgentEvent> | null) => send(ws, { type: 'history_target', requestId: msg.requestId, page })
+      if (!session || !history || !range.generation || !range.targetId || targetReads >= 2) {
+        respond(null)
+        return
+      }
+      targetReads++
+      void session.request<HistoryPage<AgentEvent>>({ type: 'history', range })
+        .then(page => respond(page.mode === 'target' && page.generation === range.generation && page.start < page.end ? page : null))
+        .catch(() => respond(null))
+        .finally(() => { targetReads-- })
+      return
+    }
     if (!session) {
       early.push(msg)
       return
@@ -261,7 +280,8 @@ async function handleConnection(
     const live = session
     try {
       if (msg.type === 'history') {
-        if (history) void live.request<HistoryPage<AgentEvent>>({ type: 'history', range: validHistoryRequest(msg.range) })
+        const { targetId: _targetId, ...range } = validHistoryRequest(msg.range)
+        if (history) void live.request<HistoryPage<AgentEvent>>({ type: 'history', range })
           .then(page => send(ws, { type: 'history', page })).catch(fail)
       }
       else if (msg.type === 'history_details') {
@@ -287,7 +307,8 @@ async function handleConnection(
         // 첨부 경로는 에이전트가 읽게 하되, 대화 창에는 사용자가 쓴 프롬프트만 남긴다.
         const displayText = typeof msg.displayText === 'string' ? msg.displayText : msg.text
         const attachments = validAttachments(msg.attachments, runtime)?.map(({ project, path, mimeType }) => ({ project, path, mimeType }))
-        live.send({ type: 'prompt', text: displayText, promptText: assistant ? assistant.prompt(prompt) : promptForRuntime(runtime, cwd, prompt, msg.skills), images, imageRefs, settings: validSettings(msg.settings), attachments })
+        const reply = validAgentReply(msg.reply)
+        live.send({ type: 'prompt', text: displayText, promptText: assistant ? assistant.prompt(prompt) : promptForRuntime(runtime, cwd, prompt, msg.skills), images, imageRefs, settings: validSettings(msg.settings), attachments, reply })
       }
       else if (msg.type === 'cancel') live.send({ type: 'cancel' })
       else if (msg.type === 'permission') live.send({ type: 'permission', id: msg.id, optionId: msg.optionId })

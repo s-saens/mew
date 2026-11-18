@@ -7,6 +7,8 @@ import { agentDisplayEvent, compactHistoryWork } from '../shared/agent-display.t
 import { randomUUID } from 'node:crypto'
 import { agentGitEnv } from './agent-git-identity.ts'
 import type { AgentAttachmentInput, AgentAttachmentRef } from '../shared/agent-attachment.ts'
+import { agentReplyPrompt, restoredAgentReplyPrompt, validAgentReply, type AgentReplyReference } from '../shared/agent-reply.ts'
+import { agentReplySource } from './agent-reply-context.ts'
 import type { AgentExecutionOptions } from '../shared/agent-execution-options.ts'
 import { splitCodexModelId, splitModelVariant, modelVariantId, MODEL_EFFORT_CONFIG_ID } from '../shared/codex-models.ts'
 // ACP(Agent Client Protocol) 클라이언트 — 에이전트를 child process로 띄우고 **워크스페이스**에 묶는다.
@@ -57,7 +59,7 @@ import {
 } from '@agentclientprotocol/sdk'
 import { workspacePaths } from './paths.ts'
 import { UsageReader, type Usage } from './agentUsage.ts'
-import { readAgentTranscript, reconcileAgentTranscript, writeAgentTranscript } from './agentTranscript.ts'
+import { readAgentTranscript, reconcileAgentTranscript, assignAgentBubbleIds, writeAgentTranscript } from './agentTranscript.ts'
 import { listSessionsFromDisk, stripLocalCommandMeta } from './agentSessionList.ts'
 import { readAgentDefault, type AgentRuntimeDefault } from './agentDefaults.ts'
 export {
@@ -134,6 +136,7 @@ type QueuedPrompt = {
   images: AgentImage[]
   imageRefs: AgentImageRef[]
   settings?: AgentMessageSettings
+  reply?: AgentReplyReference
 }
 
 type AgentImage = { data: string; mimeType: string }
@@ -169,6 +172,7 @@ export type SessionMeta = {
   queuedKinds?: ('prompt' | 'clear' | 'cli')[]
   queuedAttachments?: AgentAttachmentRef[][]
   queuedSettings?: (AgentMessageSettings | null)[]
+  queuedReplies?: (AgentReplyReference | null)[]
   activeTask?: 'cli' | null
   accessIssue?: AccessIssue | null
   capacityRetry?: { attempt: number; maxRetries: number; retryAt: number } | null
@@ -196,12 +200,12 @@ type AuthMethodInternal = AgentAuthMethod & { terminal?: TerminalAuthSpec }
 
 export type AgentEvent =
   | HistoryWorkPending
-  | { type: 'update'; update: SessionNotification['update']; settings?: AgentMessageSettings }
+  | { type: 'update'; update: SessionNotification['update']; settings?: AgentMessageSettings; reply?: AgentReplyReference; bubbleId?: string }
   | { type: 'user_images'; images: AgentImageRef[] }
   | { type: 'user_attachments'; attachments: AgentAttachmentRef[] }
   | { type: 'permission'; id: string; toolCall: ToolCallUpdate; options: PermissionOption[] }
   | { type: 'permission_done'; id: string }
-  | { type: 'turn_start'; startedAt: number }
+  | { type: 'turn_start'; startedAt: number; bubbleId?: string }
   | { type: 'turn_end'; stopReason: string; durationMs: number }
   | { type: 'error'; message: string; accessIssue?: AccessIssue }
   | { type: 'models'; models: SessionModelState }
@@ -772,11 +776,16 @@ export class AgentSession {
         if (params.update.sessionUpdate === 'user_message_chunk') {
           const content = params.update.content
           if (!Array.isArray(content) && content?.type === 'text') {
-            const unwrapped = stripLocalCommandMeta(stripMewContext(content.text))
-            const text = selectedRuntimePrompt(unwrapped)?.text ?? unwrapped
+            const unwrapped = stripLocalCommandMeta(content.text)
+            const replyPrompt = restoredAgentReplyPrompt(unwrapped)
+            const display = stripMewContext(replyPrompt?.text ?? unwrapped)
+            const text = selectedRuntimePrompt(display)?.text ?? display
             if (!text) return
             if (text !== content.text) {
-              this.#emit({ type: 'update', update: { ...params.update, content: { ...content, text } } })
+              this.#emit({
+                type: 'update', update: { ...params.update, content: { ...content, text } },
+                ...(replyPrompt ? { reply: replyPrompt.reply } : {}),
+              })
               return
             }
           }
@@ -980,17 +989,20 @@ export class AgentSession {
   }
 
   /** 진행 중인 턴이 있으면 줄을 세운다 — 끝나는 대로 순서대로 이어 돈다 */
-  prompt(text: string, promptText = text, images: AgentImage[] = [], imageRefs: AgentImageRef[] = [], settings?: AgentMessageSettings, automatic = false, attachments?: AgentAttachmentInput[]) {
+  prompt(text: string, promptText = text, images: AgentImage[] = [], imageRefs: AgentImageRef[] = [], settings?: AgentMessageSettings, automatic = false, attachments?: AgentAttachmentInput[], reply?: AgentReplyReference) {
     if (this.#authRequired || !this.#sessionId) throw new Error('먼저 에이전트에 로그인하세요')
     settings = { ...this.#currentMessageSettings(), ...settings }
     attachments = attachments?.map(file => ({
       ...file, image: images[imageRefs.findIndex(ref => ref.path === file.path)],
     }))
+    reply = validAgentReply(reply)
+    if (reply && !reply.sessionId) reply = { ...reply, sessionId: this.#sessionId }
+    const item: QueuedPrompt = { kind: 'prompt', text, promptText, images, imageRefs, settings, attachments, reply }
     if (automatic) {
       const pressure = this.#memoryProblem()
       if (pressure) this.#pauseForMemory(pressure)
       if (this.#memoryPaused) {
-        this.#queue.push({ kind: 'prompt', text, promptText, images, imageRefs, settings, attachments })
+        this.#queue.push(item)
         if (this.#idleTimer) { clearTimeout(this.#idleTimer); this.#idleTimer = null }
         this.#broadcast(this.#metaEvent())
         return
@@ -1002,12 +1014,12 @@ export class AgentSession {
     if (resume) this.#accessIssue = null
     if (resume && !automatic) this.#capacityPaused = false
     if (this.busy || this.#queue.length > 0 || this.#memoryContinuation || this.#clearFailed || this.#capacityPaused) {
-      this.#queue.push({ kind: 'prompt', text, promptText, images, imageRefs, settings, attachments })
+      this.#queue.push(item)
       this.#broadcast(this.#metaEvent())
       if (resume) this.#drainQueue()
       return
     }
-    this.#run(text, promptText, images, imageRefs, settings, attachments)
+    this.#run(item)
   }
 
   enqueueTask(task: AgentQueuedTask) {
@@ -1119,7 +1131,7 @@ export class AgentSession {
       image: item.attachments?.find(saved => saved.project === file.project && saved.path === file.path)?.image ?? file.image,
     }))
     this.#queue[actualIndex] = {
-      kind: 'prompt', text: next, promptText, settings: settings ? { ...item.settings, ...settings } : item.settings,
+      kind: 'prompt', text: next, promptText, reply: item.reply, settings: settings ? { ...item.settings, ...settings } : item.settings,
       attachments: files ?? item.attachments,
       images: files ? files.flatMap(file => file.image ? [file.image] : []) : item.images,
       imageRefs: files ? files.filter(file => ['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.mimeType))
@@ -1188,7 +1200,7 @@ export class AgentSession {
     if (settings.modeId) await this.#conn.setSessionMode({ sessionId: this.#sessionId, modeId: settings.modeId })
   }
 
-  #run(text: string, promptText = text, images: AgentImage[] = [], imageRefs: AgentImageRef[] = [], settings?: AgentMessageSettings, attachments?: AgentAttachmentRef[]) {
+  #run({ text, promptText, images, imageRefs, settings, attachments, reply }: QueuedPrompt) {
     let context: string
     let retrySettings: ReturnType<typeof readAgentCapacityRetrySettings>
     try {
@@ -1220,12 +1232,19 @@ export class AgentSession {
     this.#promptAbort = abort
     this.#turns += 1
     const turnStartedAt = Date.now()
+    if (reply) {
+      const range = reply.sessionId === this.#sessionId ? this.#history.bubbleRange(reply.targetId) : null
+      promptText = agentReplyPrompt(promptText, reply, agentReplySource(this.#events, range, reply))
+    }
     // 사용자 발화도 이벤트 버퍼에 남긴다 — 재접속한 창이 대화를 그대로 복원하려면 여기 있어야 한다
-    this.#emit({ type: 'update', update: { sessionUpdate: 'user_message_chunk', content: { type: 'text', text } }, ...(settings ? { settings } : {}) })
+    this.#emit({
+      type: 'update', update: { sessionUpdate: 'user_message_chunk', content: { type: 'text', text } },
+      bubbleId: randomUUID(), ...(settings ? { settings } : {}), ...(reply ? { reply } : {}),
+    })
     if (attachments?.length) this.#emit({ type: 'user_attachments', attachments: attachments.map(({ project, path, mimeType }) => ({ project, path, mimeType })) })
     else if (imageRefs.length > 0) this.#emit({ type: 'user_images', images: imageRefs })
     // startedAt·durationMs는 이벤트에 새겨 나간다 — 되받은 히스토리에서도 턴 걸린 시간을 그대로 본다
-    this.#emit({ type: 'turn_start', startedAt: turnStartedAt })
+    this.#emit({ type: 'turn_start', startedAt: turnStartedAt, bubbleId: randomUUID() })
     this.#broadcast(this.#metaEvent())
     const prompt: ContentBlock[] = [
       { type: 'text', text: promptText },
@@ -1370,7 +1389,7 @@ export class AgentSession {
       this.#runTask(next)
       return
     }
-    this.#run(next.text, next.promptText, next.images, next.imageRefs, next.settings, next.attachments)
+    this.#run(next)
   }
 
   /** Codex는 큐 경계에서 프로세스를 교체해 이전 thread writer를 반납한다. */
@@ -1432,7 +1451,7 @@ export class AgentSession {
     let replay: AgentEvent[]
     try {
       loaded = await measureAgentPhase(this.runtime, 'session/load', () => this.#conn.loadSession({ sessionId, cwd: this.cwd, mcpServers: this.#sessionMcpServers(), ...skillRuntimeSessionOptions(this.runtime) }))
-      replay = reconcileAgentTranscript(readAgentTranscript(this.runtime, this.cwd, sessionId), this.#loadingEvents)
+      replay = assignAgentBubbleIds(reconcileAgentTranscript(readAgentTranscript(this.runtime, this.cwd, sessionId), this.#loadingEvents))
     } catch (err) {
       // 일부 어댑터는 실패하기 전 update를 몇 개 흘리거나 모드를 바꾼다. 어느 쪽도 현재 세션에 남기지 않는다.
       this.#models = previousModels
@@ -1746,6 +1765,7 @@ export class AgentSession {
         queued: this.#queue.map((item) => item.text),
         queuedKinds: this.#queue.map((item) => item.kind),
         queuedSettings: this.#queue.map(item => item.kind === 'prompt' ? item.settings ?? null : null),
+        queuedReplies: this.#queue.map(item => item.kind === 'prompt' ? item.reply ?? null : null),
         queuedAttachments: this.#queue.map(item => item.kind === 'prompt'
           ? (item.attachments ?? []).map(({ project, path, mimeType }) => ({ project, path, mimeType })) : []),
         activeTask: this.#activeTask ? 'cli' : null,

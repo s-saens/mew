@@ -15,7 +15,7 @@ async function composerValue(input: Locator): Promise<string> {
 }
 
 for (const replyOnly of [true, false]) test(replyOnly
-  ? 'agent reply previews preserve the draft and quote the selected message only on submit'
+  ? 'agent reply previews preserve the draft and send a compact reference that opens the original bubble'
   : 'agent loading and clear feedback cover connection, history and startup queues, preserve drafts and respect reduced motion', { timeout: 60_000 }, async () => {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
@@ -38,7 +38,7 @@ class Socket {
  static OPEN=1;static CLOSED=3;readyState=0;bufferedAmount=0;
  constructor(url){this.tab=new URL(url).searchParams.get('tab');window.socketAttempts[this.tab]=(window.socketAttempts[this.tab]||0)+1;if(window.throwSocket)throw new Error('Socket construction unavailable');window.sockets[this.tab]=this;if(window.fail)setTimeout(()=>this.close(),20)}
  emit(value){this.onmessage?.({data:JSON.stringify(value)})}
- open(restore=true){this.readyState=1;this.onopen?.();if(!restore)return;this.emit({type:'replay',restored:true,events:[{type:'update',update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:'Saved conversation'}}}]});this.emit({type:'meta',meta:{sessionId:this.tab,startedAt:new Date().toISOString(),turns:1,busy:false,queued:[],usage:null,canLoad:true,canList:true}})}
+ open(restore=true){this.readyState=1;this.onopen?.();if(!restore)return;this.emit({type:'replay',restored:true,events:[{type:'update',bubbleId:'original-question',update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:'Saved conversation'}}}]});this.emit({type:'meta',meta:{sessionId:this.tab,startedAt:new Date().toISOString(),turns:1,busy:false,queued:[],usage:null,canLoad:true,canList:true}})}
  send(raw){if(this.readyState!==1)throw new Error('sent while disconnected');const message=JSON.parse(raw);window.messages.push(message);if(message.type==='clear_session'){window.clearTabs.push(this.tab);window.clearFeedbackAtSend=document.querySelector('[data-agent-session]:not([hidden]) [data-agent-clear-feedback]')?.dataset.agentClearFeedback;if(!window.holdClear){this.clearCount=(this.clearCount||0)+1;this.emit({type:'meta',meta:{sessionId:this.tab,busy:true,queued:Array(this.clearCount).fill('/clear'),queuedKinds:Array(this.clearCount).fill('clear'),canLoad:true,canList:true}})}}}
  close(){this.readyState=3;this.onclose?.()}
 }
@@ -223,7 +223,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
 
         await page.evaluate(`(() => {
           const socket = window.sockets.first;
-          socket.emit({type:'turn_start'});
+          socket.emit({type:'turn_start',bubbleId:'original-answer'});
           socket.emit({type:'update',update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Agent answer'}}});
           socket.emit({type:'turn_end',stopReason:'end_turn'});
         })()`)
@@ -237,10 +237,26 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         assert.equal(await send.isDisabled(), true, 'a reply target alone cannot be sent')
         await draft.fill('! Keep this in the reply')
         assert.equal(await composerValue(draft), '! Keep this in the reply')
+        await preview.getByRole('button', { name: /답장 원문 보기/ }).click()
+        assert.equal(await composerValue(draft), '! Keep this in the reply')
         await send.click()
-        assert.equal(await page.evaluate('window.messages.at(-1).text'), '> Agent answer\n\n! Keep this in the reply')
+        const sent = await page.evaluate<{ text: string; displayText: string; reply: unknown }>('window.messages.at(-1)')
+        assert.equal(sent.text, '! Keep this in the reply')
+        assert.equal(sent.displayText, sent.text)
+        assert.deepEqual(sent.reply, { targetId: 'original-answer', kind: 'turn', excerpt: 'Agent answer', sessionId: 'first' })
         assert.equal(await composerValue(draft), '')
         await preview.waitFor({ state: 'hidden' })
+        const reply = session.getByRole('button', { name: /답장 원문 보기/ })
+        await reply.waitFor()
+        assert.equal(await session.getByText('! Keep this in the reply', { exact: true }).count(), 1)
+        await page.evaluate(`(() => {
+          const socket = window.sockets.first;
+          const {text,reply} = window.messages.at(-1);
+          socket.emit({type:'update',bubbleId:'sent-reply',reply,update:{sessionUpdate:'user_message_chunk',content:{type:'text',text}}});
+          socket.emit({type:'turn_start'});
+        })()`)
+        await session.locator('[data-agent-message-id="sent-reply"]').getByRole('button', { name: /답장 원문 보기/ }).click()
+        await page.waitForFunction("document.activeElement?.getAttribute('data-agent-message-id') === 'original-answer'")
         assert.deepEqual(errors, [])
         await page.close()
         continue

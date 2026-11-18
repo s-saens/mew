@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { restoredAgentReplyPrompt, type AgentReplyReference } from '../shared/agent-reply.ts'
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-clear-'))
 process.env.MEW_WORKSPACE = root
@@ -87,6 +88,25 @@ test('Codex clear는 앞 턴과 writer 종료를 기다리고 뒤 큐를 새 대
   assert.deepEqual(ordered, ['boot', 'new', 'prompt', 'done', 'boot', 'new', 'prompt', 'done', 'boot', 'new', 'prompt', 'done'])
   assert.equal(events.filter(e => e.type === 'reset').length, 2)
   assert.ok(!events.some(e => e.type === 'error'))
+})
+
+test('a queued reply crossing clear uses its own source excerpt in the new session', { timeout: 10_000 }, async t => {
+  const { session, events, calls } = await fixture(t)
+  session.prompt('Short excerpt with an unquoted suffix')
+  const source = events.find(event => event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk')
+  assert.ok(source?.type === 'update' && source.bubbleId)
+  const reply: AgentReplyReference = { targetId: source.bubbleId, kind: 'user', excerpt: 'Short excerpt', sessionId: session.sessionId }
+  session.clearAfterQueue()
+  session.prompt('Reply in the new session', undefined, undefined, undefined, undefined, false, undefined, reply)
+  await until(() => session.sessionId === 'session-2' && !session.busy && calls().filter(call => call.type === 'done').length === 2)
+  const prompt = calls().filter(call => call.type === 'prompt').at(-1).text
+  assert.deepEqual(restoredAgentReplyPrompt(prompt), { text: 'Reply in the new session', reply })
+  assert.match(prompt, /\n> Short excerpt\n/)
+  assert.doesNotMatch(prompt, /unquoted suffix/)
+  const user = session.snapshot().find(event => event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk')
+  assert.ok(user?.type === 'update' && user.update.sessionUpdate === 'user_message_chunk')
+  assert.deepEqual(user.update.content, { type: 'text', text: 'Reply in the new session' })
+  assert.deepEqual(user.reply, reply)
 })
 
 for (const failure of ['fail', 'crash']) test(`Codex clear ${failure} 실패는 포인터와 뒤 메시지를 보존하고 재시도로 새 대화에서만 실행한다`, { timeout: 10_000 }, async t => {

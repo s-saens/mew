@@ -2,7 +2,7 @@ import type { HistoryPage, HistoryPosition, HistoryPreview, HistoryWorkPending }
 
 type DisplayEvent = { type: string; update?: { sessionUpdate: string } }
 type DisplayMessage = DisplayEvent & {
-  page?: HistoryPage<DisplayEvent>
+  page?: HistoryPage<DisplayEvent> | null
   preview?: HistoryPreview<DisplayEvent> | null
   events?: DisplayEvent[]
   event?: DisplayEvent
@@ -50,7 +50,7 @@ export function agentDisplayEvent<T extends DisplayEvent>(event: T): T {
 
 /** Apply the same display contract to paged, preview, live and legacy WS messages. */
 export function agentDisplayMessage<T extends DisplayMessage>(message: T): T {
-  if (message.type === 'history' && message.page) return {
+  if ((message.type === 'history' || message.type === 'history_target') && message.page) return {
     ...message, page: { ...message.page, events: message.page.events.map(agentDisplayEvent), controls: message.page.controls.map(agentDisplayEvent) },
   }
   if ((message.type === 'history_preview' || message.type === 'session_preview') && message.preview) return {

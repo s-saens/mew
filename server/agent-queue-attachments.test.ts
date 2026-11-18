@@ -7,6 +7,7 @@ import path from 'node:path'
 import { WebSocket } from 'ws'
 import type { AgentEvent } from './agentAcp.ts'
 import type { AgentAttachmentInput } from '../shared/agent-attachment.ts'
+import { restoredAgentReplyPrompt, type AgentReplyReference } from '../shared/agent-reply.ts'
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-queue-attachments-'))
 process.env.MEW_WORKSPACE = root
@@ -78,13 +79,19 @@ test('WS and supervisor relay queue attachment metadata and edit file refs for C
     send({ type: 'prompt', text: 'image refs', images: [image], imageRefs })
     await until(() => events.filter(event => event.type === 'turn_end').length === 2)
     assert.deepEqual(events.findLast(event => event.type === 'user_images'), { type: 'user_images', images: imageRefs }, 'older clients retain image references from either upload directory')
+    const source = events.findLast(event => event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk')
+    assert.ok(source?.type === 'update' && source.bubbleId)
+    const replyReference: AgentReplyReference = {
+      targetId: source.bubbleId, kind: 'user', excerpt: 'image refs', sessionId: meta()!.sessionId,
+    }
     send({ type: 'set_mode', modeId: 'default' })
     await until(() => events.findLast(event => event.type === 'modes')?.modes.currentModeId === 'default')
     send({ type: 'prompt', text: 'hold' })
-    send({ type: 'prompt', text: 'original\n[[.workspace:.mew/assets/photo.png]]', displayText: 'original', attachments: [file], images: [image], imageRefs: [file] })
+    send({ type: 'prompt', text: 'original\n[[.workspace:.mew/assets/photo.png]]', displayText: 'original', attachments: [file], images: [image], imageRefs: [file], reply: replyReference })
     send({ type: 'begin_edit_queued', index: 0, expect: 'original' })
     await until(() => meta()?.queuedAttachments?.[0]?.length === 1)
     assert.deepEqual(meta()?.queuedAttachments, [[file]])
+    assert.deepEqual(meta()?.queuedReplies, [replyReference])
     assert.equal(meta()?.queuedSettings?.[0]?.modelId, 'alpha', 'queue snapshots the original model even for older clients')
     assert.equal(meta()?.queuedSettings?.[0]?.modeId, 'default')
     send({ type: 'set_model', modelId: 'beta' })
@@ -101,14 +108,19 @@ test('WS and supervisor relay queue attachment metadata and edit file refs for C
     const reply = events.findLast(event => event.type === 'update' && event.update.sessionUpdate === 'agent_message_chunk')
     assert.ok(reply?.type === 'update' && reply.update.sessionUpdate === 'agent_message_chunk')
     const blocks = JSON.parse((reply.update.content as { text: string }).text) as { type: string; text?: string; data?: string }[]
-    assert.equal(blocks[0].text, 'edited\n[[.workspace:.mew/assets/photo.png]]\n[[.workspace:.mew/assets/notes.pdf]]')
+    assert.deepEqual(restoredAgentReplyPrompt(blocks[0].text!), {
+      reply: replyReference, text: 'edited\n[[.workspace:.mew/assets/photo.png]]\n[[.workspace:.mew/assets/notes.pdf]]',
+    })
+    assert.match(blocks[0].text!, /\n> image refs\n/)
     assert.deepEqual(blocks.filter(block => block.type === 'image').map(block => block.data), runtime === 'codex' ? [image.data] : [])
     await until(() => meta()?.busy === false)
     const settingsLog = fs.readFileSync(path.join(root, 'settings-log'), 'utf8').trim().split('\n').map(line => JSON.parse(line))
     assert.deepEqual(settingsLog.at(-1), { modelId:'alpha', effort:'high', modeId:'default', text:blocks[0].text }, 'queued execution uses the edited IDs through WS and supervisor')
     const user = events.findLast(event => event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk')
-    assert.ok(user?.type === 'update')
+    assert.ok(user?.type === 'update' && user.update.sessionUpdate === 'user_message_chunk')
     assert.deepEqual(user.settings, settings)
+    assert.deepEqual(user.update.content, { type: 'text', text: 'edited' })
+    assert.deepEqual(user.reply, replyReference)
     assert.equal(events.findLast(event => event.type === 'models')?.models.currentModelId, 'beta', 'queue execution does not overwrite draft model')
     send({ type:'prompt', text:'after' })
     await until(() => events.filter(event => event.type === 'turn_end').length === 5)
@@ -127,6 +139,7 @@ test('WS and supervisor relay queue attachment metadata and edit file refs for C
       { type: 'user_attachments', attachments },
       { type: 'user_attachments', attachments: [file, pdf] },
     ], 'reconnecting restores both submitted and queued attachment tags')
+    assert.deepEqual(replayed!.find(event => event.type === 'update' && event.reply), user)
     reconnected.close()
     ws.close()
   }

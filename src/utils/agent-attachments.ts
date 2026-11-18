@@ -1,7 +1,7 @@
-import type { AgentAttachmentRef } from '../../shared/agent-attachment'
+import { UPLOADED_ATTACHMENT_TOKEN, type AgentAttachmentRef } from '../../shared/agent-attachment.ts'
+export { withoutAttachmentTokens } from '../../shared/agent-attachment.ts'
 
 type FileReference = { from: number; to: number; token: string; project: string; path: string; title?: string }
-const UPLOADED_ATTACHMENT_TOKEN = /\[\[([^:\]\n]+):(\.mew\/(?:temp\/assets|assets|files)\/[^\]\n]+)\]\]/g
 const escapeReference = (value: string) => value.replace(/[\\|[\]\r\n]/g, char => `\\${char === '\n' ? 'n' : char === '\r' ? 'r' : char}`)
 const unescapeReference = (value: string) => value.replace(/\\([\\|[\]nr])/g, (_, char: string) => char === 'n' ? '\n' : char === 'r' ? '\r' : char)
 
@@ -34,10 +34,6 @@ export function uploadedAttachmentTokens(text: string): FileReference[] {
   return [...text.matchAll(UPLOADED_ATTACHMENT_TOKEN)].map(match => ({
     from: match.index, to: match.index + match[0].length, token: match[0], project: match[1], path: match[2],
   }))
-}
-
-export function withoutAttachmentTokens(text: string): string {
-  return text.replace(UPLOADED_ATTACHMENT_TOKEN, '').replace(/\[\[mew-upload:[^\]\n]+\]\]/g, '')
 }
 
 export function attachmentKind(mimeType: string, path: string): 'image' | 'video' | 'audio' | 'file' {

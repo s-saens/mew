@@ -26,6 +26,34 @@ test('recent pages preserve complete turns and loading all prior pages reconstru
   assert.equal(cached.events.length, 80)
 })
 
+test('target pages locate a durable bubble in a small window without changing the live cursor', () => {
+  const withIds = events.map((event, seq) => event.type === 'turn_start' ? { ...event, bubbleId: `answer-${seq}` } : event)
+  const source = new HistoryIndex<AgentEvent>('generation')
+  withIds.forEach(event => source.push(event))
+  const current = mergeHistoryPage(null, source.page(withIds, 'session', { turns: 3 }))!
+  const range = source.page(withIds, 'session', { generation: 'generation', targetId: 'answer-41', turns: 3 })
+  assert.equal(range.mode, 'target')
+  assert.deepEqual(range.events, withIds.slice(36, 48))
+  assert.deepEqual(source.bubbleRange('answer-41'), { start: 40, end: 44 })
+  assert.deepEqual(source.bubbleRange('turn41'), { start: 40, end: 44 })
+  assert.deepEqual(source.page(withIds, 'session', { generation: 'old', targetId: 'answer-41' }).events, [])
+  assert.deepEqual(source.page(withIds, 'session', { generation: 'generation', targetId: 'missing' }).events, [])
+  assert.equal(mergeHistoryPage(current, range), null)
+  assert.equal(current.start, 388)
+})
+
+test('target indexing distinguishes adjacent user bubbles by ID and retains their chunks', () => {
+  const source = new HistoryIndex<AgentEvent>('generation')
+  const question = events[0]
+  assert.equal(question.type, 'update')
+  source.push({ ...question, bubbleId: 'first' })
+  source.push(question)
+  source.push({ ...question, bubbleId: 'second' })
+  source.push(question)
+  assert.deepEqual(source.bubbleRange('first'), { start: 0, end: 2 })
+  assert.deepEqual(source.bubbleRange('second'), { start: 2, end: 4 })
+})
+
 test('reconnect sends only new events; duplicate live events are ignored and gaps rejected', () => {
   const source = index()
   let state = mergeHistoryPage(null, source.page(events, 'session'))!

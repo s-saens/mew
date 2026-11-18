@@ -11,7 +11,7 @@ import { foldEvents } from '../src/utils/agentFold.ts'
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-agent-transcript-'))
 process.env.MEW_DATA_DIR = dataDir
 
-const { readAgentTranscript, readAgentTranscriptRange, reconcileAgentTranscript, writeAgentTranscript, transcriptKey, closeTranscriptDatabase } = await import('./agentTranscript.ts')
+const { readAgentTranscript, readAgentTranscriptRange, reconcileAgentTranscript, assignAgentBubbleIds, writeAgentTranscript, transcriptKey, closeTranscriptDatabase } = await import('./agentTranscript.ts')
 after(() => { closeTranscriptDatabase(); fs.rmSync(dataDir, { recursive: true, force: true }) })
 
 type AgentEvent = import('./agentAcp.ts').AgentEvent
@@ -24,6 +24,35 @@ const settingsB = { ...settingsA, thinking: 'low' }
 const configuredUser = (text: string, settings = settingsA): AgentEvent => ({ ...message('user', text), settings } as AgentEvent)
 const userSettings = (events: AgentEvent[]) => events.flatMap(event =>
   event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk' ? [event.settings] : [])
+
+test('saved bubble IDs and reply references survive ACP chunk coalescing and changed prefixes', () => {
+  const sourceId = '1633eecd-9caa-49bf-a894-b4a62c53e1d0'
+  const userId = '60850159-2b52-4635-b5af-b862893a02fb'
+  const answerId = '0c80bbdf-fc3a-4b5f-a160-7e4ee93d949f'
+  const reply = { targetId: sourceId, kind: 'turn' as const, excerpt: 'Original answer' }
+  const saved = [
+    ...savedTurn,
+    message('user', 'Source message'),
+    { ...message('agent', 'Original answer'), bubbleId: sourceId } as AgentEvent,
+    { ...message('user', 'Reply message'), bubbleId: userId, reply } as AgentEvent,
+    { type: 'turn_start', startedAt: 1, bubbleId: answerId } as AgentEvent,
+    message('agent', 'Part one.'), message('agent', 'Part two.'),
+    { type: 'turn_end', stopReason: 'end_turn', durationMs: 42 } as AgentEvent,
+  ]
+  const loaded = [message('user', 'External prefix'), message('agent', 'External answer'),
+    message('user', 'Source message'), message('agent', 'Original answer'),
+    message('user', 'Reply message'), message('agent', 'Part one.Part two.')]
+  assert.equal(writeAgentTranscript('codex', '/work', 'reply-id', saved), true)
+  const restored = assignAgentBubbleIds(reconcileAgentTranscript(readAgentTranscript('codex', '/work', 'reply-id'), loaded))
+  assert.deepEqual(restored.slice(3, 6), [
+    { ...loaded[3], bubbleId: sourceId },
+    { ...loaded[4], bubbleId: userId, reply },
+    { ...loaded[5], bubbleId: answerId },
+  ])
+  assert.ok(restored[0].type === 'update' && restored[0].bubbleId)
+  assert.ok(restored[1].type === 'update' && restored[1].bubbleId)
+  assert.deepEqual(assignAgentBubbleIds(restored), restored)
+})
 
 test('앞 질문이 바뀌어도 유일하고 순서가 같은 질문과 답변의 시간은 반복 복원한다', () => {
   const saved = [...savedTurn, message('user', '유일한 질문'), message('agent', '보존할 답변'),

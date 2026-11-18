@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { appendEventFold, createEventFold, foldEvents, formatDuration, isTurnComplete, type AgentEvent } from './agentFold.ts'
+import { agentBubbleId, agentReplyReference } from './agent-replies.ts'
 import { composeRuntimePrompt } from '../../server/agentRuntimes.ts'
 
 const user = (text: string): Extract<AgentEvent, { type: 'update' }> => ({
@@ -29,6 +30,25 @@ test('한 턴은 질문 하나와 답변 묶음 하나로 접힌다', () => {
   assert.deepEqual(items.map((i) => i.kind), ['user', 'turn'])
   const turn = items[1]
   assert.equal(turn.kind === 'turn' && turn.done, true)
+})
+
+test('reply references stay separate from user text and point to the same bubble across history positions', () => {
+  const reply = { targetId: 'answer-id', kind: 'turn', excerpt: 'First part Second part', sessionId: 'session-id' } as const
+  const history: AgentEvent[] = [
+    { ...user('Initial question'), bubbleId: 'question-id' },
+    { type: 'turn_start', bubbleId: 'answer-id' },
+    agent('First part'),
+    { type: 'update', update: { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Private details' } } },
+    agent('Second part'),
+    { ...user('Follow-up'), bubbleId: 'reply-id', reply },
+  ]
+  const [question, answer, followUp] = foldEvents(history, 'en', 130)
+  assert.equal(agentBubbleId(question), 'question-id')
+  assert.equal(agentBubbleId(answer), 'answer-id')
+  assert.deepEqual(agentReplyReference(answer, 'session-id'), reply)
+  assert.equal(followUp.kind === 'user' && followUp.text, 'Follow-up')
+  assert.deepEqual(followUp.kind === 'user' && followUp.reply, reply)
+  assert.equal(agentBubbleId(foldEvents(history, 'en')[1]), agentBubbleId(answer))
 })
 
 test('late MCP startup diagnostics do not create a completed answer bubble', () => {

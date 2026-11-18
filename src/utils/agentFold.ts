@@ -1,6 +1,7 @@
 import type { AgentExecutionOptions } from '../../shared/agent-execution-options'
 import type { HistoryPage, HistoryPosition, HistoryPreview } from '../../shared/agent-history.ts'
 import type { AgentAttachmentRef } from '../../shared/agent-attachment.ts'
+import type { AgentReplyReference } from '../../shared/agent-reply.ts'
 import type { AgentConnectionReady, AgentConnectionPong } from '../../shared/agent-connection.ts'
 import { isMcpStartupEvent } from '../../shared/agent-display.ts'
 import { selectedRuntimePrompt } from '../../shared/selected-runtime-prompt.ts'
@@ -43,6 +44,7 @@ export type SessionMeta = {
   queuedKinds?: ('prompt' | 'clear' | 'cli')[]
   queuedAttachments?: AgentAttachmentRef[][]
   queuedSettings?: (AgentMessageSettings | null)[]
+  queuedReplies?: (AgentReplyReference | null)[]
   activeTask?: 'cli' | null
   accessIssue?: AccessIssue | null
   memoryPaused?: boolean
@@ -89,16 +91,17 @@ export type AgentEvent =
   | { type: 'work_pending'; count: number }
   | { type: 'history_details'; requestId: string; generation: string; start: number; end: number; events?: AgentEvent[]; error?: string }
   | { type: 'history'; page: HistoryPage<AgentEvent>; restoreFailure?: { sessionId: string; message: string } }
+  | { type: 'history_target'; requestId: string; page: HistoryPage<AgentEvent> | null }
   | { type: 'history_preview'; preview: HistoryPreview<AgentEvent> }
   | { type: 'session_preview'; requestId: string; preview: HistoryPreview<AgentEvent> | null }
   | { type: 'history_event'; event: AgentEvent; position: HistoryPosition }
-  | { type: 'update'; update: SessionUpdate; settings?: AgentMessageSettings }
+  | { type: 'update'; update: SessionUpdate; settings?: AgentMessageSettings; bubbleId?: string; reply?: AgentReplyReference }
   | { type: 'user_images'; images: { path: string; mimeType: string }[] }
   | { type: 'user_attachments'; attachments: AgentAttachmentRef[] }
   | { type: 'permission'; id: string; toolCall: { title?: string | null }; options: PermissionOption[] }
   | { type: 'permission_done'; id: string }
   // startedAt·durationMs — 서버(agentAcp.ts)가 턴 시작·끝에 새겨 보낸다. 옛 서버 이벤트에는 없을 수 있다
-  | { type: 'turn_start'; startedAt?: number }
+  | { type: 'turn_start'; startedAt?: number; bubbleId?: string }
   | { type: 'turn_end'; stopReason: string; durationMs?: number }
   | { type: 'error'; message: string; accessIssue?: AccessIssue }
   | AgentConnectionReady
@@ -127,11 +130,11 @@ export type InnerItem =
   | { key: string; kind: 'error'; text: string }
 
 export type Item =
-  | { key: string; kind: 'user'; text: string; images: { path: string; mimeType: string }[]; attachments: AgentAttachmentRef[]; settings?: AgentMessageSettings; messageId?: string }
+  | { key: string; kind: 'user'; text: string; images: { path: string; mimeType: string }[]; attachments: AgentAttachmentRef[]; settings?: AgentMessageSettings; messageId?: string; bubbleId?: string; reply?: AgentReplyReference }
   // stopReason — 턴이 어떻게 끝났나('end_turn'·'cancelled'·'error' 등, ACP 값 그대로).
   // 되받은 히스토리에는 turn_end가 없어 null로 남는다
   // startedAt(에포크 ms)·durationMs — 작업 버블의 걸린 시간 표시용. 옛 히스토리는 null이다
-  | { key: string; kind: 'turn'; children: InnerItem[]; done: boolean; stopReason: string | null; startedAt: number | null; durationMs: number | null }
+  | { key: string; kind: 'turn'; children: InnerItem[]; done: boolean; stopReason: string | null; startedAt: number | null; durationMs: number | null; bubbleId?: string }
   | { key: string; kind: 'error'; text: string }
 
 /** 밀리초를 "15초"·"36분 32초"·"2시간 3분 4초" 꼴로 — 0인 윗 단위는 떼고, 초는 반올림한다 */
@@ -259,6 +262,7 @@ export function appendEventFold(previous: EventFold, events: AgentEvent[]): Even
     if (event.type === 'turn_start') {
       const turn = ensureTurn(i)
       if (event.startedAt != null) turn.startedAt = event.startedAt
+      if (event.bubbleId) turn.bubbleId = event.bubbleId
       continue
     }
     if (event.type === 'user_attachments') {
@@ -339,10 +343,17 @@ export function appendEventFold(previous: EventFold, events: AgentEvent[]): Even
       // ID가 바뀌면 연속 프레임이어도 반드시 새 질문 버블로 나눈다.
       const sameMessage = last?.kind === 'user'
         && (!update.messageId || update.messageId === last.messageId)
+        && (!event.bubbleId || event.bubbleId === last.bubbleId)
       if (last && last.kind === 'user' && sameMessage) {
         const user = editItem(items.length - 1) as typeof last
         user.text += (user.text ? '\n' : '') + text
-      } else pushItem({ key: `m${i}`, kind: 'user', text, images: [], attachments: [], ...(event.settings ? { settings: event.settings } : {}), ...(update.messageId ? { messageId: update.messageId } : {}) })
+      } else pushItem({
+        key: `m${i}`, kind: 'user', text, images: [], attachments: [],
+        ...(event.settings ? { settings: event.settings } : {}),
+        ...(update.messageId ? { messageId: update.messageId } : {}),
+        ...(event.bubbleId ? { bubbleId: event.bubbleId } : {}),
+        ...(event.reply ? { reply: event.reply } : {}),
+      })
       // 새 질문은 앞 턴을 닫는다 — 불러온 히스토리에는 turn_end가 없어서 여기서 끊지 않으면
       // 지난 대화 전체가 턴 하나로 뭉친다
       const open = currentTurn()
@@ -354,6 +365,7 @@ export function appendEventFold(previous: EventFold, events: AgentEvent[]): Even
       const kind = update.sessionUpdate === 'agent_message_chunk' ? 'agent' as const : 'thought' as const
       const text = update.content?.type === 'text' ? (update.content.text ?? '') : `[${update.content?.type}]`
       const turn = ensureTurn(i)
+      if (event.bubbleId) turn.bubbleId ??= event.bubbleId
       const last = turn.children.at(-1)
       // 같은 답변의 청크만 합친다. 히스토리 속 별도 답변을 마지막 답변 버블에 합치지 않는다.
       const sameMessage = last?.kind === kind

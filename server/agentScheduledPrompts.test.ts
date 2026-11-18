@@ -37,6 +37,7 @@ const { scheduleAgentPrompt, updateAgentScheduledPrompt, listAgentScheduledPromp
 const { runWithAgentAccount } = await import('./agent-account-settings.ts')
 const scope = { runtime: 'codex', tab: 'scheduled-tab', cwd: process.env.MEW_WORKSPACE }
 const input = () => ({ ...scope, sessionId: 'saved-session', text: 'Verify the scheduled change', skills: [], at: new Date(Date.now() + 60_000).toISOString() })
+const reply = { targetId: '1633eecd-9caa-49bf-a894-b4a62c53e1d0', kind: 'turn', excerpt: 'Earlier answer', sessionId: 'saved-session' }
 const saved = () => JSON.parse(fs.readFileSync(file, 'utf8')) as import('./agentScheduledPrompts.ts').AgentScheduledPrompt[]
 function reset() {
   fs.writeFileSync(file, '[]')
@@ -66,12 +67,14 @@ test('one-time schedules validate and persist independent execution choices whil
   assert.equal(saved().length, 2, 'invalid requests do not mutate the schedule')
 })
 
-test('editing or rescheduling retains captured execution unless explicitly replaced', () => {
-  const job = scheduleAgentPrompt({ ...input(), execution: { build: false, deploy: true } })
+test('editing or rescheduling retains the reply and captured execution choices', () => {
+  const job = scheduleAgentPrompt({ ...input(), execution: { build: false, deploy: true }, reply })
   const edited = updateAgentScheduledPrompt({ ...input(), id: job.id, text: 'Edited scheduled request', at: new Date(Date.now() + 90_000).toISOString() })
   assert.deepEqual(edited.execution, { build: false, deploy: true })
   assert.equal(saved()[0].text, 'Edited scheduled request')
   assert.deepEqual(saved()[0].execution, { build: false, deploy: true })
+  assert.deepEqual(edited.reply, reply)
+  assert.deepEqual(saved()[0].reply, reply)
   const replaced = updateAgentScheduledPrompt({ ...input(), id: job.id, execution: { build: true, deploy: false } })
   assert.deepEqual(replaced.execution, { build: true, deploy: false })
   assert.throws(() => updateAgentScheduledPrompt({ ...input(), id: job.id, execution: { build: true } }), AgentScheduledPromptError)
@@ -86,7 +89,7 @@ test('restored schedules deliver their saved execution and account through the a
     { build: true, deploy: false }, { build: false, deploy: true },
     { build: false, deploy: false }, { build: true, deploy: true },
   ]
-  for (const execution of choices) runWithAgentAccount('schedule@example.test', () => scheduleAgentPrompt({ ...input(), execution }))
+  for (const execution of choices) runWithAgentAccount('schedule@example.test', () => scheduleAgentPrompt({ ...input(), execution, reply }))
   scheduleAgentPrompt(input())
   fs.writeFileSync(file, JSON.stringify(saved().map(job => ({ ...job, at: new Date(Date.now() - 1_000).toISOString() }))))
   startAgentScheduledPrompts()
@@ -110,7 +113,10 @@ test('restored schedules deliver their saved execution and account through the a
     assert.equal(message.automatic, true)
     assert.equal(message.text, input().text)
     assert.equal(message.promptText, message.text)
-    if (index < choices.length) assert.deepEqual(message.settings, { model: '', thinking: '', permission: '', execution: choices[index] })
+    if (index < choices.length) {
+      assert.deepEqual(message.settings, { model: '', thinking: '', permission: '', execution: choices[index] })
+      assert.deepEqual(message.reply, reply)
+    }
     else assert.equal(Object.hasOwn(message, 'settings'), false, 'legacy schedules retain existing guidance behavior')
   }
 })

@@ -5,6 +5,7 @@ import type { CachedHistory } from './agent-history-cache.ts'
 
 /** Reject gaps; never advance a reconnect cursor beyond records actually held by the browser. */
 export function mergeHistoryPage(current: CachedHistory | null, page: HistoryPage<AgentEvent>): CachedHistory | null {
+  if (page.mode === 'target') return null
   page = { ...page, events: expandHistoryWork(page.events) }
   if (page.events.length !== page.end - page.start || page.start < 0 || page.end > page.total) return null
   const same = current?.generation === page.generation && current.sessionId === page.sessionId

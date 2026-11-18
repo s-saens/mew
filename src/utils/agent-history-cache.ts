@@ -3,7 +3,7 @@ import { HistoryIndex } from '../../shared/agent-history.ts'
 import type { HistoryPage } from '../../shared/agent-history.ts'
 import type { AgentEvent, SessionMeta } from './agentFold.ts'
 
-export type CachedQueue = Pick<SessionMeta, 'sessionId' | 'queued' | 'queuedKinds' | 'queuedAttachments' | 'queuedSettings'>
+export type CachedQueue = Pick<SessionMeta, 'sessionId' | 'queued' | 'queuedKinds' | 'queuedAttachments' | 'queuedSettings' | 'queuedReplies'>
 export type CachedHistory = Omit<HistoryPage<AgentEvent>, 'controls' | 'mode'> & { queue?: CachedQueue }
 type Meta = Omit<CachedHistory, 'events'> & { key: string; tab: string; savedAt: number; bytes: number }
 const DB_NAME = 'mew-agent-history'
@@ -196,9 +196,9 @@ export async function readQueueCache(key: string): Promise<CachedQueue | null> {
     && queue.queued.every(text => typeof text === 'string') ? queue : null
 }
 export function writeQueueCache(key: string, tab: string, meta: CachedQueue): Promise<void> {
-  const { sessionId, queued, queuedKinds, queuedAttachments, queuedSettings } = meta
+  const { sessionId, queued, queuedKinds, queuedAttachments, queuedSettings, queuedReplies } = meta
   return writeHistoryCache(queueCacheKey(key), tab, {
     sessionId, generation: 'queue', start: 0, end: 0, total: 0, usersBefore: 0, events: [],
-    queue: { sessionId, queued, queuedKinds, queuedAttachments, queuedSettings },
+    queue: { sessionId, queued, queuedKinds, queuedAttachments, queuedSettings, queuedReplies },
   })
 }

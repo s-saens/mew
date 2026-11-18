@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { AgentAttachmentRef } from '../../shared/agent-attachment'
+import type { AgentReplyReference } from '../../shared/agent-reply'
 import type { AgentEvent, AgentMessageSettings, Item, SessionMeta } from '../utils/agentFold'
 import { uuid } from '../utils/uuid'
 
-type Prompt = { text: string; attachments: AgentAttachmentRef[]; settings: AgentMessageSettings }
+type Prompt = { text: string; attachments: AgentAttachmentRef[]; settings: AgentMessageSettings; reply?: AgentReplyReference }
 type Feedback = {
   user: Extract<Item, { kind: 'user' }>
   afterKey: string | null
@@ -12,6 +13,20 @@ type Feedback = {
   echoed: boolean
   waiting: boolean
   queuedCount: number
+}
+
+function sameReply(a: AgentReplyReference | null | undefined, b: AgentReplyReference | null | undefined) {
+  return a?.targetId === b?.targetId && a?.kind === b?.kind
+}
+
+function matchingQueued(texts: string[], replies: SessionMeta['queuedReplies'], user: Pick<Feedback['user'], 'text' | 'reply'>) {
+  return texts.filter((text, index) => text === user.text && (!replies || sameReply(replies[index], user.reply))).length
+}
+
+function isPromptEcho(event: AgentEvent, user: Feedback['user']): boolean {
+  return event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk'
+    && event.update.content.type === 'text' && event.update.content.text === user.text
+    && (!event.bubbleId && !event.reply || sameReply(event.reply, user.reply))
 }
 
 /** Local display feedback never enters the sequenced transcript or its cache. */
@@ -23,12 +38,12 @@ export function useAgentPromptFeedback(items: Item[]) {
     setFeedback(next)
   }, [])
   const clear = useCallback(() => update(null), [update])
-  const begin = useCallback((prompt: Prompt, afterKey: string | null, queued: string[], startupId?: number) => {
+  const begin = useCallback((prompt: Prompt, afterKey: string | null, meta: Pick<SessionMeta, 'queued' | 'queuedReplies'> | null, startupId?: number) => {
     if (current.current?.waiting) return
     update({ user: { key: `local-${uuid()}`, kind: 'user', text: prompt.text, images: [],
-      attachments: prompt.attachments, settings: prompt.settings }, afterKey, startupId,
+      attachments: prompt.attachments, settings: prompt.settings, reply: prompt.reply }, afterKey, startupId,
       sent: startupId === undefined, echoed: false, waiting: true,
-      queuedCount: queued.filter(text => text === prompt.text).length })
+      queuedCount: meta ? matchingQueued(meta.queued, meta.queuedReplies, { text: prompt.text, reply: prompt.reply }) : 0 })
   }, [update])
   const markSent = useCallback((text: string) => {
     const value = current.current
@@ -42,8 +57,7 @@ export function useAgentPromptFeedback(items: Item[]) {
     if (!next?.sent) return
     for (const event of events) {
       if (event.type === 'reset') { next = null; break }
-      if (event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk'
-        && event.update.content.type === 'text' && event.update.content.text === next.user.text) {
+      if (isPromptEcho(event, next.user)) {
         next = { ...next, echoed: true }
       }
       if (event.type === 'turn_start' && next.echoed) { next = null; break }
@@ -57,10 +71,9 @@ export function useAgentPromptFeedback(items: Item[]) {
   const acknowledgeQueue = useCallback((meta: SessionMeta, buffered: AgentEvent[]) => {
     const value = current.current
     // A later identical queued prompt can be acknowledged before this frame's echo is painted.
-    if (value && buffered.some(event => event.type === 'update'
-      && event.update.sessionUpdate === 'user_message_chunk' && event.update.content.text === value.user.text)) return
+    if (value && buffered.some(event => isPromptEcho(event, value.user))) return
     if (value?.sent && !value.echoed
-      && meta.queued.filter(text => text === value.user.text).length > value.queuedCount) clear()
+      && matchingQueued(meta.queued, meta.queuedReplies, value.user) > value.queuedCount) clear()
   }, [clear])
   const replace = useCallback(() => {
     if (current.current?.sent) clear()

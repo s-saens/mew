@@ -1,12 +1,12 @@
 /** Transport ranges are half-open: [start, end). A generation changes whenever history is replaced. */
 export type HistoryCursor = { generation: string; end: number }
-export type HistoryRequest = { generation?: string; after?: number; before?: number; deferWork?: boolean; turns?: number }
+export type HistoryRequest = { generation?: string; after?: number; before?: number; targetId?: string; deferWork?: boolean; turns?: number }
 export type HistoryWorkPending = { type: 'work_pending'; count: number }
 export type HistoryDetailsRequest = { generation: string; start: number; end: number }
 export type HistoryDetails<T> = HistoryDetailsRequest & { events: T[] }
 export type HistoryPage<T> = {
   generation: string; sessionId: string; start: number; end: number; total: number
-  usersBefore: number; mode: 'replace' | 'append' | 'prepend'; events: T[]; controls: T[]
+  usersBefore: number; mode: 'replace' | 'append' | 'prepend' | 'target'; events: T[]; controls: T[]
 }
 export type HistoryPosition = { generation: string; seq: number }
 /** Display-only saved records; never a session pointer or a reconnect cursor. */
@@ -26,7 +26,7 @@ export function expandHistoryWork<T extends { type: string }>(events: readonly (
   return expanded
 }
 
-type EventShape = { type: string; update?: { sessionUpdate: string; messageId?: string } }
+type EventShape = { type: string; bubbleId?: string; update?: { sessionUpdate: string; messageId?: string } }
 
 /** Maintains user boundaries incrementally; never splits a streamed question or its answer. */
 export class HistoryIndex<T extends EventShape> {
@@ -34,14 +34,19 @@ export class HistoryIndex<T extends EventShape> {
   boundaries: number[] = []
   controls = new Map<string, T>()
   length = 0
+  private bubblePositions = new Map<string, number>()
   private lastUser = false
   private messageId: string | undefined
+  private userBubbleId: string | undefined
   constructor(generation: string) { this.generation = generation }
   push(event: T) {
+    if (event.bubbleId && !this.bubblePositions.has(event.bubbleId)) this.bubblePositions.set(event.bubbleId, this.length)
     if (event.type === 'update' && event.update?.sessionUpdate === 'user_message_chunk') {
-      if (!this.lastUser || event.update.messageId && event.update.messageId !== this.messageId) {
+      if (!this.lastUser || event.update.messageId && event.update.messageId !== this.messageId
+        || event.bubbleId && event.bubbleId !== this.userBubbleId) {
         this.boundaries.push(this.length)
         this.messageId = event.update.messageId
+        this.userBubbleId = event.bubbleId
       }
       this.lastUser = true
     } else if (['turn_start', 'permission', 'error', 'fatal', 'work_pending'].includes(event.type)
@@ -51,24 +56,47 @@ export class HistoryIndex<T extends EventShape> {
     if (['models', 'modes', 'thinking'].includes(event.type)) this.controls.set(event.type, event)
     this.length++
   }
-  range(request: HistoryRequest = {}) {
-    const boundaryIndex = (seq: number) => {
-      let lo = 0, hi = this.boundaries.length
-      while (lo < hi) {
-        const middle = (lo + hi) >>> 1
-        if (this.boundaries[middle] < seq) lo = middle + 1
-        else hi = middle
-      }
-      return lo
+  private boundaryIndex(seq: number) {
+    let lo = 0, hi = this.boundaries.length
+    while (lo < hi) {
+      const middle = (lo + hi) >>> 1
+      if (this.boundaries[middle] < seq) lo = middle + 1
+      else hi = middle
     }
+    return lo
+  }
+
+  private bubbleBoundary(targetId: string): number | null {
+    const explicit = this.bubblePositions.get(targetId)
+    const legacy = explicit === undefined ? /^(?:m|turn)(0|[1-9]\d*)$/.exec(targetId) : null
+    const seq = explicit ?? (legacy ? Number(legacy[1]) : -1)
+    if (!Number.isSafeInteger(seq) || seq < 0 || seq >= this.length) return null
+    return this.boundaryIndex(seq + 1) - 1
+  }
+
+  bubbleRange(targetId: string): { start: number; end: number } | null {
+    const boundary = this.bubbleBoundary(targetId)
+    if (boundary === null) return null
+    return { start: this.boundaries[boundary] ?? 0, end: this.boundaries[boundary + 1] ?? this.length }
+  }
+
+  range(request: HistoryRequest = {}) {
     const turns = Number.isSafeInteger(request.turns) && request.turns! >= 1 && request.turns! <= HISTORY_PAGE_TURNS ? request.turns! : HISTORY_PAGE_TURNS
+    if (request.targetId) {
+      const boundary = request.generation === this.generation ? this.bubbleBoundary(request.targetId) : null
+      if (boundary === null) return { generation: this.generation, start: 0, end: 0, total: this.length, usersBefore: 0, mode: 'target' as const }
+      const first = boundary - Math.floor((turns - 1) / 2)
+      const start = first >= 0 ? this.boundaries[first] : 0
+      const end = this.boundaries[Math.max(first, 0) + turns] ?? this.length
+      return { generation: this.generation, start, end, total: this.length, usersBefore: this.boundaryIndex(start), mode: 'target' as const }
+    }
     const recent = this.boundaries.length > turns ? this.boundaries[this.boundaries.length - turns] : 0
     let start = recent, end = this.length, mode: HistoryPage<T>['mode'] = 'replace'
     if (request.generation === this.generation) {
       if (Number.isSafeInteger(request.after) && request.after! >= recent && request.after! <= end) {
         start = request.after!; mode = 'append'
       } else if (Number.isSafeInteger(request.before) && request.before! > 0 && request.before! <= end) {
-        const boundary = boundaryIndex(request.before!)
+        const boundary = this.boundaryIndex(request.before!)
         if (this.boundaries[boundary] === request.before) {
           end = request.before!
           start = boundary > turns ? this.boundaries[boundary - turns] : 0
@@ -76,7 +104,7 @@ export class HistoryIndex<T extends EventShape> {
         }
       }
     }
-    const usersBefore = boundaryIndex(start)
+    const usersBefore = this.boundaryIndex(start)
     return { generation: this.generation, start, end, total: this.length, usersBefore, mode }
   }
   page(events: T[], sessionId: string, request: HistoryRequest = {}): HistoryPage<T> {
@@ -90,6 +118,7 @@ export function validHistoryRequest(value: unknown): HistoryRequest {
   const input = value as HistoryRequest
   const result: HistoryRequest = {}
   if (typeof input.generation === 'string' && input.generation.length <= 100) result.generation = input.generation
+  if (typeof input.targetId === 'string' && /^[\w-]{1,100}$/.test(input.targetId)) result.targetId = input.targetId
   for (const key of ['after', 'before'] as const) if (Number.isSafeInteger(input[key]) && input[key]! >= 0) result[key] = input[key]
   if (input.deferWork === true) result.deferWork = true
   if (Number.isSafeInteger(input.turns) && input.turns! >= 1 && input.turns! <= HISTORY_PAGE_TURNS) result.turns = input.turns

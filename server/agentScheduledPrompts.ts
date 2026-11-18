@@ -7,13 +7,14 @@ import { DATA_DIR, readJsonFile, writeFileAtomic } from './dataDir.ts'
 import { composeRuntimePrompt, RUNTIMES } from './agentRuntimes.ts'
 import { listSkills } from './skills.ts'
 import { isAgentExecutionOptions, type AgentExecutionOptions } from '../shared/agent-execution-options.ts'
+import { validAgentReply, type AgentReplyReference } from '../shared/agent-reply.ts'
 
 const FILE = path.join(DATA_DIR, 'agent-scheduled-prompts.json')
 const TAB_ID = /^[A-Za-z0-9_-]{1,64}$/
 const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/
 const MAX_PROMPT = 100_000
 
-export type AgentScheduledPrompt = { account?: string | null; id: string; runtime: string; tab: string; cwd: string; sessionId: string; text: string; skills: string[]; execution?: AgentExecutionOptions; at: string; createdAt: string }
+export type AgentScheduledPrompt = { account?: string | null; id: string; runtime: string; tab: string; cwd: string; sessionId: string; text: string; skills: string[]; execution?: AgentExecutionOptions; reply?: AgentReplyReference; at: string; createdAt: string }
 export class AgentScheduledPromptError extends Error {}
 type AgentScheduledPromptScope = Pick<AgentScheduledPrompt, 'runtime' | 'tab' | 'cwd'>
 
@@ -50,10 +51,12 @@ function validate(input: unknown): Omit<AgentScheduledPrompt, 'id' | 'createdAt'
   const when = new Date(typeof value.at === 'string' ? value.at : '')
   const skills = Array.isArray(value.skills) ? value.skills.filter((name): name is string => typeof name === 'string') : []
   const execution = validateExecution(value.execution)
+  const reply = validAgentReply(value.reply)
   if (RUNTIMES[runtime]?.surface !== 'acp' || !TAB_ID.test(tab) || !path.isAbsolute(cwd) || !SESSION_ID.test(sessionId)) throw new AgentScheduledPromptError('예약할 에이전트 세션이 올바르지 않습니다')
   if (!text || text.length > MAX_PROMPT) throw new AgentScheduledPromptError('예약할 메시지를 입력하세요')
   if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now()) throw new AgentScheduledPromptError('미래의 날짜와 시간을 고르세요')
-  return { runtime, tab, cwd, sessionId, text, skills: [...new Set(skills)], ...(execution ? { execution } : {}), at: when.toISOString() }
+  return { runtime, tab, cwd, sessionId, text, skills: [...new Set(skills)], ...(execution ? { execution } : {}),
+    ...(reply ? { reply: { ...reply, sessionId: reply.sessionId ?? sessionId } } : {}), at: when.toISOString() }
 }
 
 function validateScope(input: unknown): AgentScheduledPromptScope {
@@ -83,7 +86,8 @@ async function dispatch(job: AgentScheduledPrompt) {
     const promptText = wanted.size ? composeRuntimePrompt(job.runtime, job.text, listSkills(job.cwd, job.runtime).filter((skill) => wanted.has(skill.name))) : job.text
     // prompt()는 실행 중인 세션에 자동으로 큐잉한다. 새 감독은 resume 힌트로 원 세션을 먼저 load한다.
     const settings = job.execution ? { model: '', thinking: '', permission: '', execution: { ...job.execution } } : undefined
-    client.send({ type: 'prompt', text: job.text, promptText, automatic: true, ...(settings ? { settings } : {}) })
+    client.send({ type: 'prompt', text: job.text, promptText, automatic: true, ...(settings ? { settings } : {}),
+      ...(job.reply ? { reply: job.reply } : {}) })
   } finally { client.close() }
 }
 async function runDue() {

@@ -87,6 +87,21 @@ test('WS negotiates paged history, live sequence and reconnect delta without ful
   assert.equal(expandHistoryWork(initial.events).length, initial.end - initial.start)
   assert.ok(initial.events.some(event => event.type === 'work_pending'))
   assert.ok(!initial.events.some(event => event.type === 'update' && event.update.sessionUpdate === 'tool_call'))
+  const target = stored.find(event => event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk'
+    && event.update.content.type === 'text' && event.update.content.text === 'q4')
+  assert.ok(target?.type === 'update' && target.bubbleId)
+  lazy.ws.send(JSON.stringify({ type: 'history_target', requestId: 'target', generation: initial.generation, targetId: target.bubbleId }))
+  await until(() => lazy.messages.some(item => item.type === 'history_target' && item.requestId === 'target'))
+  const targetPage = lazy.messages.find(item => item.type === 'history_target' && item.requestId === 'target').page as HistoryPage<AgentEvent>
+  assert.equal(targetPage.mode, 'target')
+  assert.equal(targetPage.usersBefore, 3)
+  assert.ok(targetPage.end < initial.start)
+  assert.equal(targetPage.events.filter(event => event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk').length, 3)
+  displayTools(targetPage.events)
+  assert.equal(lazy.messages.filter(item => item.type === 'history').length, 1, 'target response is separate from live history')
+  lazy.ws.send(JSON.stringify({ type: 'history_target', requestId: 'stale', generation: 'old-generation', targetId: target.bubbleId }))
+  await until(() => lazy.messages.some(item => item.type === 'history_target' && item.requestId === 'stale'))
+  assert.equal(lazy.messages.find(item => item.type === 'history_target' && item.requestId === 'stale').page, null)
   const detailsRange = { generation: initial.generation, start: initial.start, end: initial.end }
   lazy.ws.send(JSON.stringify({ type: 'history_details', requestId: 'details', ...detailsRange }))
   await until(() => lazy.messages.some(item => item.type === 'history_details' && item.requestId === 'details'))

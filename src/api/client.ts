@@ -1,4 +1,5 @@
 import type { AgentExecutionOptions } from '../../shared/agent-execution-options'
+import type { AgentReplyReference } from '../../shared/agent-reply'
 import type { AgentTaskBindings } from '../../shared/agent-task-bindings'
 import type { ProjectAction, ProjectActionArtifact, ProjectActionRun, ProjectActionsState } from '../../shared/project-actions'
 import type { ProjectPipeline, ProjectPipelineRun, ProjectPipelinesState } from '../../shared/project-pipelines'
@@ -104,6 +105,7 @@ export interface AgentCwdSuggestions {
 
 export interface AgentScheduledPrompt {
   execution?: AgentExecutionOptions
+  reply?: AgentReplyReference
   id: string
   runtime: string
   tab: string
@@ -748,6 +750,7 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     cwd: string
     sessionId: string
     text: string
+    reply?: AgentReplyReference
     execution?: AgentExecutionOptions
     skills: string[]
     at: string

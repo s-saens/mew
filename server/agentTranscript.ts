@@ -5,6 +5,7 @@ import path from 'node:path'
 import { DatabaseSync, type StatementSync } from 'node:sqlite'
 import { DATA_DIR, readJsonFile } from './dataDir.ts'
 import type { AgentEvent } from './agentAcp.ts'
+import { isMcpStartupEvent } from '../shared/agent-display.ts'
 import type { SessionSearchResult } from '../shared/agent-session-search.ts'
 import {
   initializeAgentSessionSearch, queryAgentSessionSearch, readAgentSessionSearchState,
@@ -201,24 +202,55 @@ export function readAgentTranscriptRange(runtime: string, cwd: string, sessionId
     .all(transcriptKey(runtime, cwd, sessionId), start, end).map(row => JSON.parse(String(row.payload)) as AgentEvent)
 }
 
+/** Old transcripts receive stable addresses when the authoritative history is restored. */
+export function assignAgentBubbleIds(events: AgentEvent[]): AgentEvent[] {
+  let lastUser = false, messageId: string | undefined, turnAddressed = false
+  return events.map(event => {
+    if (isMcpStartupEvent(event)) return event
+    if (event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk') {
+      const id = (event.update as { messageId?: string }).messageId
+      const first = !lastUser || !!id && id !== messageId
+      if (first) messageId = id
+      lastUser = true
+      turnAddressed = false
+      return first && !event.bubbleId ? { ...event, bubbleId: crypto.randomUUID() } : event
+    }
+    if (event.type === 'turn_end') turnAddressed = false
+    if (event.type === 'turn_start' || event.type === 'update' && event.update.sessionUpdate === 'agent_message_chunk') {
+      lastUser = false
+      const first = !turnAddressed
+      turnAddressed = true
+      return first && !event.bubbleId ? { ...event, bubbleId: crypto.randomUUID() } : event
+    }
+    if (event.type === 'turn_end' || event.type === 'work_pending' || event.type === 'permission' || event.type === 'error'
+      || event.type === 'update' && (event.update.sessionUpdate === 'agent_thought_chunk' || event.update.sessionUpdate === 'tool_call')) lastUser = false
+    return event
+  })
+}
+
 /** ACP may replay whole messages while the saved transcript contains streaming chunks. */
 function conversationTurns(events: AgentEvent[]): { events: AgentEvent[]; identity: string; userIdentity: string }[] {
   const turns: { events: AgentEvent[]; identity: string; userIdentity: string }[] = []
   let group: AgentEvent[] = [], messages: { role: string; content: unknown[] }[] = [], hasUser = false, replied = false
+  let userMessageId: string | undefined
   const flush = () => {
     if (group.length) turns.push({
       events: group,
       identity: JSON.stringify(messages),
       userIdentity: JSON.stringify(messages.filter(message => message.role === 'user_message_chunk')),
     })
-    group = []; messages = []; hasUser = false; replied = false
+    group = []; messages = []; hasUser = false; replied = false; userMessageId = undefined
   }
   for (const event of events) {
     const update = event.type === 'update' ? event.update : null
     const user = update?.sessionUpdate === 'user_message_chunk'
-    if (user && hasUser && replied) flush()
+    const messageId = user ? (update as { messageId?: string }).messageId : undefined
+    if (user && hasUser && (replied || messageId && messageId !== userMessageId)) flush()
     group.push(event)
-    if (user) hasUser = true
+    if (user) {
+      if (!hasUser) userMessageId = messageId
+      hasUser = true
+    }
     else if (event.type === 'turn_end' || update && ['agent_message_chunk', 'agent_thought_chunk', 'tool_call', 'tool_call_update'].includes(update.sessionUpdate)) replied = true
     if (update?.sessionUpdate !== 'user_message_chunk' && update?.sessionUpdate !== 'agent_message_chunk') continue
     const role = update.sessionUpdate
@@ -255,7 +287,8 @@ export function reconcileAgentTranscript(saved: AgentEvent[] | null, loaded: Age
     return freshUsers.get(turn.userIdentity) === index && savedIndex !== undefined && savedIndex >= 0
       && cached[savedIndex].identity === turn.identity
       && turn.events.some(event => event.type === 'update' && event.update.sessionUpdate === 'agent_message_chunk')
-      && cached[savedIndex].events.some(event => event.type === 'turn_end' && typeof event.durationMs === 'number')
+      && cached[savedIndex].events.some(event => event.type === 'turn_end' && typeof event.durationMs === 'number'
+        || (event.type === 'turn_start' || event.type === 'update') && !!event.bubbleId)
       ? [{ index, savedIndex }] : []
   })
   const orderedAnchors = new Map<number, number>()
@@ -282,17 +315,36 @@ export function reconcileAgentTranscript(saved: AgentEvent[] | null, loaded: Age
     if (!previous) return turn.events
     // ACP can omit intermediate answers and turn_end. Retain the recorded ending
     // for the same question, unless ACP supplies an ending of its own.
-    const ending = turn.userIdentity !== '[]' ? previous.events.findLast(event => event.type === 'turn_end') : undefined
+    const ending = turn.userIdentity !== '[]' ? previous.events.findLast(event =>
+      event.type === 'turn_end' && (matchingUsers || typeof event.durationMs === 'number')) : undefined
     const events = ending && !turn.events.some(event => event.type === 'turn_end')
       ? [...turn.events, ending] : turn.events
-    if (!matchingUsers) return events
-    const settings = previous.events.flatMap(event =>
+    const previousUser = previous.events.find(event => event.type === 'update'
+      && event.update.sessionUpdate === 'user_message_chunk' && (event.bubbleId || event.reply))
+    const previousAnswer = previous.events.find(event => (event.type === 'turn_start'
+      || event.type === 'update' && event.update.sessionUpdate === 'agent_message_chunk') && event.bubbleId)
+    const settings = matchingUsers ? previous.events.flatMap(event =>
       event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk' && event.settings ? [event.settings] : [])
+      : []
     const first = settings[0]
-    if (!first || settings.some(value => value.model !== first.model || value.thinking !== first.thinking || value.permission !== first.permission)) return events
-    return events.map(event =>
-      event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk' && !event.settings
-        ? { ...event, settings: first }
-        : event)
+    const agreedSettings = first && settings.every(value => value.model === first.model && value.thinking === first.thinking && value.permission === first.permission) ? first : undefined
+    let addressedUser = false, addressedAnswer = false
+    return events.map(event => {
+      if (event.type === 'update' && event.update.sessionUpdate === 'user_message_chunk') {
+        const address = !addressedUser && previousUser?.type === 'update' ? previousUser : null
+        addressedUser = true
+        return address || agreedSettings && !event.settings ? {
+          ...event,
+          ...(!event.settings && agreedSettings ? { settings: agreedSettings } : {}),
+          ...(!event.bubbleId && address?.bubbleId ? { bubbleId: address.bubbleId } : {}),
+          ...(!event.reply && address?.reply ? { reply: address.reply } : {}),
+        } : event
+      }
+      if (!addressedAnswer && (event.type === 'turn_start' || event.type === 'update' && event.update.sessionUpdate === 'agent_message_chunk')) {
+        addressedAnswer = true
+        if (!event.bubbleId && previousAnswer && 'bubbleId' in previousAnswer) return { ...event, bubbleId: previousAnswer.bubbleId }
+      }
+      return event
+    })
   })
 }

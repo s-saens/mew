@@ -1,8 +1,8 @@
 ---
 title: "Conversation Storage and Range Synchronization"
 created: 2026-09-30
-updated: "2026-11-11"
-description: "Conversation persistence and recovery contracts: SQLite originals, attachments, range/work-detail synchronization, selected-skill prompt display, and temporary transcript display before ACP readiness. Defines previews, device cache, authority, and incremental rendering."
+updated: "2026-11-18"
+description: "Conversation persistence and recovery in SQLite, attachment and reply metadata, message-targeted history, and range and work-detail synchronization. Covers provider authority, pre-restoration previews, the device cache, and incremental rendering."
 상위파일: "MOC.md"
 ---
 
@@ -61,6 +61,14 @@ Do not split consecutive chunks and answers for one question. Turn count alone t
 - Retrieve authoritative history and work details through existing tab WS/supervisor IPC, rechecking authentication and feature permissions. The read-only [saved tab preview API](#saved-previews-for-unopened-tabs) resolves an account-owned tab; [history-result previews](#saved-previews-for-history-results) use the authenticated connection's runtime and cwd. Failed automatic restoration preserves the original tab pointer and device transcript.
 
 Binary search of the question boundary array finds the preceding range and `usersBefore`. It preserves range/question boundaries while avoiding a prefix scan proportional to turn count on every request.
+
+### Reply References
+
+Addressable user messages and agent answers carry Mew bubble IDs in their transcript events. The supervisor assigns IDs to older bubbles on authoritative restoration and persists them with the transcript. A reply stores `targetId`, source `kind`, a normalized `excerpt` of up to 180 Unicode code points, and the originating `sessionId` when known. The user-written text remains the display body, including after provider replay. Previously stored Markdown-quoted replies retain their text.
+
+Resolve targets within the authorized conversation. When submitting a reply, the supervisor reads the source text from the matching turn and limits runtime context to 12,000 UTF-16 code units. It uses the excerpt if the source is unavailable. A versioned prompt wrapper lets Mew recover the user-written text and reply metadata from provider replay.
+
+The browser jumps to a displayed target without a request. For an older target it sends `{type:'history_target', requestId, generation, targetId}` over the authenticated tab connection. The supervisor resolves the ID through an incrementally maintained map, finds its turn through the existing boundary index, and returns up to three turns in a display history page with `mode:'target'`. The browser displays that range separately from the live history cursor and device cache. [Reply feature contract](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#reply-to-a-message) · [Reply reference decision](../decisions/0189-agent-reply-references.md).
 
 ### Display Tool Events
 

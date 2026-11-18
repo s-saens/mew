@@ -8,7 +8,10 @@ import { connectTestBrowser } from './test-browser.ts'
 import { documentReference } from '../src/utils/agent-attachments.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
-test('paged conversations keep scroll position and restore account-scoped IndexedDB on desktop/mobile', { timeout: 120_000 }, async () => {
+test('distant reply jumps request one bounded page and return to retained latest messages on desktop/mobile', { timeout: 60_000 }, () => runHistoryUiTest(true))
+test('paged conversations keep scroll position and restore account-scoped IndexedDB on desktop/mobile', { timeout: 120_000 }, () => runHistoryUiTest(false))
+
+async function runHistoryUiTest(verifyDistantReply: boolean) {
   const source = `import React from '${root}/node_modules/react/index.js';
 import {createRoot} from '${root}/node_modules/react-dom/client.js';
 import {AgentPanel} from '${root}/src/components/AgentPanel.tsx';
@@ -17,7 +20,7 @@ import {HistoryIndex} from '${root}/shared/agent-history.ts';
 import * as cache from '${root}/src/utils/agent-history-cache.ts';
 localStorage.setItem('mew:locale','ko');window.cache=cache;window.requests=[];window.openedFiles=[];
 Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{window.copied=text}}});
-const events=JSON.parse(sessionStorage.getItem('fixture-events')||'[]');if(!events.length)for(let i=0;i<45;i++)events.push({type:'update',update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:'Question '+i}}},{type:'turn_start'},{type:'update',update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Answer '+i+' '+(i===42||i===43?'long readable answer\\n\\n'.repeat(65):i===40?'long readable answer '.repeat(100):i===44?'short':'long readable answer '.repeat(15))}}},...(i===44?[
+const events=JSON.parse(sessionStorage.getItem('fixture-events')||'[]');if(!events.length)for(let i=0;i<45;i++)events.push({type:'update',...(${verifyDistantReply}&&i===44?{reply:{targetId:'older-answer',kind:'turn',excerpt:'Answer 1',sessionId:'conversation'}}:{}),update:{sessionUpdate:'user_message_chunk',content:{type:'text',text:'Question '+i}}},{type:'turn_start',...(${verifyDistantReply}&&i===1?{bubbleId:'older-answer'}:{})},{type:'update',update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Answer '+i+' '+(i===42||i===43?'long readable answer\\n\\n'.repeat(65):i===40?'long readable answer '.repeat(100):i===44?'short':'long readable answer '.repeat(15))}}},...(i===44?[
 {type:'update',update:{sessionUpdate:'tool_call',toolCallId:'saved-tool-1',title:'Read project requirements',status:'completed'}},
 {type:'update',update:{sessionUpdate:'agent_thought_chunk',content:{type:'text',text:'Considering project requirements'}}},
 {type:'update',update:{sessionUpdate:'tool_call',toolCallId:'saved-tool-2',title:'Inspect renderer',status:'failed'}},
@@ -29,7 +32,8 @@ class Socket {
  static OPEN=1;readyState=0;
  constructor(url){window.socket=this;this.url=url;window.requests.push(url);setTimeout(()=>{this.readyState=1;this.onopen?.();const query=new URL(url).searchParams;this.emit({type:'history',page:index.page(events,'conversation',{generation:query.get('generation'),after:query.has('after')?Number(query.get('after')):undefined})});this.emit(meta)},location.search.includes('slow')?1500:20)}
  emit(event){if(['update','user_images','user_attachments','turn_start','turn_end','permission','permission_done','error','fatal'].includes(event.type)){const position={generation:index.generation,seq:events.length};events.push(event);index.push(event);event={type:'history_event',event,position}}this.onmessage?.({data:JSON.stringify(event)})}
- send(raw){const message=JSON.parse(raw);window.requests.push(message);if(message.type==='history')setTimeout(()=>this.emit({type:'history',page:index.page(events,'conversation',message.range)}),20)}
+ send(raw){const message=JSON.parse(raw);window.requests.push(message);if(message.type==='history')setTimeout(()=>this.emit({type:'history',page:index.page(events,'conversation',message.range)}),20);
+  if(message.type==='history_target')setTimeout(()=>this.emit({type:'history_target',requestId:message.requestId,page:index.page(events,'conversation',{generation:message.generation,targetId:message.targetId,turns:3})}),20)}
  close(){this.readyState=3;this.onclose?.()}
 }
 window.WebSocket=Socket;window.historyIndex=index;window.fixtureEvents=events;
@@ -75,6 +79,23 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       await page.goto('http://mew-history.test/')
       await page.getByText('Question 44', { exact: true }).waitFor()
       assert.equal(await page.getByText('Question 24', { exact: true }).count(), 0)
+      if (verifyDistantReply) {
+        await page.locator('button[data-agent-reply-reference]').click()
+        const oldAnswer = page.locator('[data-agent-message-id="older-answer"]')
+        await oldAnswer.locator('[data-agent-turn-footer]').waitFor()
+        assert.equal(await oldAnswer.evaluate(el => el.ownerDocument.activeElement === el), true, 'a distant answer receives focus')
+        assert.equal(await oldAnswer.getAttribute('data-agent-message-highlighted'), '', 'jump marks the destination')
+        assert.equal(await page.getByText('Question 24', { exact: true }).count(), 0, 'target jump skips intervening history')
+        assert.equal(await page.evaluate('window.requests.filter(request => request.type === "history_target").length'), 1)
+        assert.equal(await page.evaluate('window.requests.filter(request => request.type === "history").length'), 0, 'target jump does not fetch preceding pages')
+        await page.getByRole('button', { name: '최신 메시지로 돌아가기' }).click()
+        await page.getByText('Question 44', { exact: true }).waitFor()
+        assert.equal(await oldAnswer.count(), 0, 'returning to latest restores the original window')
+        assert.equal(await page.evaluate('window.requests.filter(request => request.type === "history").length'), 0, 'latest window is retained locally')
+        assert.deepEqual(errors, [])
+        await page.close()
+        continue
+      }
       const savedHeader = page.locator('[data-agent-turn-header]').filter({ has: page.getByText('Saved final answer', { exact: true }) })
       const savedTurn = page.locator('[data-agent-turn]').filter({ hasText: 'Saved final answer' })
       await savedHeader.locator('button[aria-expanded]').click()
@@ -738,4 +759,4 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
       await page.close()
     }
   } finally { await browser.close() }
-})
+}
