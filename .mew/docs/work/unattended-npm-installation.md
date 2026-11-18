@@ -1,6 +1,6 @@
 ---
 title: "Unattended npm installation and remote onboarding"
-description: "Records implementation of the mew-ide npm entry, managed Postgres, background startup, Windows WSL bootstrap, and remote onboarding. Includes local verification for the 0.1.1 release preparation and the 0.1.2–0.1.4 cross-platform fixes, and the 0.1.5 release matrix."
+description: "Records implementation of the mew-ide npm entry, managed Postgres, background startup, Windows WSL bootstrap, and remote onboarding. Covers release preparation and verification of the public 0.1.5 GitHub assets."
 updated: "2026-11-18"
 ---
 
@@ -82,12 +82,11 @@ Moved the native Windows x64 and arm64 builds into a manually dispatched verific
 
 On Linux with Node.js 24.16.0, the build and lint passed. All 24 host, lock, and release tests passed. The CLI suite passed 78 tests and skipped the opt-in live PostgreSQL test. The release tests exercised the upload list and rejected incomplete manifests and changed assets. The documentation check passed all 865 descriptions and reported 39 existing broken links outside the changed documents.
 
-The [0.1.5 tag run](https://github.com/s-saens/mew/actions/runs/44251423119) passed all four runtime jobs and the standalone job. The downloaded installer and standalone archive matched their SHA-256 checksums. The release job reached the protected `cli-release` review. Public downloads and clean-host acceptance were still pending at that point.
+The [0.1.5 tag run](https://github.com/s-saens/mew/actions/runs/44251423119) passed all four runtime jobs and the standalone job. After protected environment approval, GitHub published the [0.1.5 release](https://github.com/s-saens/mew/releases/tag/mew-cli-v0.1.5). An anonymous download verified the installer and standalone archive against `SHA256SUMS`. GitHub's asset digests matched the manifest for all six payloads. The npm job was skipped.
 
 ## Remaining gates
 
-The initial npm package and matching runtime releases are not published by this
-task. Verify package ownership and protected publication separately. Clean
+The initial npm publication requires separate package ownership and publisher verification. Clean
 Linux/macOS installation, Windows WSL absence/preparation/UAC/reboot resume,
 login startup, terminal closure, Postgres behavior on the other supported platforms, browser
 opening, provider sign-in, and remote connectivity require platform acceptance.

@@ -1,6 +1,6 @@
 ---
 title: "CLI Releases and npm Publishing"
-description: "Release procedure for the mew-ide npm package, curl installer, and platform runtime archives. Covers four Linux/macOS runtimes, separate native Windows CI, and publication gates for 0.1.5."
+description: "Release procedure for the mew-ide npm package, curl installer, and platform runtime archives. Covers the public 0.1.5 GitHub assets, separate native Windows CI, and installation acceptance."
 updated: "2026-11-18"
 상위파일:
   - "../../../docs/deployment/native.md"
@@ -81,7 +81,7 @@ Assign reviewers for `cli-release`, `npm-publish`, `desktop-release`, and the se
 
 Archive link checks resolve the runtime root and final symlink targets against the same physical directory on macOS. CLI tests check Unix permissions on POSIX hosts, including WSL, where the Windows installer runs managed Postgres.
 
-The source tree prepares version `0.1.5` for the first public CLI release. The matching GitHub runtime release, npm publication, and clean-host acceptance are pending.
+The first public GitHub CLI release is [mew-cli-v0.1.5](https://github.com/s-saens/mew/releases/tag/mew-cli-v0.1.5). Its versioned assets include the shell installer. The tag run skipped npm publication. Clean-host installation acceptance remains pending.
 
 For the initial publication, verify scope permissions using the responsible person's npm account before proceeding. First create the runtime tag release, then review the package contents in `apps/cli/` and publish.
 
@@ -112,5 +112,4 @@ Before advertising curl installation, also verify a host without Node/npm/Git,
 an existing WSL 2 distribution with and without user systemd, Windows interop
 failure, login task ownership and reboot recovery, quoted installation paths,
 private Node after login, interrupted/repeated downloads, and preservation of
-unrelated files and distributions. No public script or shell assets have been
-published or accepted on clean hosts by the current implementation task.
+unrelated files and distributions. See the [installation work record](../work/unattended-npm-installation.md#015-release-preparation) for the verified public downloads.
