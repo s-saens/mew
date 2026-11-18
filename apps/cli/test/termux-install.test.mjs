@@ -9,7 +9,7 @@ import { promisify } from 'node:util'
 
 const exec = promisify(execFile)
 
-test('Termux bootstrap installs verified source and runs setup in the terminal', {
+test('Termux bootstrap installs verified source and runs setup without prompts', {
   skip: process.platform !== 'linux',
 }, async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-termux-test-'))
@@ -19,10 +19,10 @@ test('Termux bootstrap installs verified source and runs setup in the terminal',
   const source = path.join(directory, 'source')
   const archive = path.join(directory, 'source.tar.gz')
   const installer = path.join(directory, 'install.sh')
-  const destination = path.join(home, '.local/opt/mew-termux')
+  const destination = path.join(home, '.local/opt/mew-termux-0.1.6')
   for (const folder of [home, bin, source]) await fs.mkdir(folder)
   await fs.writeFile(path.join(source, 'package-lock.json'), '{}')
-  await fs.writeFile(path.join(source, 'mew'), 'test -t 0 && test "$1" = setup && printf "setup\n" >> setup.log\n')
+  await fs.writeFile(path.join(source, 'mew'), 'set -e; test ! -t 0; test "$*" = "setup --termux-defaults"; printf "setup\n" >> setup.log\n')
   execFileSync('tar', ['-czf', archive, '-C', directory, 'source'])
   const hash = createHash('sha256').update(await fs.readFile(archive)).digest('hex')
   const script = await fs.readFile(new URL('../../../install-termux.sh', import.meta.url), 'utf8')
