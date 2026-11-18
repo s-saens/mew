@@ -1,8 +1,8 @@
 ---
 title: "Project selection panel appearance"
-description: "Records transparent mobile and multi-project selectors, project-add controls, external path labels, local verification, and remaining documentation link failures."
+description: "Records transparent mobile and multi-project selectors, the edge-to-edge mobile current-project highlight, project-add controls, external path labels, and local verification."
 created: "2026-11-17"
-updated: "2026-11-17"
+updated: "2026-11-18"
 ---
 
 The panel-scoped project selector now exposes the workspace background and hides the underlying project while open. Its title bar matches the project panel height and colors, and the Korean title reads **프로젝트 선택**. The current layout contract is in [workspace layout](../development/ui-workspace-layout.md).
@@ -14,3 +14,9 @@ Local verification: the Korean copy test and the browser tests for adding a pane
 The mobile selector now uses a transparent surface over the theme background, with Add beside Close. The add dialog offers New project, Git clone, and Browse. Registered projects outside the server's managed root show their paths beside their names; the server checks the actual managed root, including a symlinked root. The [navigation contract](../development/ui-project-navigation.md) describes the current controls.
 
 Local verification covered project registration, project path labels, the add dialog, and panel-scoped selection and focus. Lint completed with warnings. The documentation metadata check passed; the link check reported 39 existing missing targets and an asset URL. The build passed locally. The build updates browser assets served from `dist/`; server source changes require a separate server reload. No server was restarted and no deployment was performed. Physical-device appearance remains unverified.
+
+## Mobile current-project highlight
+
+The full-screen selector now extends the current project's background across the panel while keeping its controls aligned with the other rows. See the [navigation contract](../development/ui-project-navigation.md#header-project-switcher).
+
+The Chromium regression reproduced the 12px left gap before the change and verified both edges at 390px afterward. The build passed, and lint completed with warnings. Documentation descriptions passed validation. The link check reported 39 existing errors. Verification used a local browser fixture. No server was restarted and no deployment was performed.
