@@ -152,17 +152,35 @@ export function ProjectCatalogPanel({ paths, onOpen, onProjectsChanged, beforeMu
         {renderedRows.map((row, visualIndex) => {
           const { ref, ...handleProps } = drag.getItemProps(visualIndex)
           const hasChildren = rows.some(child => child.parentPath === row.path)
+          const isExpanded = !!search || expanded.has(row.path)
           const project = byPath.get(row.path)!
           const mine = paths.includes(row.path) || imported.has(row.path)
           const showPath = !project.inManagedRoot || duplicates.has(project.name)
           const indent = Math.min(row.depth, 5)
           return <div key={row.path} ref={selection ? ref : undefined} data-catalog-project={row.path} data-project-depth={row.depth} data-active={row.path === activePath || undefined} className="mew-project-catalog-row">
-            {selection && <MenuReorderHandle {...handleProps} aria-label={`${project.name} · ${t('project.reorder')}`} onMove={direction => moveSibling(visualIndex, direction)} />}
+            {selection && <MenuReorderHandle {...handleProps}
+              aria-label={`${project.name} · ${hasChildren ? isExpanded ? '−' : '+' : t('project.reorder')}`}
+              aria-expanded={hasChildren ? isExpanded : undefined}
+              onMove={direction => moveSibling(visualIndex, direction)}
+              onPointerDown={event => {
+                if (event.isPrimary && event.button === 0) drag.consumeClick()
+                handleProps.onPointerDown(event)
+              }}
+              onClick={event => {
+                if (event.detail > 0 && drag.consumeClick()) return
+                if (!hasChildren || search) return
+                setExpanded(previous => {
+                  const next = new Set(previous)
+                  if (next.has(row.path)) next.delete(row.path)
+                  else next.add(row.path)
+                  return next
+                })
+              }}>
+              {hasChildren ? (isExpanded ? <NavArrowDown width={14} aria-hidden="true" /> : <NavArrowRight width={14} aria-hidden="true" />) : undefined}
+            </MenuReorderHandle>}
             {indent > 0 && <span aria-hidden="true" className="mew-project-catalog-indent" style={{ width: indent * 14 }}>
               {Array.from({ length: indent }, (_, index) => <span key={index} data-project-tree-guide className="mew-project-catalog-guide" style={{ left: index * 14 + 7 }} />)}
             </span>}
-            {selection && hasChildren && <button type="button" className="mew-project-catalog-pin" aria-label={`${project.name} · ${search || expanded.has(row.path) ? '−' : '+'}`} aria-expanded={!!search || expanded.has(row.path)} disabled={!!search} onClick={() => setExpanded(previous => { const next = new Set(previous); if (next.has(row.path)) next.delete(row.path); else next.add(row.path); return next })}>{search || expanded.has(row.path) ? <NavArrowDown width={14} /> : <NavArrowRight width={14} />}</button>}
-            {selection && !hasChildren && <span aria-hidden="true" className="mew-project-catalog-expander-space" />}
             <button type="button" disabled={busy} title={project.path} onClick={() => { discoveryRequest.current?.abort(); setLoading(false); if (selection) void onOpen(project.path); else void importProject(project) }} onContextMenu={event => onContextMenu?.(project.path, event)} className="mew-project-catalog-open"
               aria-label={`${project.name}${showPath ? ` (${project.path})` : ''} · ${t(mine ? 'project.inMine' : 'project.addToMine')}`}>
               <ProjectIcon icon={project.icon ?? 'i:folder'} size={16} />

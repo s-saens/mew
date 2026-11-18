@@ -1,6 +1,6 @@
 ---
 title: "Project selection favorites transition"
-description: "Records the incomplete transition to a single account-starred catalog, default-collapsed nested projects, sibling reordering, hierarchy guides, themed favorite stars, local checks, and remaining regressions."
+description: "Records the incomplete transition to a single account-starred catalog, default-collapsed nested projects, sibling reordering, hierarchy guides, combined expand and reorder controls, themed favorite stars, local checks, and remaining regressions."
 created: "2026-11-16"
 updated: "2026-11-18"
 ---
@@ -26,3 +26,9 @@ Local Chromium tests covered mouse and touch dragging, keyboard movement, expand
 ## Favorite star color — 2026-11-18
 
 The filled star now uses the theme's primary color so favorites stand out in the [project selection catalog](../features/projects-files-search/opening-projects-tabs-and-groups.md#select-and-organize-projects). The Chromium regression verified the filled star and the unfilled outline in the mobile selector. The build passed and lint completed with warnings. Documentation descriptions passed, and the link check reported 39 existing errors. Verification was local.
+
+## Shared chevron for expansion and reordering — 2026-11-18
+
+Parent rows now use their left chevron for both expansion and reordering. This saves a column and keeps the row and its subtree together during a drag. See the [project selection contract](../features/projects-files-search/opening-projects-tabs-and-groups.md#select-and-organize-projects).
+
+Five local Chromium tests passed. They covered mouse and touch dragging, tap and keyboard interaction, expansion state after a drop, and control alignment at 320, 390, and 1100 pixels. The build passed and lint completed with warnings. Documentation descriptions passed validation, and the link checker reported 39 existing errors. Verification used browser fixtures. No deployment or server restart was performed.

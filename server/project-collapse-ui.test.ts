@@ -36,9 +36,9 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
       assert.deepEqual(await rows(), ['/a', '/b'])
       const toggle = row('/a').getByRole('button', { name: 'a · +' })
       assert.equal(await toggle.getAttribute('aria-expanded'), 'false')
-      await row('/a').getByRole('button', { name: /reorder/i }).press('ArrowDown')
+      await toggle.press('ArrowDown')
       assert.deepEqual(await rows(), ['/b', '/a'], 'collapsed subprojects do not prevent parent reordering')
-      await toggle.click()
+      await toggle.press('Enter')
       assert.deepEqual(await rows(), ['/b', '/a', '/a/child'])
       await row('/a/child').getByRole('button', { name: 'child · +' }).click()
       assert.deepEqual(await rows(), ['/b', '/a', '/a/child', '/a/child/deep'])
@@ -74,18 +74,19 @@ window.moves=[];createRoot(document.getElementById('root')).render(<I18nProvider
       const pathname = new URL(route.request().url()).pathname
       if (pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: chunk.code })
       if (pathname === '/api/project-registry') return route.fulfill({ json: { projects } })
-      return route.fulfill({ contentType: 'text/html', body: '<!doctype html><meta charset="utf-8"><style>[data-catalog-project]{display:flex;align-items:center;height:44px}[data-catalog-project] button{height:38px}.mew-menu-reorder-handle{touch-action:none}</style><div id="root"></div><script src="/app.js"></script>' })
+      return route.fulfill({ contentType: 'text/html', body: '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>[data-catalog-project]{display:flex;align-items:center;height:44px}[data-catalog-project] button{height:38px}.mew-menu-reorder-handle{touch-action:none}</style><div id="root"></div><script src="/app.js"></script>' })
     })
     await page.goto('http://mew-drag.test/')
     const row = (project: string) => page.locator(`[data-catalog-project="${project}"]`)
     const rows = () => page.locator('[data-catalog-project]').evaluateAll(elements => elements.map(element => element.getAttribute('data-catalog-project')))
     await row('/a').waitFor()
-    await row('/a').getByRole('button', { name: 'a · +' }).click()
+    await row('/a').getByRole('button', { name: 'a · +' }).tap()
+    await row('/a/one').waitFor()
     await row('/a/one').getByRole('button', { name: 'one · +' }).click()
     await row('/b').getByRole('button', { name: 'b · +' }).click()
     assert.deepEqual(await rows(), ['/a', '/a/one', '/a/one/deep', '/a/two', '/b', '/b/leaf', '/c'])
     const drag = async (sourcePath: string, destinations: string[]) => {
-      const handle = row(sourcePath).getByRole('button', { name: /reorder/i })
+      const handle = row(sourcePath).locator('.mew-menu-reorder-handle')
       const start = (await handle.boundingBox())!
       await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2)
       await page.mouse.down()
@@ -99,14 +100,14 @@ window.moves=[];createRoot(document.getElementById('root')).render(<I18nProvider
     await drag('/a/one/deep', ['/c'])
     assert.deepEqual(await rows(), before, 'a single child never previews or commits an unrelated root move')
     assert.deepEqual(await page.evaluate('window.moves'), [])
-    await row('/a/one').getByRole('button', { name: /reorder/i }).press('ArrowDown')
+    await row('/a/one').getByRole('button', { name: 'one · −' }).press('ArrowDown')
     assert.deepEqual(await rows(), ['/a', '/a/two', '/a/one', '/a/one/deep', '/b', '/b/leaf', '/c'], 'keyboard moves a sibling with its expanded subtree')
     await drag('/a/one', ['/a/two'])
     assert.deepEqual(await rows(), before, 'dragging swaps siblings with their descendants intact')
     await drag('/a', ['/b', '/c'])
     assert.deepEqual(await rows(), ['/b', '/b/leaf', '/c', '/a', '/a/one', '/a/one/deep', '/a/two'], 'continuous dragging moves the root and its expanded subtree through two roots')
     const touch = await page.context().newCDPSession(page)
-    const start = (await row('/a').getByRole('button', { name: /reorder/i }).boundingBox())!
+    const start = (await row('/a').getByRole('button', { name: 'a · −' }).boundingBox())!
     const destination = (await row('/b').boundingBox())!
     const x = start.x + start.width / 2, startY = start.y + start.height / 2, endY = destination.y + destination.height / 2 - 2
     await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: startY }] })
@@ -114,6 +115,8 @@ window.moves=[];createRoot(document.getElementById('root')).render(<I18nProvider
     await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
     await touch.detach()
     assert.deepEqual(await rows(), before, 'touch drag restores the root and all expanded descendants across siblings')
+    await row('/a').getByRole('button', { name: 'a · −' }).click()
+    assert.deepEqual(await rows(), ['/a', '/b', '/b/leaf', '/c'], 'an intentional click after dragging still collapses the branch')
     await page.close()
   } finally { await browser.close() }
 })
