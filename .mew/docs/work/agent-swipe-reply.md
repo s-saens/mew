@@ -2,7 +2,7 @@
 title: "Agent message swipe reply"
 created: "2026-11-17"
 updated: "2026-11-18"
-description: "Records agent reply gestures, composer and mobile keyboard fixes, linked message references, and the placement of Reply beside Copy on user questions. Includes local checks and application limits."
+description: "Records agent reply gestures, composer and mobile keyboard fixes, linked message references, and the placement and spacing of question buttons. Includes local checks and application limits."
 ---
 
 Agent conversations now let users swipe a text-bearing question or answer left, or choose its Reply button, to add an editable Markdown quote to the composer. This provides context for a follow-up without replacing the existing draft or introducing a separate message transport. The [conversation contract](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#reply-to-a-message) owns the current behavior.
@@ -42,3 +42,7 @@ The 112 focused Node tests passed. They covered transcript and provider replay, 
 Group Copy and Reply together on the left of a question in both disclosure states. Use the same content column for the question and its reply reference. [Bubble display contract](../features/terminals-agents-automation/agent-conversations-queue-and-restoration.md#task-bubble-status).
 
 Three Chromium tests passed at desktop and mobile widths in both themes. They verified button alignment, copying, reply selection, and navigation from the reference. The local build and lint passed. Documentation descriptions and the contract anchor passed inspection. The link checker reported the same 39 existing errors.
+
+### Compact question spacing
+
+Halved the horizontal gaps and left indentation to give the question bubble 22px more width when both buttons are visible. Three Chromium tests passed at desktop and mobile widths in both themes. They checked the new dimensions, original hit areas, and reply interaction. The local build and lint passed. The documentation checker validated descriptions and reported the same 39 existing link errors.

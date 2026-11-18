@@ -5208,13 +5208,13 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
           </div>
         )}
         {/* 설정줄은 작업 버블과 같은 전체 폭, 사용자 발화만 오른쪽으로 들여쓴다. */}
-        <div className="ml-6 space-y-2">
+        <div className="ml-3 space-y-2">
         {preview && <AgentMediaPreviewDialog kind={preview.isImage ? 'image' : 'video'} src={rawUrl(preview.relPath, preview.project)} name={preview.relPath.split('/').pop() ?? preview.relPath} onClose={() => setPreview(null)} />}
         {(item.reply || questionText || files.length > 0) && (
-          <div className={`grid grid-cols-[auto_minmax(0,1fr)] items-start gap-y-2 ${questionText ? 'gap-x-1' : ''}`}>
+          <div className={`grid grid-cols-[auto_minmax(0,1fr)] items-start gap-y-2 ${questionText ? 'gap-x-0.5' : ''}`}>
             {item.reply && <div className="col-start-2"><AgentReplyLink reply={item.reply} onJump={onJumpToReply} /></div>}
-            {questionText && <div className="col-start-1 flex items-center gap-1">
-              <CopyButton text={questionText} label={uiText("이 질문 복사")} />
+            {questionText && <div className="col-start-1 flex items-center gap-0.5">
+              <CopyButton text={questionText} label={uiText("이 질문 복사")} className="mx-0.75 my-1.5 size-6" />
               {replyButton}
             </div>}
             {(questionText || files.length > 0) && (hasReferences ? <div
@@ -5290,7 +5290,7 @@ const AgentConversationItem = memo(function AgentConversationItem({ item, expand
           </button>
           <div data-agent-turn-actions className="flex shrink-0 items-center">
             {canStop && <button type="button" onClick={() => send({ type: 'cancel' })} className="flex size-8 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover hover:text-ink" aria-label={uiText("중단")} title={uiText("중단")} data-tip={uiText("중단")}><span className="size-2 rounded-[1px] bg-current" /></button>}
-            {answerText && <CopyButton text={answerText} label={uiText("이 답변 복사")} rail />}
+            {answerText && <CopyButton text={answerText} label={uiText("이 답변 복사")} className="size-8" />}
             {replyButton}
           </div>
         </div>}
@@ -5447,7 +5447,7 @@ function AgentErrorDialog({ title, detail, onClose }: { title: string; detail: s
 }
 
 /** 버블 텍스트를 통째로 클립보드에 넣는다 — 끌어 고르지 않고 한 번에 가져가는 길 */
-function CopyButton({ text, label, rail = false }: { text: string; label: string; rail?: boolean }) {
+function CopyButton({ text, label, className = 'm-1.5 size-6' }: { text: string; label: string; className?: string }) {
   useUiLocale()
   const [done, setDone] = useState(false)
   useEffect(() => {
@@ -5460,7 +5460,7 @@ function CopyButton({ text, label, rail = false }: { text: string; label: string
     <button
       type="button"
       onClick={() => void copyText(text).then((ok) => ok && setDone(true))}
-      className={`flex shrink-0 items-center justify-center rounded text-ink-muted hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-ink ${rail ? 'size-8' : 'm-1.5 h-6 w-6'}`}
+      className={`flex shrink-0 items-center justify-center rounded text-ink-muted hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-ink ${className}`}
       aria-label={label}
       title={label}
       data-tip={label}

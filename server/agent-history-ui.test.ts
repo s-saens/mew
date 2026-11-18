@@ -173,11 +173,25 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
           const copyButton = el.querySelector('button[title="이 질문 복사"]')!
           const copy = copyButton.getBoundingClientRect()
           const reply = el.querySelector('button[data-agent-reply-button]')!.getBoundingClientRect()
-          return { left: bubble.left, copyRight: copy.right, replyLeft: reply.left, replyRight: reply.right,
+          const question = el.getBoundingClientRect()
+          const row = copyButton.parentElement!.parentElement!.getBoundingClientRect()
+          return {
+            indent: row.left - question.left,
+            copyToReply: reply.left - copy.right,
+            replyToBubble: bubble.left - reply.right,
+            copySize: [copy.width, copy.height],
+            replySize: [reply.width, reply.height],
+            spaceOutsideBubble: question.width - bubble.width,
             centerDifference: Math.abs(copy.top + copy.height / 2 - reply.top - reply.height / 2),
-            background: el.ownerDocument.defaultView!.getComputedStyle(copyButton.parentElement!).backgroundColor }
+            background: el.ownerDocument.defaultView!.getComputedStyle(copyButton.parentElement!).backgroundColor,
+          }
         })
-        assert.ok(bounds.copyRight < bounds.replyLeft && bounds.replyRight < bounds.left, 'copy and reply sit together to the left of the question')
+        assert.equal(bounds.copyToReply, 5, 'copy and reply sit 5px apart')
+        assert.equal(bounds.replyToBubble, 2, 'reply sits 2px to the left of the question')
+        assert.equal(bounds.indent, 12, 'the question row is indented by 12px')
+        assert.equal(bounds.spaceOutsideBubble, 78, 'the question bubble fills the width left by the compact actions')
+        assert.deepEqual(bounds.copySize, [24, 24], 'copy retains its button size')
+        assert.deepEqual(bounds.replySize, [32, 32], 'reply retains its button size')
         assert.ok(bounds.centerDifference < 1, 'question controls share the same row')
         assert.equal(bounds.background, 'rgba(0, 0, 0, 0)', 'question copy container has no bubble background')
         await question.getByRole('button', { name: '이 질문 복사', exact: true }).click()
