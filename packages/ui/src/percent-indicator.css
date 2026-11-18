@@ -1,0 +1,18 @@
+.mew-percent-indicator {
+  --mew-percent-fill: var(--color-accent);
+  --mew-percent-track: color-mix(in srgb, currentColor 25%, transparent);
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: conic-gradient(var(--mew-percent-fill) 0 var(--mew-percent-value), var(--mew-percent-track) var(--mew-percent-value) 100%);
+  mask-image: radial-gradient(closest-side, transparent 57%, black 67%);
+}
+
+@media (forced-colors: active) {
+  .mew-percent-indicator {
+    forced-color-adjust: none;
+    --mew-percent-fill: Highlight;
+    --mew-percent-track: color-mix(in srgb, CanvasText 40%, transparent);
+  }
+}

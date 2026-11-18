@@ -1,8 +1,8 @@
 ---
 title: "UI installation, loading, and recovery feedback"
-description: "Shared installation guidance, loading, session restoration, quiet recovery, and hamburger notification previews with full history. Defines retained content, acknowledgment, and retry/error feedback boundaries."
+description: "Shared installation guidance, loading, the shared PercentIndicator, session restoration, quiet recovery, and hamburger notification previews with full history. Defines retained content, acknowledgment, and retry/error feedback boundaries."
 created: "2026-11-03"
-updated: "2026-11-05"
+updated: "2026-11-18"
 상위파일: "ui-contracts.md"
 ---
 
@@ -30,13 +30,13 @@ Actual Android/iOS installation and fullscreen/back navigation behavior in insta
 | --- | --- | --- |
 | Logo | `logo` | Full entry into Mew, the demo, and Mewlink; full project restoration and switching |
 | Three dots | `dots` (default) | Inside panels, editors, and buttons; agent connection, initial preparation, and history retrieval; Mewlink lists and recovery |
-| Circular | `spinner` | Attachment upload pending tags in new agent input and pending queue editing |
+| Circular | `spinner` | Indeterminate waits that call for a compact ring |
 
-Do not use the logo for internal retrieval or recovery. Follow [ADR 0075](../decisions/0075-attachment-spinner-indicator.md) for restoring circular indicators in attachment tags.
+Do not use the logo for internal retrieval or recovery.
 
 The three dots inherit the current text color. Arrange three equally sized circles in a row and vary each dot's transform scale and opacity over a 1.2-second cycle. Offset their phases by 160ms so they grow and shrink in sequence from the left without changing position. The default height is 16px, the width is 1.5 times the height, and the dot diameter is 24% of the height. Use 15px for comment submission and 20px for editor/panel waiting states. Agent connection, initial preparation, and history retrieval use the same three dots, replacing the previous empty-bubble shimmer.
 
-The circular indicator uses a 2px circular border in the current text color with only the top border transparent, rotating at a constant speed over a 0.8-second cycle. Display it as a 12px square in attachment upload pending tags, and replace it with the file type icon when the upload finishes. Because sending is blocked during uploads, do not add loading states to user bubble tags; retain the completed file icons. The [agent input and attachment contract](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md) owns detailed tag behavior.
+The circular indicator uses a 2px circular border in the current text color with only the top border transparent, rotating at a constant speed over a 0.8-second cycle. See [ADR 0075](../decisions/0075-attachment-spinner-indicator.md) for the spinner’s original use in attachment tags.
 
 The full loading logo uses the square border and inner mark from `public/favicon.svg` as an inline SVG mask with the same coordinates and stroke width. Keep the logo fixed and rotate only the muted gray-purple and blue-gray light layer every 2.4 seconds. `StartupScreen` on the shared Mew/demo entry screen and `ProjectLoadingOverlay` during full restoration/project switching display a 56px logo. Both screens apply two shadow layers colored with the selected theme background (`--color-surface-deep`) to the `mew-loading-logo-shadow` wrapper outside the logo. Preserve the 80% and 60% opacities, offsets, and blur radii; theme changes update both layers immediately. Gradient themes use their base background color. The shadow spreads downward along the logo outline, is not clipped by the mask, and does not rotate with the logo's light layer. The entry screen uses the lightweight `@mew/ui/loading-indicator` entry point so the initial display does not load unnecessary UI package dependencies.
 
@@ -47,6 +47,12 @@ Git-excluded Mewlink uses the same CSS and the `loadingIndicator` DOM helper. Ex
 The indicator itself is decorative, so set `aria-hidden`. Communicate status through the container's translated name and `role="status"`, or the button's `aria-busy`. Pause the dots, circular indicator, and light layer together with `active=false` or `data-paused` on an ancestor. With reduced motion, retain three static dots, a static circular indicator, and a static logo highlight; in forced colors mode, use the system body text color. Keep the circular indicator's top border transparent even in forced colors mode. Do not use additional SVG requests, JS frame loops, SVG path animations, or animated filters. Use a static CSS filter only for the full-screen logo's shadow.
 
 On 2026-10-26, the full logo and internal three dots were checked in isolated Chromium on mobile/desktop and in both themes. In a trace collected for 1.5 seconds after initial display with 48 instances of each type animating simultaneously, Layout, Paint, and UpdateLayoutTree each occurred 0 times. These results cover the logo and three dots at that time and do not include circular indicator validation. They do not replace performance guarantees for actual mobile or production environments. The validation and application status of the subsequent circular indicator restoration follows the [work record](../work/loading-indicators.md).
+
+## Percent indicator
+
+Use `PercentIndicator` from `@mew/ui` for determinate progress. Pass a localized `label` and a `percent` from 0 to 100. The component exposes the value through the `progressbar` role.
+
+The indicator defaults to 12px. Its center is transparent and its faint track shows the remaining portion. The theme accent fills the ring clockwise from 12 o’clock as progress increases. Forced colors mode uses system colors. Both the [editor](../features/document-code-media-editing/links-file-references-and-attachments.md) and [agent input](../features/terminals-agents-automation/agent-input-mentions-skills-and-attachments.md) use the ring for each pending file upload.
 
 ## Mewlink stay-signed-in prompt
 

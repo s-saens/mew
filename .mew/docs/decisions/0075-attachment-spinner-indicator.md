@@ -1,11 +1,11 @@
 ---
 title: "Restore the Circular Indicator on Attachment Upload Tags"
-description: "Decision to distinguish three shared loading indicator types—logo, three dots, and circular—and restore attachment upload tags in agent input from three dots to circular, partially superseding the scope of ADR 0063."
+description: "Decision to distinguish three shared loading indicator types—logo, three dots, and circular—and restore attachment upload tags in agent input from three dots to circular, partially superseding the scope of ADR 0063. Records the later replacement of the spinner in upload tags with PercentIndicator."
 created: "2026-10-27"
-updated: "2026-10-27"
+updated: "2026-11-18"
 ---
 
-Status: Adopted
+Status: Adopted. On 2026-11-18, attachment upload tags switched to the [PercentIndicator](../development/ui-recovery-feedback.md#percent-indicator) to display measured upload progress in the ring.
 
 ## Background
 

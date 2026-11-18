@@ -4,11 +4,11 @@ parent: "mew-editor"
 title: "Links, file references, and attachments"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-10"
+updated: "2026-11-18"
 status_hash: "7de6eaf2f2c15edc7c1f36bdcbbfd8639072863ca76586cd4dcc07f7c56c6cc2"
 files: ["packages/editor/src/editor/LinkTooltip.tsx", "packages/editor/src/editor/file-link.ts", "packages/editor/src/editor/editor.css", "packages/editor/src/ResizableImage.tsx", "packages/editor/src/MediaNodes.ts", "src/components/EditorPane.tsx", "src/utils/editor-image-url.ts", "packages/editor/src/editor/image-source-context.ts", "packages/editor/src/Editor.tsx", "packages/editor/src/types.ts"]
 commits: []
-description: "Markdown links, file references, and attachments in the editor. Covers navigation, file mentions, relative image paths, attachment permissions, per-file upload progress, temporary upload storage and Git behavior, and playback restrictions."
+description: "Markdown links, file references, and attachments in the editor. Covers navigation, file mentions, relative image paths, attachment permissions, per-file upload progress with PercentIndicator, temporary upload storage and Git behavior, and playback restrictions."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -21,7 +21,7 @@ description: "Markdown links, file references, and attachments in the editor. Co
 ### Scope
 
 - Provides link insertion and editing, file mentions, file uploads and drops, image pasting, and resizing.
-- Show each file’s upload percentage while it is being uploaded, including images, video, audio, and other files. Keep its pending state visible while the server completes the request.
+- Show each pending file’s name and [PercentIndicator](../../development/ui-recovery-feedback.md#percent-indicator), including images, video, audio, and other files. Keep the indicator visible while the server completes the request.
 - Hotview `@` file candidates are queried across the current file's entire project scope. For Documents documents, the scope is all of Documents, including folders collapsed in the explorer or not yet queried. Existing file viewing permissions apply, and case-insensitive filename prefix autocomplete displays up to 8 candidates.
 - Internal file links are distinguished as inline items with icons and backgrounds. Subdocuments of the current document and other internal documents retain the same border, with leading icons distinguished as a down-and-right arrow and a document icon, respectively. Files outside the configured Docs folder display a diagonal arrow on the right of the existing item. External URLs remain underlined hyperlinks.
 - The display text of internal file links in Hotview cannot be edited directly. A regular click on an internal document link, including subdocuments, opens it in the same tab without a tooltip and adds it to that tab's visit history. Ctrl/Cmd+click opens a new tab, which does not inherit the previous tab's visit history. Even if another tab displays the same document, same-tab navigation stays in the originating tab and does not merge document visit histories.

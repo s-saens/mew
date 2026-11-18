@@ -1,5 +1,5 @@
 import { uiText } from '@mew/ui/i18n-core'
-import { observeEditorViewport, visibleEditorBounds } from '@mew/ui'
+import { PercentIndicator, observeEditorViewport, visibleEditorBounds } from '@mew/ui'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useEditor, EditorContent, type Editor as TiptapEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -2286,7 +2286,12 @@ export const Editor = forwardRef<
       {drawing && canDraw && renderDrawingEditor?.({ onClose: () => closeDrawing(drawing), onSave: file => saveDrawingImage(drawing, file) })}
       {uploads.length > 0 && createPortal(
         <div className="fixed bottom-2 right-2 z-[10000] flex max-w-xs flex-col gap-1 rounded bg-surface-inverse px-2 py-1 text-xs text-ink-inverse shadow-lg" role="status" aria-live="polite">
-          {uploads.map(upload => <div key={upload.id} role="progressbar" aria-label={upload.name} aria-valuemin={0} aria-valuemax={100} aria-valuenow={upload.percent} className="break-words">{uiText('업로드 중…')} {upload.name}: {upload.percent}%</div>)}
+          {uploads.map(upload => (
+            <div key={upload.id} className="flex items-center gap-1.5">
+              <PercentIndicator percent={upload.percent} label={`${uiText('업로드 중…')} ${upload.name}`} />
+              <span className="min-w-0 break-words" aria-hidden="true">{uiText('업로드 중…')} {upload.name}</span>
+            </div>
+          ))}
         </div>, document.body,
       )}
       {/* 에러 토스트(toast) — 클릭하면 닫히고, 6초 뒤 자동으로 사라진다 (아래 auto-dismiss effect) */}

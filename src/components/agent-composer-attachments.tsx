@@ -2,7 +2,7 @@ import { StateEffect, type Extension } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from '@codemirror/view'
 import { isolateHistory } from '@codemirror/commands'
 import { createRoot, type Root } from 'react-dom/client'
-import { LoadingIndicator } from '@mew/ui'
+import { PercentIndicator } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { attachmentKind } from '../utils/agent-attachments'
 import { AgentAttachmentIcon } from './agent-attachment-icon'
@@ -48,7 +48,7 @@ class AttachmentWidget extends WidgetType {
     const video = attachmentKind(this.file.mimeType, this.file.name) === 'video'
     const label = video ? uiText('{p0} 동영상 미리보기', { p0: this.file.name }) : uiText('{p0} 사진 미리보기', { p0: this.file.name })
     this.root.render(<>
-      {this.file.pending ? <span role="status" aria-label={`${uiText('첨부 중…')} ${this.file.progress ?? 0}%`} className="mew-composer-upload"><LoadingIndicator variant="spinner" size={12} /> {this.file.progress ?? 0}%</span>
+      {this.file.pending ? <PercentIndicator percent={this.file.progress ?? 0} label={uiText('첨부 중…')} />
         : this.file.href ? <a href={this.file.href} target="_blank" rel="noreferrer" aria-label={this.file.name}>
           <AgentAttachmentIcon mimeType={this.file.mimeType} path={this.file.name} />
         </a> : <button type="button" aria-label={label} title={video ? uiText('동영상 미리보기') : uiText('사진 미리보기')} onClick={() => this.resolve(this.token)?.preview?.()}>
@@ -245,7 +245,6 @@ export function composerAttachments(resolve: (token: string) => ComposerAttachme
   }, { decorations: value => value.decorations, provide: plugin => EditorView.atomicRanges.of(view => view.plugin(plugin)?.decorations ?? Decoration.none) })
   return [plugin, EditorView.baseTheme({
     '.mew-composer-attachment': { display: 'inline-flex', height: '24px', boxSizing: 'border-box', verticalAlign: 'middle', alignItems: 'center', gap: '2px', margin: '0 2px', padding: '4px', borderRadius: '6px', background: 'var(--color-surface-raised)', color: 'var(--color-ink-secondary)', userSelect: 'none', touchAction: 'none', cursor: 'grab' },
-    '.mew-composer-upload': { display: 'inline-flex', alignItems: 'center', gap: '2px', fontSize: '12px', whiteSpace: 'nowrap' },
     '.mew-composer-attachment button, .mew-composer-attachment a': { display: 'inline-flex', width: '16px', height: '16px', padding: '0', alignItems: 'center', justifyContent: 'center', color: 'inherit', borderRadius: '3px', cursor: 'inherit' },
     '.mew-composer-attachment button:hover, .mew-composer-attachment a:hover': { color: 'var(--color-ink)', background: 'var(--color-surface-hover)' },
     '.mew-composer-attachment button:focus-visible, .mew-composer-attachment a:focus-visible': { outline: '2px solid var(--color-accent)', outlineOffset: '1px' },
