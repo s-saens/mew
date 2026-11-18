@@ -1027,6 +1027,7 @@ export const uiMessages = {
   "준비 실패 · 터미널의 오류를 확인한 뒤 다시 연결해 주세요.": ["Setup failed · Check terminal errors and reconnect.","准备失败 · 请检查终端错误后重新连接。","準備失敗 · ターミナルのエラーを確認して再接続してください。"],
   "준비가 중단됐습니다. 다시 연결해 주세요.": ["Setup interrupted. Please reconnect.","准备已中断，请重新连接。","準備が中断されました。再接続してください。"],
   "설치 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.": ["Could not check installation status. Try again shortly.","无法检查安装状态，请稍后重试。","インストール状態を確認できませんでした。しばらくして再試行してください。"],
+  "설치된 기본 실행 파일을 사용하려면 런타임 설정의 실행 파일 항목을 비우고 저장하세요.": ["To use the installed default, clear the executable field in runtime settings and save.", "要使用已安装的默认程序，请清空运行时设置中的可执行文件字段并保存。", "インストール済みの既定の実行ファイルを使うには、ランタイム設定の実行ファイル欄を空にして保存してください。"],
   "준비 내역 보기": ["View setup log","查看准备记录","準備履歴を表示"],
   "필요한 파일을 자동으로 준비합니다": ["Required files are prepared automatically","自动准备所需文件","必要なファイルを自動で準備します"],
   " (종료 코드 {p0})": [" (exit code {p0})","（退出代码 {p0}）","（終了コード {p0}）"],

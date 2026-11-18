@@ -7,7 +7,7 @@ import test from 'node:test'
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-antigravity-test-'))
 process.env.MEW_DATA_DIR = path.join(root, 'data')
 process.env.MEW_WORKSPACE = root
-const { antigravityAuthUrl, antigravityDistribution, antigravityCommand } = await import('./antigravityAcp.ts')
+const { antigravityAuthUrl, antigravityDistribution, antigravityCommand, antigravityInstallSupported } = await import('./antigravityAcp.ts')
 const { resolvedSpec, agentSetRuntimeList } = await import('./agentRuntimes.ts')
 const { writeAgentSetting } = await import('./agentSettings.ts')
 const { AgentSession } = await import('./agentAcp.ts')
@@ -18,11 +18,14 @@ test.after(() => fs.rmSync(root, { recursive: true, force: true }))
 test('official distribution selects supported architectures and ignores saved agy TUI commands', () => {
   for (const [platform, arch, target] of [['linux', 'x64', 'linux-x86_64'], ['linux', 'arm64', 'linux-arm64'], ['darwin', 'arm64', 'darwin-arm64']] as const) {
     const { url, args } = antigravityDistribution(platform, arch)
+    assert.equal(antigravityInstallSupported(platform, arch), true)
     assert.equal(new URL(url).hostname, 'dl.google.com')
     assert.ok(url.endsWith(`1.1.1-${target}.zip`))
     assert.deepEqual(args, platform === 'linux' ? ['--uid='] : [])
   }
   assert.throws(() => antigravityDistribution('darwin', 'x64'), /공식 배포본/)
+  assert.equal(antigravityInstallSupported('darwin', 'x64'), false)
+  assert.equal(antigravityInstallSupported('win32', 'x64'), false)
   process.env.MEW_AGENT_ANTIGRAVITY_CMD = '/old/agy'
   process.env.MEW_AGENT_ANTIGRAVITY_ARGS = '--theme dark'
   writeAgentSetting('antigravity', { cmd: '/old/custom-agy', extraArgs: ['--old-tui'], env: { GEMINI_HOME: path.join(root, 'gemini') } })
@@ -41,7 +44,16 @@ test('OAuth stderr URL rejects spoofed hosts, credentials, ports and unrelated G
   }
 })
 
-test('installer stages the official archive, cleans failures and preserves an existing installation', async (t) => {
+test('installer checks for unzip before requesting the archive', { skip: !antigravityInstallSupported() }, async t => {
+  const previousPath = process.env.PATH
+  process.env.PATH = path.join(root, 'missing-bin')
+  t.after(() => { if (previousPath === undefined) delete process.env.PATH; else process.env.PATH = previousPath })
+  const download = t.mock.method(globalThis, 'fetch', () => { throw new Error('unexpected download') })
+  await assert.rejects(installAntigravityAcp(), /unzip/)
+  assert.equal(download.mock.callCount(), 0)
+})
+
+test('installer stages the official archive, cleans failures and preserves an existing installation', { skip: !antigravityInstallSupported() }, async (t) => {
   // A stored ZIP with two inert files named like the distribution (never executable test code).
   const zip = Buffer.from('UEsDBBQAAAAAAJMKL11lSM2QGAAAABgAAAASAAAAYWd5X2FjcF9zZXJ2ZXIucGFyZml4dHVyZSwgZG8gbm90IGV4ZWN1dGUKUEsDBBQAAAAAAJMKL11lSM2QGAAAABgAAAAVAAAAbG9jYWxoYXJuZXNzX2V4dGVybmFsZml4dHVyZSwgZG8gbm90IGV4ZWN1dGUKUEsBAhQDFAAAAAAAkwovXWVIzZAYAAAAGAAAABIAAAAAAAAAAAAAAIABAAAAAGFneV9hY3Bfc2VydmVyLnBhclBLAQIUAxQAAAAAAJMKL11lSM2QGAAAABgAAAAVAAAAAAAAAAAAAACAAUgAAABsb2NhbGhhcm5lc3NfZXh0ZXJuYWxQSwUGAAAAAAIAAgCDAAAAkwAAAAAA', 'base64')
   const output: string[] = []

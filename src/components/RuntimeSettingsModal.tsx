@@ -1,5 +1,6 @@
 import { useWorkspaceApi } from '../api/workspace-api-context'
-import { RuntimeInstallProgress } from './RuntimeInstallProgress'
+import { RuntimeInstallAction } from './RuntimeInstallProgress'
+import { useRuntimeInstall } from '../hooks/use-runtime-install'
 import { subscribeAgentRuntimes, updateAgentRuntimesCache } from '../utils/agentPickerCache'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
@@ -45,7 +46,7 @@ export function RuntimeSettingsButton({ runtimeId, label }: { runtimeId: string;
 type EnvRow = { key: string; value: string; originalKey?: string }
 
 function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string; label: string; onClose: () => void }) {
-  const { fetchAgentRuntimeSetting, fetchAgentRuntimes, saveAgentRuntimeSetting, deleteAgentRuntimeSetting, installAgentRuntime, uninstallAgentRuntime, logoutAgentRuntime } = useWorkspaceApi()
+  const { fetchAgentRuntimeSetting, fetchAgentRuntimes, saveAgentRuntimeSetting, deleteAgentRuntimeSetting, uninstallAgentRuntime, logoutAgentRuntime } = useWorkspaceApi()
   useUiLocale()
   const titleId = useId()
   const [cmd, setCmd] = useState('')
@@ -59,8 +60,8 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
   const [savedNote, setSavedNote] = useState(false)
   const [runtime, setRuntime] = useState<AgentRuntimeStatus | null>(null)
   const [lifecycleBusy, setLifecycleBusy] = useState(false)
-  const [installing, setInstalling] = useState(false)
-  const runtimeBusy = lifecycleBusy || runtime?.installing === true
+  const installation = useRuntimeInstall()
+  const runtimeBusy = lifecycleBusy || installation.installing === runtimeId || runtime?.installing === true
   const [confirm, setConfirm] = useState<'uninstall' | 'logout' | 'reset' | null>(null)
 
   useEffect(() => {
@@ -135,6 +136,7 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
     setError(null)
     try {
       await saveAgentRuntimeSetting(runtimeId, buildPayload())
+      void refreshRuntime().catch(() => {})
       setSavedNote(true)
       setTimeout(() => onClose(), 600)
     } catch (err: unknown) {
@@ -150,6 +152,7 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
     setError(null)
     try {
       await deleteAgentRuntimeSetting(runtimeId)
+      void refreshRuntime().catch(() => {})
       onClose()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err))
@@ -164,13 +167,6 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
     updateAgentRuntimesCache(runtimes)
   }
 
-  const install = async () => {
-    setLifecycleBusy(true); setInstalling(true); setError(null)
-    try { await installAgentRuntime(runtimeId) } catch (err) { setError(err instanceof Error ? err.message : String(err)) } finally {
-      await refreshRuntime().catch(() => {})
-      setLifecycleBusy(false); setInstalling(false)
-    }
-  }
   const uninstall = async () => {
     setConfirm(null); setLifecycleBusy(true); setError(null)
     try { await uninstallAgentRuntime(runtimeId); await refreshRuntime() } catch (err) { setError(err instanceof Error ? err.message : String(err)) } finally { setLifecycleBusy(false) }
@@ -192,14 +188,13 @@ function RuntimeSettingsModal({ runtimeId, label, onClose }: { runtimeId: string
           <div className="space-y-4 px-4 py-3">
             <section>
               <h3 className="text-sm font-medium text-ink">{uiText("설치 및 계정")}</h3>
-              <div className="mt-1 text-xs text-ink-secondary">{runtime ? ((runtimeId === 'codex' || runtimeId === 'claude') ? (runtime.installed ? uiText("연결 프로그램 설치됨") : uiText("연결 프로그램 설치되지 않음")) : (runtime.installed ? uiText("설치됨") : uiText("설치되지 않음"))) : uiText("설치 상태 확인 중…")}</div>
+              <div className="mt-1 text-xs text-ink-secondary">{runtime ? ((runtimeId === 'codex' || runtimeId === 'claude') ? ((runtime.connectorInstalled ?? runtime.installed) ? uiText("연결 프로그램 설치됨") : uiText("연결 프로그램 설치되지 않음")) : (runtime.installed ? uiText("설치됨") : uiText("설치되지 않음"))) : uiText("설치 상태 확인 중…")}</div>
               {(runtimeId === 'codex' || runtimeId === 'claude') && <p className="mt-1 text-xs text-ink-secondary">{runtimeId === 'codex' ? uiText("Codex는 연결 프로그램 외에 호스트에 설치된 Codex CLI가 필요합니다. 로그인은 별도로 진행하세요.") : uiText("별도 Claude CLI가 없으면 포함된 CLI를 사용합니다. 로그인은 별도로 진행하세요.")}</p>}
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {!runtime?.installed && runtime?.installable && <button type="button" disabled={runtimeBusy} onClick={install} className="rounded bg-accent px-2.5 py-1 text-xs text-ink-on-accent disabled:opacity-40">{uiText("설치")}</button>}
+                <RuntimeInstallAction runtimeId={runtimeId} label={label} status={runtime} disabled={lifecycleBusy} {...installation} />
                 {runtime?.installed && <button type="button" disabled={runtimeBusy} onClick={() => window.dispatchEvent(new CustomEvent('mew:open-agent-runtime', { detail: runtimeId }))} className="rounded border border-edge px-2.5 py-1 text-xs text-ink-secondary hover:bg-surface-hover disabled:opacity-40">{uiText("로그인")}</button>}
                 {runtime?.installed && runtime.logoutable && <button type="button" disabled={runtimeBusy} onClick={() => setConfirm('logout')} className="rounded border border-warning px-2.5 py-1 text-xs text-warning hover:bg-surface-hover disabled:opacity-40">{uiText("로그아웃")}</button>}
               </div>
-              <RuntimeInstallProgress runtimeId={runtimeId} busy={installing || runtime?.installing === true} installation={runtime?.installation} />
             </section>
             {runtime?.installed && Object.hasOwn(SUBSCRIPTION_URLS, runtimeId) && <AgentAccountCard runtime={runtimeId} />}
             <section className="rounded border border-edge px-3 py-2">

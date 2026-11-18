@@ -4,8 +4,13 @@ import { execHostFile as exec } from './platform/process.ts'
 import { userProcessCommands } from './platform/identity.ts'
 import { terminalBackend } from '../packages/tmux-term/src/server/backends/index.ts'
 import { MEW_APP_ROOT, isReleaseDistribution, RELEASE_UPDATE_MESSAGE } from './mewUpdate.ts'
-import { findExecutable, RUNTIMES, resolvedSpec, claudeCliSpec, type SpawnSpec } from './agentRuntimes.ts'
+import {
+  claudeCliSpec, findExecutable, findRuntimeExecutable, isNpmAgentRuntime, LEGACY_OPENCODE_NPM_PACKAGE,
+  NPM_RUNTIME_PACKAGES, npmAgentInstallSpec, resolvedSpec, RUNTIMES, runtimeNpmBin, runtimeNpmPackageRoot,
+  runtimeNpmPrefix, type SpawnSpec,
+} from './agentRuntimes.ts'
 import { ANTIGRAVITY_ACP_VERSION, antigravityCommand } from './antigravityAcp.ts'
+import { CURSOR_INSTALL_URL, cursorUpdateSpec } from './cursorCliInstall.ts'
 import { runtimeStatusesAsync } from './agentRuntimeInstall.ts'
 import { agentProcessRunning, primeReleaseUrl, primeReleaseVersion } from './update-policy.ts'
 import type { UpdateItem, UpdateJob, UpdatesStatus } from '../shared/updates.ts'
@@ -51,7 +56,9 @@ export async function assertAgentIdle(row: Pick<UpdateCandidate, 'category' | 'i
   const cli = runtime === 'claude' ? claudeCliSpec([]).cmd : runtime === 'codex' ? RUNTIMES.codex.logout!().cmd : null
   const commands = [spec?.cmd, cli].filter((cmd): cmd is string => !!cmd && cmd !== process.execPath)
   for (const command of [...commands]) {
-    try { commands.push(fs.realpathSync(findExecutable(command) ?? command)) } catch { /* Keep the configured command. */ }
+    const executable = findRuntimeExecutable(runtime, command) ?? command
+    commands.push(executable)
+    try { commands.push(fs.realpathSync(executable)) } catch { /* Keep the executable path. */ }
   }
   // Inspect all processes owned by the server user, including detached hosts and terminal CLIs.
   const processes = await userProcessCommands()
@@ -83,20 +90,56 @@ export function newer(current: string | null, latest: string | null): boolean {
 function item(id: string, label: string, category: UpdateItem['category'], current: string | null): UpdateCandidate {
   return { id, label, category, current, latest: null, available: false, canUpdate: false, error: null }
 }
-const npmAgents: Record<string, string> = { kimi: '@moonshot-ai/kimi-code', openclaw: 'openclaw', opencode: 'opencode-ai', prime: 'prime-agent', codex: '@openai/codex', claude: '@anthropic-ai/claude-code' }
+const npmAgents: Record<string, string[]> = {
+  ...Object.fromEntries(Object.entries(NPM_RUNTIME_PACKAGES).map(([id, pkg]) => [id, [pkg]])),
+  opencode: [NPM_RUNTIME_PACKAGES.opencode, LEGACY_OPENCODE_NPM_PACKAGE],
+  claude: ['@anthropic-ai/claude-code'],
+}
+
+function inDirectory(directory: string, file: string): boolean {
+  const relative = path.relative(directory, file)
+  return !!relative && !relative.startsWith('..') && !path.isAbsolute(relative)
+}
+
+function isPackageExecutable(root: string, pkg: string, executable: string): boolean {
+  try {
+    return inDirectory(fs.realpathSync(path.join(root, pkg)), fs.realpathSync(executable))
+  } catch { return false }
+}
+
+function managedNpmPackage(id: string, executable: string): { pkg: string; version: string; prefix: string } | undefined {
+  if (!isNpmAgentRuntime(id) || !inDirectory(runtimeNpmBin(id), executable)) return
+  const prefix = runtimeNpmPrefix(id)
+  const root = runtimeNpmPackageRoot(prefix)
+  for (const pkg of npmAgents[id] ?? []) {
+    if (process.platform !== 'win32' && !isPackageExecutable(root, pkg, executable)) continue
+    try {
+      const { version } = JSON.parse(fs.readFileSync(path.join(root, pkg, 'package.json'), 'utf8'))
+      if (typeof version === 'string') return { pkg, version, prefix }
+    } catch { /* Missing package metadata. */ }
+  }
+}
+
+function npmAgentUpdateSpec(id: string, pkg: string, prefix: string): SpawnSpec {
+  if (isNpmAgentRuntime(id)) return npmAgentInstallSpec(id, prefix, pkg)
+  return { cmd: 'npm', args: ['install', '-g', '--prefix', prefix, `${pkg}@latest`, '--no-audit', '--no-fund'] }
+}
+
 async function agents(): Promise<UpdateCandidate[]> {
   let globals: Record<string, { version?: string }> = {}
   try { globals = JSON.parse(await output('npm', ['ls', '-g', '--depth=0', '--json'])).dependencies ?? {} } catch { /* Non-npm installations remain visible. */ }
   let globalRoot: string | null = null
   try { globalRoot = await output('npm', ['root', '-g']) } catch { /* Unmanaged installations are not rewritten. */ }
-  const managedNpm = (command: string, pkg: string) => {
-    if (!globalRoot || !globals[pkg]) return false
-    try {
-      const executable = fs.realpathSync(findExecutable(command) ?? command)
-      const directory = fs.realpathSync(path.join(globalRoot, pkg))
-      const relative = path.relative(directory, executable)
-      return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
-    } catch { return false }
+  const globalPrefix = globalRoot && path.isAbsolute(globalRoot)
+    ? path.resolve(globalRoot, process.platform === 'win32' ? '..' : '../..') : null
+  const npmInstallation = (id: string, executable: string) => {
+    const managed = managedNpmPackage(id, executable)
+    if (managed) return managed
+    if (!globalRoot || !globalPrefix) return
+    for (const pkg of npmAgents[id] ?? []) {
+      const version = globals[pkg]?.version
+      if (version && isPackageExecutable(globalRoot, pkg, executable)) return { pkg, version, prefix: globalPrefix }
+    }
   }
   const rows: UpdateCandidate[] = []
   for (const status of (await runtimeStatusesAsync()).filter(row => row.installed && row.id !== 'tmux')) {
@@ -109,52 +152,66 @@ async function agents(): Promise<UpdateCandidate[]> {
       continue
     }
     const spec = status.id === 'prime' ? { cmd: process.env.MEW_PRIME_AGENT_EXECUTABLE || 'prime-agent', args: [] } : resolvedSpec(status.id)
-    if (!spec || !findExecutable(spec.cmd) && !fs.existsSync(spec.cmd)) continue
+    if (!spec) continue
+    const executable = findRuntimeExecutable(status.id, spec.cmd)
+    if (!executable) continue
     let current: string | null = null
-    try { current = (await output(spec.cmd, ['--version'])).match(/\d+\.\d+(?:\.\d+)?(?:-[\w.-]+)?/)?.[0] ?? null } catch { /* Show unknown instead of guessing. */ }
+    const npm = npmAgents[status.id] && npmInstallation(status.id, executable)
+    try { current = npm?.version ?? (await output(executable, ['--version'])).match(/\d+\.\d+(?:\.\d+)?(?:-[\w.-]+)?/)?.[0] ?? null } catch { /* Show unknown instead of guessing. */ }
     const row = item(`agent:${status.id}`, status.label, 'agent', current)
-    const pkg = npmAgents[status.id]
-    if (pkg && managedNpm(spec.cmd, pkg)) row.current = globals[pkg].version!
     if (status.id === 'prime') {
       row.lookup = primeLatest
-      row.command = { cmd: spec.cmd, args: ['update'] }
-    } else if (pkg) {
+      row.command = { cmd: executable, args: ['update'] }
+    } else if (npmAgents[status.id]) {
+      const pkg = npm?.pkg ?? npmAgents[status.id][0]
       row.lookup = () => npmLatest(pkg)
-      if (managedNpm(spec.cmd, pkg)) row.command = { cmd: 'npm', args: ['install', '-g', `${pkg}@latest`, '--no-audit', '--no-fund'] }
+      if (npm) row.command = npmAgentUpdateSpec(status.id, pkg, npm.prefix)
       else row.error = '설치 경로를 자동으로 업데이트할 수 없습니다'
     } else if (status.id === 'hermes') {
       row.lookup = async () => (await remoteJson('https://pypi.org/pypi/hermes-agent/json')).info.version
-      if (findExecutable('uv')) row.command = { cmd: 'uv', args: ['tool', 'upgrade', 'hermes-agent'] }
+      const uv = findRuntimeExecutable('hermes', 'uv')
+      if (uv) {
+        try {
+          const tools = await output(uv, ['tool', 'dir'])
+          if (isPackageExecutable(tools, 'hermes-agent', executable)) row.command = { cmd: uv, args: ['tool', 'upgrade', 'hermes-agent'] }
+        } catch { /* uv does not own this installation. */ }
+      }
+      if (!row.command) row.error = '현재 Hermes 설치에 사용한 도구에서 업데이트해 주세요'
     } else if (status.id === 'cursor') {
       row.lookup = async () => {
-        const response = await fetch('https://cursor.com/install', { signal: AbortSignal.timeout(15_000) })
+        const response = await fetch(CURSOR_INSTALL_URL, { signal: AbortSignal.timeout(15_000) })
         if (!response.ok) throw new Error('Cursor 버전 조회 실패')
         const version = (await response.text()).match(/downloads\.cursor\.com\/[^/]+\/([^/]+)\//)?.[1]
         if (!version) throw new Error('Cursor 최신 버전을 읽지 못했습니다')
         return version
       }
-      row.command = { cmd: spec.cmd, args: ['update'] }
+      try { row.command = cursorUpdateSpec(executable) }
+      catch (error) { row.error = message(error) }
     } else row.error = '공식 최신 버전 조회를 지원하지 않습니다'
     rows.push(row)
   }
-  for (const [id, pkg] of Object.entries(npmAgents).filter(([id]) => id === 'claude' || id === 'codex')) {
+  for (const id of ['claude', 'codex']) {
+    const [pkg] = npmAgents[id]
     const cli = id === 'codex' ? { cmd: RUNTIMES.codex.logout!().cmd, args: [] } : claudeCliSpec([])
     const command = cli.cmd
-    if (!findExecutable(command) && !fs.existsSync(command)) continue
-    let current: string | null = managedNpm(command, pkg) ? globals[pkg]?.version ?? null : null
+    const executable = findExecutable(command)
+    if (!executable) continue
+    const npm = npmInstallation(id, executable)
+    let current: string | null = npm?.version ?? null
     try { current ??= (await output(command, [...cli.args, '--version'])).match(/\d+\.\d+\.\d+/)?.[0] ?? null } catch { /* Unknown */ }
     const row = item(`cli:${id}`, id === 'claude' ? 'Claude Code CLI' : 'Codex CLI', 'agent', current)
     row.lookup = () => npmLatest(pkg)
-    if (managedNpm(command, pkg)) row.command = { cmd: 'npm', args: ['install', '-g', `${pkg}@latest`, '--no-audit', '--no-fund'] }
+    if (npm) row.command = npmAgentUpdateSpec(id, pkg, npm.prefix)
     else if (id === 'claude' && cli.args.length === 0) row.command = { cmd: command, args: ['update'] }
     else row.error = '설치 경로를 자동으로 업데이트할 수 없습니다'
     rows.push(row)
   }
-  for (const [id, pkg] of Object.entries(npmAgents)) {
-    if (id === 'prime' || id === 'claude' || id === 'codex' || rows.some(row => row.id === `agent:${id}`) || !globals[pkg]?.version) continue
+  for (const [id, packages] of Object.entries(npmAgents)) {
+    const pkg = packages.find(pkg => globals[pkg]?.version)
+    if (!pkg || !globalPrefix || id === 'claude' || id === 'codex' || rows.some(row => row.id === `agent:${id}`)) continue
     const row = item(`agent:${id}`, RUNTIMES[id]?.label ?? pkg, 'agent', globals[pkg].version!)
     row.lookup = () => npmLatest(pkg)
-    row.command = { cmd: 'npm', args: ['install', '-g', `${pkg}@latest`, '--no-audit', '--no-fund'] }
+    row.command = npmAgentUpdateSpec(id, pkg, globalPrefix)
     rows.push(row)
   }
   return rows

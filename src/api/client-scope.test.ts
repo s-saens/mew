@@ -243,6 +243,78 @@ test('ancillary editor, agent, drawing and debugger APIs use the same fixed clie
   assert.equal(new URL(client.agentCommandArchiveUrl('command'), 'https://device.test').searchParams.get('mewWorkspacePath'), '/worktree')
 })
 
+test('runtime installation polls a scoped background attempt beyond a normal request deadline', async t => {
+  installGlobals(t)
+  const api = await fixture()
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const client = api.createWorkspaceClient({ workspacePath: '/worktree', projectPath: '/logical' })
+  const requests: { method: string; url: URL }[] = []
+  const running = { id: 'opencode', installed: false, installing: true }
+  const complete = { status: { ...running, installed: true, installing: false }, output: 'fixture installed' }
+  let polls = 0
+  let legacy = false
+  api.configureAppRuntime({ transport: {
+    async fetch(input, init) {
+      const url = new URL(String(input), 'https://device.test')
+      const method = init?.method ?? 'GET'
+      requests.push({ method, url })
+      if (method === 'POST') return legacy ? Response.json(complete) : Response.json({ status: running, output: '', attempt: 'fixture-attempt' }, { status: 202 })
+      polls++
+      if (polls === 1) return Response.json({ status: running, output: '' })
+      if (polls === 2) throw new TypeError('fixture connection interrupted')
+      return Response.json(complete)
+    },
+    socket() { throw new Error('Unexpected socket') }, close() {},
+  } })
+
+  const pending = client.installAgentRuntime('opencode')
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(polls, 1)
+  t.mock.timers.tick(31_000)
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(polls, 2)
+  t.mock.timers.tick(1000)
+  assert.deepEqual(await pending, complete)
+  assert.deepEqual(requests.map(row => row.method), ['POST', 'GET', 'GET', 'GET'])
+  assert.equal(requests[0].url.searchParams.get('background'), '1')
+  for (const { method, url } of requests) {
+    assert.equal(url.pathname, '/api/agent-runtimes/opencode/install')
+    assert.equal(url.searchParams.get('mewWorkspacePath'), '/worktree')
+    assert.equal(url.searchParams.get('mewProjectPath'), '/logical')
+    if (method === 'GET') assert.equal(url.searchParams.get('attempt'), 'fixture-attempt')
+  }
+
+  legacy = true
+  assert.deepEqual(await client.installAgentRuntime('opencode'), complete)
+  assert.equal(polls, 3, 'a legacy response does not require polling')
+})
+
+test('background installation preserves provider errors and bounds a stalled status request', async t => {
+  installGlobals(t)
+  const api = await fixture()
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  let stall = false
+  let pollSignal: AbortSignal | undefined
+  api.configureAppRuntime({ transport: {
+    async fetch(_input, init) {
+      if (init?.method === 'POST') return Response.json({ status: { installing: true }, output: '', attempt: 'fixture-attempt' }, { status: 202 })
+      if (!stall) return Response.json({ error: 'fixture install failed' }, { status: 400 })
+      pollSignal = init?.signal ?? undefined
+      return new Promise((_resolve, reject) => pollSignal?.addEventListener('abort', () => reject(pollSignal?.reason), { once: true }))
+    },
+    socket() { throw new Error('Unexpected socket') }, close() {},
+  } })
+  await assert.rejects(api.workspaceClient.installAgentRuntime('opencode'), /fixture install failed/)
+  stall = true
+  const pending = api.workspaceClient.installAgentRuntime('opencode')
+  const rejected = assert.rejects(pending, /installation status|설치 상태/)
+  await new Promise(resolve => setImmediate(resolve))
+  assert.ok(pollSignal)
+  t.mock.timers.tick(610_000)
+  await rejected
+  assert.equal(pollSignal.aborted, true)
+})
+
 test('DB subscriptions share a root connection and close after the final consumer without crossing roots', async t => {
   installGlobals(t)
   const api = await fixture()

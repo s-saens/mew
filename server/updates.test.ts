@@ -40,7 +40,7 @@ test('release distribution keeps bundled tmux immutable while host agent updates
   process.env.MEW_DISTRIBUTION = 'release'
   try {
     const tmux = { ...row('system:tmux'), category: 'system' as const }
-    assert.throws(() => selectUpdates([tmux], [tmux.id]), /npx @liiiiv\/mew-cli@latest/)
+    assert.throws(() => selectUpdates([tmux], [tmux.id]), /npx mew-ide@latest/)
     assert.deepEqual(selectUpdates([row('cli:codex')], ['cli:codex']).map(item => item.id), ['cli:codex'])
   } finally {
     if (previous === undefined) delete process.env.MEW_DISTRIBUTION

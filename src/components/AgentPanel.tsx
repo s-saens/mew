@@ -10,7 +10,8 @@ import { AgentReplyPreview } from './agent-reply-preview'
 import { usesTouchKeyboard } from '@mew/ui/virtual-keyboard'
 import { useAgentExecutionOptions } from '../hooks/use-agent-execution-options'
 import { useAgentInputDraft } from '../hooks/use-agent-input-draft'
-import { RuntimeInstallProgress } from './RuntimeInstallProgress'
+import { RuntimeInstallAction } from './RuntimeInstallProgress'
+import { useRuntimeInstall } from '../hooks/use-runtime-install'
 import { RuntimeUpdateAction, useRuntimeUpdates } from './runtime-update-actions'
 import { AgentAttachmentIcon } from './agent-attachment-icon'
 import { historyDisplayText } from '../utils/agent-history-display'
@@ -116,7 +117,7 @@ import { AgentGuidanceButton } from './agent-guidance-settings'
 import { SUBSCRIPTION_URLS } from '../../shared/agent-access'
 import { AgentSetPicker } from './AgentSetPicker'
 import { AgentScheduleInput } from './agent-schedule-input'
-import { cachedAgentRuntimes, refreshAgentRuntimes, subscribeAgentRuntimes, updateAgentRuntimesCache } from '../utils/agentPickerCache'
+import { cachedAgentRuntimes, refreshAgentRuntimes, subscribeAgentRuntimes } from '../utils/agentPickerCache'
 import { useGridDrag } from '../hooks/useGridDrag'
 import { sessionIdOf, sessionIdsExcept, withAutoLabel, withProjectLabel, withRename, withSessionId, type AgentTab, type RequestedAgentTab } from '../utils/agentTabs'
 import { agentTabStorageKey } from '../utils/agentTabStorage'
@@ -1290,11 +1291,10 @@ void AgentPathBar
  * "탭 안에서 런타임 갈아타기 금지"를 다시 연다). 목록은 열 때 서버에서 한 번 읽는다.
  */
 function RuntimeDropdown({ current, onSelect }: { current: string; onSelect: (runtime: string) => void }) {
-  const { installAgentRuntime } = useWorkspaceApi()
   useUiLocale()
   const [open, setOpen] = useState(false)
   const [statuses, setStatuses] = useState<AgentRuntimeStatus[] | null>(cachedAgentRuntimes)
-  const [installing, setInstalling] = useState<string | null>(null)
+  const installation = useRuntimeInstall()
   const [error, setError] = useState<{ id: string; message: string } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
   const close = useCallback(() => setOpen(false), [])
@@ -1304,7 +1304,8 @@ function RuntimeDropdown({ current, onSelect }: { current: string; onSelect: (ru
   useEffect(() => {
     if (!open) return
     function onDown(e: PointerEvent) {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Element
+      if (!ref.current?.contains(target) && !target.closest('.mew-dialog-overlay')) setOpen(false)
     }
     document.addEventListener('pointerdown', onDown, true)
     return () => document.removeEventListener('pointerdown', onDown, true)
@@ -1326,24 +1327,6 @@ function RuntimeDropdown({ current, onSelect }: { current: string; onSelect: (ru
     }
   }, [open])
   useEffect(() => subscribeAgentRuntimes(setStatuses), [])
-
-  const install = (id: string) => {
-    setInstalling(id)
-    setError(null)
-    void installAgentRuntime(id)
-      .then(({ status }) => {
-        if (!status.installed) throw new Error(uiText("설치 후에도 실행 파일을 찾지 못했습니다"))
-        const next = statuses?.map((item) => (item.id === id ? status : item)) ?? [status]
-        updateAgentRuntimesCache(next)
-        onSelect(id)
-        setOpen(false)
-      })
-      .catch((err: unknown) => {
-        setError({ id, message: err instanceof Error ? err.message : String(err) })
-        return refreshAgentRuntimes().then(setStatuses)
-      })
-      .finally(() => setInstalling(null))
-  }
 
   const currentRuntime = runtimeOf(current)
   return (
@@ -1369,39 +1352,24 @@ function RuntimeDropdown({ current, onSelect }: { current: string; onSelect: (ru
           ) : (
             RUNTIMES.filter((runtime) => !isTerminalRuntime(runtime.id)).map((rt) => {
               const status = statuses?.find((item) => item.id === rt.id)
-              const busy = installing === rt.id || status?.installing === true
+              const busy = installation.installing === rt.id || status?.installing === true
               return (
                 <div key={rt.id} className={`flex items-center gap-2 px-2.5 py-1 ${rt.id === 'tmux' ? 'mb-1' : ''}`}>
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center text-ink-secondary"><rt.Glyph /></span>
                   <div className={`min-w-0 flex-1 truncate text-xs ${rt.id === current ? 'text-ink' : 'text-ink-secondary'}`}>{rt.label}</div>
                   {!isTerminalRuntime(rt.id) && <RuntimeSettingsButton runtimeId={rt.id} label={rt.label} />}
-                  {rt.id !== current &&
-                    (status?.installed ? (
-                      <button
-                        type="button"
-                        role="option"
-                        onClick={() => {
-                          onSelect(rt.id)
-                          setOpen(false)
-                        }}
-                        className="shrink-0 rounded px-2 py-0.5 text-xs text-accent hover:bg-surface-hover"
-                      >
-                        {uiText("사용")}</button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => install(rt.id)}
-                        disabled={!status?.installable || busy || installing !== null}
-                        className="shrink-0 rounded px-2 py-0.5 text-xs text-ink-secondary hover:bg-surface-hover hover:text-ink disabled:opacity-40"
-                      >
-                        {busy ? uiText("설치 중…") : uiText("설치")}
-                      </button>
-                    ))}
+                  <RuntimeInstallAction runtimeId={rt.id} label={rt.label} status={status} {...installation} />
+                  {rt.id !== current && status?.installed && (
+                    <button type="button" role="option" disabled={busy}
+                      onClick={() => { onSelect(rt.id); setOpen(false) }}
+                      className="shrink-0 rounded px-2 py-0.5 text-xs text-accent hover:bg-surface-hover disabled:opacity-40">
+                      {uiText("사용")}
+                    </button>
+                  )}
                 </div>
               )
             })
           )}
-          {installing && <RuntimeInstallProgress runtimeId={installing} busy installation={statuses?.find(item => item.id === installing)?.installation} />}
           {error && <div className="select-text max-h-24 overflow-auto whitespace-pre-wrap px-2.5 py-1.5 text-xs text-danger">{error.message}</div>}
         </div>
       )}
@@ -1412,12 +1380,11 @@ function RuntimeDropdown({ current, onSelect }: { current: string; onSelect: (ru
 // 런타임 전환은 탭을 새로 만드는 흐름으로 통일했다. 구현은 기존 탭 데이터 호환을 위해 남겨 둔다.
 void RuntimeDropdown
 
-function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) => void; onSelectSet: (set: AgentSet) => void }) {
-  const { installAgentRuntime } = useWorkspaceApi()
+function RuntimePicker({ canViewSessions, onSelect, onSelectSet }: { canViewSessions: boolean; onSelect: (runtime: string) => void; onSelectSet: (set: AgentSet) => void }) {
   useUiLocale()
   const [statuses, setStatuses] = useState<AgentRuntimeStatus[] | null>(cachedAgentRuntimes)
-  const [installing, setInstalling] = useState<string | null>(null)
-  const [error, setError] = useState<{ id: string; message: string } | null>(null)
+  const installation = useRuntimeInstall()
+  const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<'runtime' | 'set'>(() => scopedBrowserStorage().getItem('mew:agent-picker-view') === 'set' ? 'set' : 'runtime')
 
   const updates = useRuntimeUpdates(view === 'runtime')
@@ -1451,7 +1418,7 @@ function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) 
       || document.querySelector('[aria-modal="true"]')) return
     const runtime = runtimes[Number(event.key) - 1]
     const status = statuses?.find(item => item.id === runtime?.id)
-    if (!runtime || !status?.installed || status.installing || installing === runtime.id) return
+    if (!runtime || !status?.installed || status.installing || installation.installing === runtime.id) return
     event.preventDefault()
     event.stopPropagation()
     onSelect(runtime.id)
@@ -1460,7 +1427,7 @@ function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) 
   const refresh = useCallback(() => {
     void refreshAgentRuntimes()
       .then(setStatuses)
-      .catch((err: unknown) => setError({ id: '', message: err instanceof Error ? err.message : String(err) }))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
   }, [])
 
   useEffect(refresh, [refresh])
@@ -1471,25 +1438,8 @@ function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) 
     try { writeBrowserStorage('mew:agent-picker-view', next) } catch { /* 보기 기억 실패는 선택기를 막지 않는다 */ }
   }
 
-  const install = (id: string) => {
-    setInstalling(id)
-    setError(null)
-    void installAgentRuntime(id)
-      .then(({ status }) => {
-        if (!status.installed) throw new Error(uiText("설치 후에도 실행 파일을 찾지 못했습니다"))
-        const next = statuses?.map((item) => (item.id === id ? status : item)) ?? [status]
-        updateAgentRuntimesCache(next)
-        onSelect(id)
-      })
-      .catch((err: unknown) => {
-        setError({ id, message: err instanceof Error ? err.message : String(err) })
-        refresh()
-      })
-      .finally(() => setInstalling(null))
-  }
-
   return (
-    <div ref={pickerRef} tabIndex={-1} onKeyDown={selectNumber} className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-4 outline-none">
+    <div ref={pickerRef} tabIndex={-1} onKeyDown={selectNumber} className="flex min-h-0 flex-1 items-center-safe justify-center overflow-y-auto p-4 outline-none">
         <div className="w-full max-w-xl">
         <div className="mb-4 mt-4 flex rounded-md bg-surface p-0.5 text-xs">
           <button type="button" onClick={() => chooseView('runtime')} className={`flex-1 rounded px-3 py-1.5 ${view === 'runtime' ? 'bg-surface-raised text-ink' : 'text-ink-muted hover:text-ink-secondary'}`}>{uiText("런타임")}</button>
@@ -1501,7 +1451,7 @@ function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) 
           <div className="flex flex-col gap-2">
             {runtimes.map((runtime, index) => {
               const status = statuses.find((item) => item.id === runtime.id)
-              const busy = installing === runtime.id || status?.installing === true
+              const busy = installation.installing === runtime.id || status?.installing === true
               const { ref, ...handleProps } = drag.getItemProps(index)
               return (
                 <div key={runtime.id} ref={ref} data-runtime-id={runtime.id} className="relative isolate flex min-h-8 flex-wrap items-center gap-2 rounded-md border border-edge bg-surface px-2 py-0.5 sm:min-h-10 sm:px-2.5 sm:py-1.5">
@@ -1533,29 +1483,16 @@ function RuntimePicker({ onSelect, onSelectSet }: { onSelect: (runtime: string) 
                   </button>
                   <span className="pointer-events-none relative flex h-6 w-6 shrink-0 items-center justify-center text-ink-secondary"><runtime.Glyph /></span>
                   <div className="pointer-events-none relative min-w-0 flex-1 truncate text-sm text-ink">{runtime.label}</div>
-                  {!status?.installed && (
-                    <button
-                      type="button"
-                      onClick={() => install(runtime.id)}
-                      disabled={!status?.installable || busy || installing !== null}
-                      className="relative rounded px-2.5 py-1 text-xs text-ink-secondary hover:bg-surface-raised hover:text-ink disabled:opacity-40"
-                    >
-                      {busy ? uiText("설치 중…") : uiText("설치")}
-                    </button>
-                  )}
-                  {status?.installed && <RuntimeUpdateAction runtimeId={runtime.id} updates={updates} />}
+                  <RuntimeInstallAction runtimeId={runtime.id} label={runtime.label} status={status} {...installation} />
+                  <RuntimeUpdateAction runtimeId={runtime.id} runtimeLabel={runtime.label} installed={status?.installed === true} canViewSessions={canViewSessions} updates={updates} />
                   {index < 9 && <kbd aria-hidden="true" className="pointer-events-none relative text-xs tabular-nums text-ink-muted">{index + 1}</kbd>}
                   <div className="relative shrink-0"><RuntimeSettingsButton runtimeId={runtime.id} label={runtime.label} /></div>
-                  <RuntimeInstallProgress runtimeId={runtime.id} busy={busy} installation={status?.installation} />
-                  {error?.id === runtime.id && (
-                    <div className="relative select-text max-h-24 w-full basis-full overflow-auto whitespace-pre-wrap text-xs text-danger">{error.message}</div>
-                  )}
                 </div>
               )
             })}
           </div>
         )}
-        {error?.id === '' && <div className="select-text mt-3 whitespace-pre-wrap text-xs text-danger">{error.message}</div>}
+        {error && <div className="select-text mt-3 whitespace-pre-wrap text-xs text-danger">{error}</div>}
       </div>
     </div>
   )
@@ -2191,7 +2128,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
         {picking && !terminal && <div className="relative flex min-h-0 flex-1 flex-col overflow-auto">
           {openRuntimeError && <PanelNotice>{openRuntimeError}</PanelNotice>}
           {openingRuntime && <div className="px-4 pt-3 text-xs text-ink-muted">{uiText("{name} 여는 중…", { name: runtimeOf(openingRuntime).label })}</div>}
-          <RuntimePicker onSelect={(runtime) => addRuntimeTab(runtime, undefined, group)} onSelectSet={(set) => addSetTab(set, group)} />
+          <RuntimePicker canViewSessions={allowTerminal} onSelect={(runtime) => addRuntimeTab(runtime, undefined, group)} onSelectSet={(set) => addSetTab(set, group)} />
         </div>}
         {terminal && openRuntimeError && <PanelNotice>{openRuntimeError}</PanelNotice>}
         </AgentDockContent>
@@ -2249,7 +2186,7 @@ export function AgentPanel({ embedded = false, startupPrompt, requestedPicker = 
         <div className="relative flex min-h-0 flex-1 flex-col">
           {openRuntimeError && <PanelNotice>{openRuntimeError}</PanelNotice>}
           {openingRuntime && <div className="shrink-0 px-4 pt-3 text-center text-xs text-ink-muted">{uiText("{name} 여는 중…", { name: runtimeOf(openingRuntime).label })}</div>}
-          <RuntimePicker onSelect={addRuntimeTab} onSelectSet={addSetTab} />
+          <RuntimePicker canViewSessions={allowTerminal} onSelect={addRuntimeTab} onSelectSet={addSetTab} />
         </div>
       )}
     </div>

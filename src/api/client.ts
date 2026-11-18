@@ -4,7 +4,7 @@ import type { ProjectAction, ProjectActionArtifact, ProjectActionRun, ProjectAct
 import type { ProjectPipeline, ProjectPipelineRun, ProjectPipelinesState } from '../../shared/project-pipelines'
 import type { ReleaseProviderRun, ReleaseProvidersState, SaveReleaseConnection } from '../../shared/release-providers'
 import { createDatabasePageMutationScope, databasePageMutations } from '../utils/database-page-mutations'
-import { json } from './response.ts'
+import { ApiResponseError, json } from './response.ts'
 import type { Role } from './auth.ts'
 import { fetchAuthStatus, login, logout, changePassword } from './auth.ts'
 export { fetchAuthStatus, login, logout, changePassword } from './auth.ts'
@@ -237,12 +237,16 @@ export interface AgentRuntimeStatus {
   label: string
   surface: 'acp' | 'terminal'
   installed: boolean
+  connectorInstalled?: boolean
   installing: boolean
   installable: boolean
   uninstallable: boolean
   logoutable: boolean
+  installBlocker?: 'configured-command'
   installation?: { state: 'running' | 'succeeded' | 'failed'; output: string }
 }
+
+type AgentRuntimeInstallResult = { status: AgentRuntimeStatus; output: string }
 
 /** 저장된 런타임 설정의 마스킹 뷰 — 시크릿은 ****끝4자만 온다 */
 export interface RuntimeSettingView {
@@ -1209,10 +1213,34 @@ function createApiClient(scope?: Readonly<WorkspaceScope>) {
     }).then(json<{ ok: true }>)
   }
 
-  function installAgentRuntime(id: string): Promise<{ status: AgentRuntimeStatus; output: string }> {
-    return mewFetch(`/api/agent-runtimes/${encodeURIComponent(id)}/install`, { method: 'POST' }).then(
-      json<{ status: AgentRuntimeStatus; output: string }>,
-    )
+  async function installAgentRuntime(id: string): Promise<AgentRuntimeInstallResult> {
+    const path = `/api/agent-runtimes/${encodeURIComponent(id)}/install`
+    const response = await mewFetch(`${path}?background=1`, { method: 'POST' })
+    const result = await json<AgentRuntimeInstallResult & { attempt?: string }>(response)
+    if (response.status !== 202) return result
+    const statusError = uiText('설치 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+    if (!result.attempt) throw new Error(statusError)
+
+    // Keep each long-running installation independent of the transport's response deadline.
+    const controller = new AbortController()
+    const { signal } = controller
+    const timeout = setTimeout(() => controller.abort(new Error(statusError)), 610_000)
+    try {
+      while (!signal.aborted) {
+        try {
+          const statusResponse = await mewFetch(`${path}?attempt=${encodeURIComponent(result.attempt)}`, { signal, cache: 'no-store' })
+          if (statusResponse.status < 500) {
+            const progress = await json<AgentRuntimeInstallResult>(statusResponse)
+            if (!progress.status.installing) return progress
+          }
+        } catch (error) {
+          if (error instanceof ApiResponseError) throw error
+          signal.throwIfAborted()
+        }
+        await new Promise<void>(resolve => setTimeout(resolve, 1000))
+      }
+      throw signal.reason
+    } finally { clearTimeout(timeout) }
   }
 
   function uninstallAgentRuntime(id: string): Promise<{ status: AgentRuntimeStatus; output: string }> {

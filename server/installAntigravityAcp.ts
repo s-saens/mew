@@ -7,6 +7,7 @@ import { promisify } from 'node:util'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
+import { findExecutable } from './agentRuntimes.ts'
 import { antigravityDistribution, antigravityInstallDir } from './antigravityAcp.ts'
 
 const run = promisify(execFile)
@@ -14,6 +15,8 @@ const run = promisify(execFile)
 /** Extract only a pinned official archive into a private staging directory, then publish it. */
 export async function installAntigravityAcp() {
   const distribution = antigravityDistribution()
+  const unzip = findExecutable('unzip')
+  if (!unzip) throw new Error('Antigravity 설치에 unzip이 필요합니다. Mew 호스트에 unzip을 설치하고 다시 시도하세요.')
   const destination = antigravityInstallDir()
   const parent = path.dirname(destination)
   await fs.mkdir(parent, { recursive: true, mode: 0o700 })
@@ -37,14 +40,14 @@ export async function installAntigravityAcp() {
       }
     }, createWriteStream(archive, { mode: 0o600 }))
     console.log('다운로드 완료. 배포 파일 검사 중…')
-    const { stdout } = await run('unzip', ['-Z1', archive], { maxBuffer: 8 * 1024 * 1024 })
+    const { stdout } = await run(unzip, ['-Z1', archive], { maxBuffer: 8 * 1024 * 1024 })
     for (const name of stdout.trim().split('\n')) {
       if (name.startsWith('/') || name.includes('\\') || name.split('/').includes('..')) throw new Error('안전하지 않은 배포 파일 경로입니다')
     }
     const unpacked = path.join(staging, 'unpacked')
     await fs.mkdir(unpacked, { mode: 0o700 })
     console.log('압축 해제 중…')
-    await run('unzip', ['-q', archive, '-d', unpacked], { timeout: 120_000 })
+    await run(unzip, ['-q', archive, '-d', unpacked], { timeout: 120_000 })
     console.log('실행 파일 확인 중…')
     for (const name of ['agy_acp_server.par', 'localharness_external']) {
       const command = path.join(unpacked, name)

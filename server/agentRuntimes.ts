@@ -4,9 +4,12 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { terminalBackend } from '../packages/tmux-term/src/server/backends/index.ts'
+import { windowsShell } from '../packages/tmux-term/src/server/backends/psmux.ts'
 import { fileURLToPath } from 'node:url'
 import { readAgentSetting } from './agentSettings.ts'
-import { antigravityCommand } from './antigravityAcp.ts'
+import { antigravityCommand, antigravityInstallSupported } from './antigravityAcp.ts'
+import { cursorInstallDirectories, cursorInstallSpec } from './cursorCliInstall.ts'
+import { DATA_DIR } from './dataDir.ts'
 import { selectedRuntimePrompt } from '../shared/selected-runtime-prompt.ts'
 export { selectedRuntimePrompt } from '../shared/selected-runtime-prompt.ts'
 
@@ -14,10 +17,23 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 
 /** 기본 Claude Code ACP 백엔드 — 버전 고정된 로컬 설치본. `npx @latest`로 띄우지 않는다(ADR 0034). */
 const DEFAULT_CLAUDE_ACP_CMD = path.resolve(here, '../node_modules/.bin/claude-agent-acp' + (process.platform === 'win32' ? '.cmd' : ''))
-const DEFAULT_CODEX_ACP_CMD = path.resolve(here, '../node_modules/.bin/codex-acp' + (process.platform === 'win32' ? '.cmd' : ''))
+export const DEFAULT_CODEX_ACP_CMD = path.resolve(here, '../node_modules/.bin/codex-acp' + (process.platform === 'win32' ? '.cmd' : ''))
 const LOCAL_NODE_MODULES = path.resolve(here, '../node_modules')
 const DEFAULT_HOST_CODEX_CLI_CMD = path.join(os.homedir(), '.local/bin/codex')
 const PRIME_ADAPTER_CMD = path.resolve(here, 'primeAdapter.ts')
+export const CODEX_ACP_PACKAGE = '@agentclientprotocol/codex-acp@1.6.0'
+export const NPM_RUNTIME_PACKAGES = {
+  codex: '@openai/codex',
+  kimi: '@moonshot-ai/kimi-code',
+  openclaw: 'openclaw',
+  opencode: '@opencode/cli',
+} as const
+export type NpmAgentRuntime = keyof typeof NPM_RUNTIME_PACKAGES
+export const LEGACY_OPENCODE_NPM_PACKAGE = 'opencode-ai'
+const runtimeCommandNames: Readonly<Record<string, string>> = {
+  claude: 'claude', codex: 'codex', cursor: 'agent', hermes: 'hermes',
+  kimi: 'kimi', openclaw: 'openclaw', opencode: 'opencode', prime: 'prime-agent',
+}
 
 /** ACP가 인증 전에 뜨지 못해도 브라우저 터미널에서 실행할 수 있는 공통 로그인 method id. */
 export const RUNTIME_LOGIN_METHOD_ID = 'mew-runtime-login'
@@ -75,6 +91,8 @@ export interface AgentRuntime {
   terminal?: () => SpawnSpec
   /** Installation checks need only this command, without resolving launch-only host CLI/environment. */
   installationCommand?: () => string
+  /** Additional executable required by the registered connector. */
+  requiredCommand?: () => string
   /** 명령을 입력하지 않고 tmux의 기본 셸 자체를 탭 표면으로 쓴다. */
   terminalLaunch?: 'shell'
   /** UI 설치 버튼이 실행하는 고정 명령. 요청 값을 인자에 섞지 않는다. */
@@ -112,9 +130,87 @@ function isInside(root: string, candidate: string): boolean {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))
 }
 
+export function isBundledAgentExecutable(candidate: string): boolean {
+  return isInside(LOCAL_NODE_MODULES, candidate)
+}
+
+export function runtimeNpmPrefix(id: NpmAgentRuntime): string {
+  return path.resolve(DATA_DIR, 'runtimes', 'npm', id)
+}
+
+export function runtimeNpmBin(id: NpmAgentRuntime): string {
+  const prefix = runtimeNpmPrefix(id)
+  return process.platform === 'win32' ? prefix : path.join(prefix, 'bin')
+}
+
+export function runtimeNpmPackageRoot(prefix: string): string {
+  return process.platform === 'win32' ? path.join(prefix, 'node_modules') : path.join(prefix, 'lib', 'node_modules')
+}
+
+export function isNpmAgentRuntime(id: string): id is NpmAgentRuntime {
+  return Object.hasOwn(NPM_RUNTIME_PACKAGES, id)
+}
+
+export function npmAgentInstallSpec(id: NpmAgentRuntime, prefix?: string, packageName?: string): SpawnSpec {
+  const args = [path.join(here, 'installNpmAgentRuntime.ts'), id]
+  if (prefix !== undefined || packageName !== undefined) args.push(prefix ?? runtimeNpmPrefix(id))
+  if (packageName !== undefined) args.push(packageName)
+  return { cmd: process.execPath, args }
+}
+
+export function runtimeNodePath(): string {
+  return [...new Set([path.dirname(process.execPath), ...(process.env.PATH || process.env.Path || '').split(path.delimiter).filter(Boolean)])].join(path.delimiter)
+}
+
+/** Installation checks and default runtime launch use the same search order. */
+export function runtimeExecutableCandidates(id: string, command: string): string[] {
+  const candidates = executableCandidates(command)
+  const isDefault = runtimeCommandNames[id] === command
+  const isCursorAlias = id === 'cursor' && command === 'cursor-agent'
+  const isUv = id === 'hermes' && command === 'uv'
+  if (!isDefault && !isCursorAlias && !isUv) return candidates
+
+  const home = os.homedir()
+  const userBin = path.join(home, '.local', 'bin')
+  const directories: string[] = []
+  if (isNpmAgentRuntime(id)) directories.push(runtimeNpmBin(id))
+  if (isNpmAgentRuntime(id) || id === 'claude') {
+    const npmPrefix = process.env.npm_config_prefix || process.env.NPM_CONFIG_PREFIX
+    if (npmPrefix && path.isAbsolute(npmPrefix)) directories.push(process.platform === 'win32' ? npmPrefix : path.join(npmPrefix, 'bin'))
+    if (process.platform === 'win32' && process.env.APPDATA) directories.push(path.join(process.env.APPDATA, 'npm'))
+    if (process.platform !== 'win32') directories.push(path.join(home, '.npm-global', 'bin'))
+  }
+  if (id === 'cursor') directories.push(...cursorInstallDirectories(home))
+  if (id === 'hermes') {
+    const bin = isUv ? process.env.UV_INSTALL_DIR : process.env.UV_TOOL_BIN_DIR
+    if (bin && path.isAbsolute(bin)) directories.push(bin)
+    if (isUv) directories.push(path.resolve(DATA_DIR, 'runtimes', 'uv'))
+    if (process.env.XDG_BIN_HOME) directories.push(process.env.XDG_BIN_HOME)
+    if (process.env.XDG_DATA_HOME) directories.push(path.join(process.env.XDG_DATA_HOME, '..', 'bin'))
+  }
+  if (id === 'prime' && process.env.PRIME_AGENT_RUST_PREFIX) directories.push(path.join(process.env.PRIME_AGENT_RUST_PREFIX, 'bin'))
+  directories.push(userBin)
+  const fallback = { ...process.env, PATH: directories.filter(directory => path.isAbsolute(directory)).join(path.delimiter) }
+  candidates.push(...executableCandidates(command, fallback))
+  if (id === 'cursor' && command === 'agent') candidates.push(...executableCandidates('cursor-agent'), ...executableCandidates('cursor-agent', fallback))
+  return [...new Set(candidates)].filter(candidate => id !== 'codex' || !isBundledAgentExecutable(candidate))
+}
+
+export function findRuntimeExecutable(id: string, command: string): string | null {
+  for (const candidate of runtimeExecutableCandidates(id, command)) {
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK)
+      if (!fs.statSync(candidate).isFile()) continue
+      if (id === 'codex' && command === 'codex' && isBundledAgentExecutable(fs.realpathSync(candidate))) continue
+      return candidate
+    } catch { /* next candidate */ }
+  }
+  return null
+}
+
 /** Mew의 npm 의존성에 딸려 온 CLI를 제외하고 호스트에 설치된 실행 파일만 찾는다. */
 function findHostExecutable(name: string): string | null {
-  for (const candidate of executableCandidates(name)) {
+  for (const candidate of runtimeExecutableCandidates(name, name)) {
     try {
       fs.accessSync(candidate, fs.constants.X_OK)
       const realCandidate = fs.realpathSync(candidate)
@@ -127,12 +223,46 @@ function findHostExecutable(name: string): string | null {
   return null
 }
 
+function configuredCodexCliCommand(): string {
+  return process.env.MEW_AGENT_CODEX_CLI_CMD || process.env.CODEX_PATH || 'codex'
+}
+
 /** ACP 엔진과 인증 명령이 함께 쓰는 호스트 Codex. 번들된 transitive CLI로 후퇴하지 않는다. */
 function hostCodexCliCommand(): string {
-  return process.env.MEW_AGENT_CODEX_CLI_CMD
-    || process.env.CODEX_PATH
-    || findHostExecutable('codex')
-    || DEFAULT_HOST_CODEX_CLI_CMD
+  const command = configuredCodexCliCommand()
+  return command === 'codex' ? findRuntimeExecutable('codex', command) || DEFAULT_HOST_CODEX_CLI_CMD : command
+}
+
+function resolveRuntimeSpawnSpec<T extends SpawnSpec>(id: string, spec: T): T {
+  if (spec.cmd !== runtimeCommandNames[id] && !(id === 'cursor' && spec.cmd === 'cursor-agent')) return spec
+  const cmd = findRuntimeExecutable(id, spec.cmd) ?? spec.cmd
+  if (isNpmAgentRuntime(id) && isInside(runtimeNpmPrefix(id), cmd)) {
+    return { ...spec, cmd, env: { PATH: runtimeNodePath(), ...spec.env } }
+  }
+  return { ...spec, cmd }
+}
+
+function openCodeNpmPackage(executable: string): string {
+  const v2PackagePath = /(?:^|[\\/])node_modules[\\/]@opencode[\\/]cli[\\/]/i
+  if (v2PackagePath.test(executable)) return NPM_RUNTIME_PACKAGES.opencode
+  // Windows npm command shims are files, so realpath does not identify the package.
+  if (/\.(?:cmd|ps1)$/i.test(executable) && v2PackagePath.test(fs.readFileSync(executable, 'utf8'))) {
+    return NPM_RUNTIME_PACKAGES.opencode
+  }
+  return LEGACY_OPENCODE_NPM_PACKAGE
+}
+
+function npmAgentUninstallSpec(id: Exclude<NpmAgentRuntime, 'codex'>): SpawnSpec {
+  const command = findRuntimeExecutable(id, runtimeInstallationCommand(id))
+  let packageName: string = NPM_RUNTIME_PACKAGES[id]
+  let prefix: string[] = []
+  if (command) {
+    const managedPrefix = runtimeNpmPrefix(id)
+    const executable = fs.realpathSync(command)
+    if (isInside(managedPrefix, command) && isInside(managedPrefix, executable)) prefix = ['--prefix', managedPrefix]
+    else if (id === 'opencode') packageName = openCodeNpmPackage(executable)
+  }
+  return { cmd: 'npm', args: ['uninstall', '-g', ...prefix, packageName] }
 }
 
 function claudeSpawnSpec(): SpawnSpec {
@@ -180,6 +310,7 @@ function codexSpawnSpec(): SpawnSpec {
     env: {
       NO_BROWSER: process.env.NO_BROWSER ?? '1',
       CODEX_PATH: hostCodexCliCommand(),
+      PATH: runtimeNodePath(),
     },
   }
 }
@@ -214,10 +345,33 @@ function cursorSpawnSpec(): SpawnSpec {
   }
 }
 
+const primeCommand = () => process.env.MEW_PRIME_AGENT_EXECUTABLE || 'prime-agent'
+
 function primeSpawnSpec(): SpawnSpec {
   // Prime ACP에는 session/list·load·모델·mode 계약이 없으므로, mew가 공식 CLI의 RPC를 ACP로 번역한다.
   // `MEW_AGENT_PRIME_CMD`는 예전 로컬 ACP 포크 설정이므로 의도적으로 읽지 않는다.
-  return { cmd: process.execPath, args: [PRIME_ADAPTER_CMD, ...splitArgs(process.env.MEW_AGENT_PRIME_ARGS)] }
+  const command = primeCommand()
+  return {
+    cmd: process.execPath,
+    args: [PRIME_ADAPTER_CMD, ...splitArgs(process.env.MEW_AGENT_PRIME_ARGS)],
+    env: { MEW_PRIME_AGENT_EXECUTABLE: command === 'prime-agent' ? findRuntimeExecutable('prime', command) ?? command : command },
+  }
+}
+
+function primeInstallSpec(): SpawnSpec {
+  return process.platform === 'win32'
+    ? { cmd: windowsShell(), args: ['-NoProfile', '-NonInteractive', '-Command', "$ErrorActionPreference = 'Stop'; Invoke-RestMethod 'https://app.primeintellect.ai/prime-agent/install.ps1' | Invoke-Expression"] }
+    : {
+        cmd: 'bash',
+        args: ['-o', 'pipefail', '-c', 'curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh'],
+        env: { PRIME_AGENT_PRESERVE_NPM_BRIDGE: '1' },
+      }
+}
+
+function hermesToolSpec(args: string[]): SpawnSpec {
+  const uv = findRuntimeExecutable('hermes', 'uv')
+  if (!uv) throw new Error('Hermes 설치 및 제거에는 uv가 필요합니다. https://docs.astral.sh/uv/getting-started/installation/ 에서 호스트에 uv를 설치하고 다시 시도하세요.')
+  return { cmd: uv, args: ['tool', ...args] }
 }
 
 const login = (
@@ -258,7 +412,8 @@ export const RUNTIMES: Record<string, AgentRuntime> = {
   codex: {
     id: 'codex', label: 'Codex', surface: 'acp', spec: codexSpawnSpec,
     installationCommand: () => process.env.MEW_AGENT_CODEX_CMD || DEFAULT_CODEX_ACP_CMD,
-    install: () => ({ cmd: 'npm', args: ['install', '--no-save', '@agentclientprotocol/codex-acp@1.6.0'] }),
+    requiredCommand: configuredCodexCliCommand,
+    install: () => npmAgentInstallSpec('codex'),
     logout: () => ({ cmd: hostCodexCliCommand(), args: ['logout'] }),
     auth: {
       methods: () => [login(
@@ -277,8 +432,8 @@ export const RUNTIMES: Record<string, AgentRuntime> = {
   },
   hermes: {
     id: 'hermes', label: 'Hermes', surface: 'acp', spec: hermesSpawnSpec,
-    install: () => ({ cmd: 'uv', args: ['tool', 'install', '--force', 'hermes-agent[acp]'] }),
-    uninstall: () => ({ cmd: 'uv', args: ['tool', 'uninstall', 'hermes-agent'] }),
+    install: () => ({ cmd: process.execPath, args: [path.join(here, 'installHermes.ts')] }),
+    uninstall: () => hermesToolSpec(['uninstall', 'hermes-agent']),
     auth: {
       methods: () => [login(RUNTIME_LOGIN_METHOD_ID, hermesSpawnSpec(), ['acp', '--setup'], 'Hermes 로그인/설정', '사용할 모델과 계정을 선택하세요.')],
       replaceMethodIds: ['hermes-setup'],
@@ -286,8 +441,8 @@ export const RUNTIMES: Record<string, AgentRuntime> = {
   },
   kimi: {
     id: 'kimi', label: 'Kimi Code', surface: 'acp', spec: kimiSpawnSpec,
-    install: () => ({ cmd: 'npm', args: ['install', '-g', '@moonshot-ai/kimi-code@latest'] }),
-    uninstall: () => ({ cmd: 'npm', args: ['uninstall', '-g', '@moonshot-ai/kimi-code'] }),
+    install: () => npmAgentInstallSpec('kimi'),
+    uninstall: () => npmAgentUninstallSpec('kimi'),
     auth: {
       methods: () => [
         login(
@@ -316,7 +471,7 @@ export const RUNTIMES: Record<string, AgentRuntime> = {
   },
   antigravity: {
     id: 'antigravity', label: 'Antigravity', surface: 'acp', spec: antigravitySpawnSpec,
-    install: process.platform === 'win32' ? undefined : () => ({ cmd: process.execPath, args: [path.join(here, 'installAntigravityAcp.ts')] }),
+    install: antigravityInstallSupported() ? () => ({ cmd: process.execPath, args: [path.join(here, 'installAntigravityAcp.ts')] }) : undefined,
     auth: { methods: () => [] },
   },
   tmux: {
@@ -326,24 +481,24 @@ export const RUNTIMES: Record<string, AgentRuntime> = {
   },
   openclaw: {
     id: 'openclaw', label: 'OpenClaw', surface: 'acp', spec: openclawSpawnSpec,
-    install: () => ({ cmd: 'npm', args: ['install', '-g', 'openclaw@latest'] }),
-    uninstall: () => ({ cmd: 'npm', args: ['uninstall', '-g', 'openclaw'] }),
+    install: () => npmAgentInstallSpec('openclaw'),
+    uninstall: () => npmAgentUninstallSpec('openclaw'),
     auth: {
       methods: () => [login(RUNTIME_LOGIN_METHOD_ID, openclawSpawnSpec(), ['onboard', '--tui'], 'OpenClaw 로그인/설정', '공급자 인증과 게이트웨이를 대화형으로 설정합니다.')],
     },
   },
   opencode: {
     id: 'opencode', label: 'OpenCode', surface: 'acp', spec: opencodeSpawnSpec,
-    install: () => ({ cmd: 'npm', args: ['install', '-g', 'opencode-ai@latest'] }),
-    uninstall: () => ({ cmd: 'npm', args: ['uninstall', '-g', 'opencode-ai'] }),
-    logout: () => ({ cmd: 'opencode', args: ['auth', 'logout'] }),
+    install: () => npmAgentInstallSpec('opencode'),
+    uninstall: () => npmAgentUninstallSpec('opencode'),
+    logout: () => resolveRuntimeSpawnSpec('opencode', { cmd: 'opencode', args: ['auth', 'logout'] }),
     auth: {
       methods: () => [login(RUNTIME_LOGIN_METHOD_ID, opencodeSpawnSpec(), ['auth', 'login'], 'OpenCode 로그인', '사용할 서비스를 선택해 로그인하세요.')],
     },
   },
   cursor: {
     id: 'cursor', label: 'Cursor CLI', surface: 'acp', spec: cursorSpawnSpec,
-    install: process.platform === 'win32' ? undefined : () => ({ cmd: 'bash', args: ['-lc', 'curl https://cursor.com/install -fsS | bash'] }),
+    install: cursorInstallSpec,
     auth: {
       methods: () => [login(
         RUNTIME_LOGIN_METHOD_ID,
@@ -360,12 +515,11 @@ export const RUNTIMES: Record<string, AgentRuntime> = {
   },
   prime: {
     id: 'prime', label: 'Prime Agent', surface: 'acp', spec: primeSpawnSpec,
-    installationCommand: () => process.env.MEW_PRIME_AGENT_EXECUTABLE || 'prime-agent',
-    // 공식 인스톨러 — Linux·macOS 공통. 버전 있는 릴리스를 내려받아 검증 후 prime-agent 명령을 심는다.
-    install: process.platform === 'win32' ? undefined : () => ({ cmd: 'sh', args: ['-lc', 'curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh'] }),
+    installationCommand: primeCommand,
+    install: process.platform === 'win32' && process.arch !== 'x64' ? undefined : primeInstallSpec,
     auth: {
       // /login은 Prime Agent TUI의 슬래시 명령이다 — 터미널 팝업에서 대화형으로 공급자를 고른다.
-      methods: () => [login(RUNTIME_LOGIN_METHOD_ID, { cmd: process.env.MEW_PRIME_AGENT_EXECUTABLE || 'prime-agent', args: [] }, [], 'Prime Agent 로그인/설정', '터미널에서 /login을 입력하세요. 설정을 마치면 터미널을 닫으세요.')],
+      methods: () => [login(RUNTIME_LOGIN_METHOD_ID, { cmd: primeCommand(), args: [] }, [], 'Prime Agent 로그인/설정', '터미널에서 /login을 입력하세요. 설정을 마치면 터미널을 닫으세요.')],
       replaceMethodIds: ['login'],
     },
   },
@@ -422,7 +576,7 @@ export function resolvedSpec(id: string): SpawnSpec | null {
   const entry = RUNTIMES[id]
   if (!entry?.spec) return null
   // terminal 표면의 실행 파일 설정은 공식 CLI에 적용한다. Claude 예약 작업의 ACP 어댑터는 고정한다.
-  return entry.surface === 'terminal' ? entry.spec() : applySetting(entry.spec(), id)
+  return entry.surface === 'terminal' ? entry.spec() : resolveRuntimeSpawnSpec(id, applySetting(entry.spec(), id))
 }
 
 export function resolvedTerminalSpec(id: string): SpawnSpec | null {
@@ -432,12 +586,12 @@ export function resolvedTerminalSpec(id: string): SpawnSpec | null {
 }
 
 /** Resolve only the executable whose presence defines installation, retaining saved command rules. */
-export function runtimeInstallationCommand(id: string): string {
+export function runtimeInstallationCommand(id: string, { useSavedSettings = true } = {}): string {
   const entry = RUNTIMES[id]
   if (!entry) return ''
-  const command = entry.installationCommand?.()
-  if (command === undefined) return (entry.surface === 'terminal' ? resolvedTerminalSpec(id) : resolvedSpec(id))?.cmd ?? ''
-  return applySetting({ cmd: command, args: [] }, id).cmd
+  const command = entry.installationCommand?.() ?? (entry.surface === 'terminal' ? entry.terminal?.() : entry.spec?.())?.cmd
+  if (command === undefined) return ''
+  return useSavedSettings ? applySetting({ cmd: command, args: [] }, id).cmd : command
 }
 
 /** 요청값으로 명령을 만들지 않는다. 등록표에 박힌 로그인 spec만 돌려준다. */
@@ -446,7 +600,7 @@ export function runtimeLoginSpec(runtime: string, methodId = RUNTIME_LOGIN_METHO
   if (!entry) throw new Error('지원하지 않는 에이전트 런타임입니다')
   const method = entry.auth.methods().find((item) => item.id === methodId)
   if (!method) throw new Error('지원하지 않는 런타임 로그인 방법입니다')
-  return method
+  return resolveRuntimeSpawnSpec(runtime, method)
 }
 
 export function isRuntimeLoginMethod(runtime: string, methodId: string): boolean {

@@ -4,6 +4,11 @@ import { DATA_DIR } from './dataDir.ts'
 // Google LLC's ACP Registry distribution, deliberately separate from the agy TUI.
 export const ANTIGRAVITY_ACP_VERSION = '1.1.1'
 
+export function antigravityInstallSupported(platform = process.platform, arch = process.arch): boolean {
+  try { antigravityDistribution(platform, arch); return true }
+  catch { return false }
+}
+
 export function antigravityDistribution(platform = process.platform, arch = process.arch) {
   const targets: Record<string, string> = {
     'linux-x64': 'linux/agy-acp-server-agy_acp_server_1.1.1-linux-x86_64.zip',

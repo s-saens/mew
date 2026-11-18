@@ -9,7 +9,7 @@ test('런타임 상태는 서버 등록표 전체를 설치 여부와 함께 내
   const statuses = runtimeStatuses()
   assert.deepEqual(statuses.map((item) => item.id), Object.keys(RUNTIMES))
   assert.ok(statuses.every((item) => typeof item.installed === 'boolean'))
-  assert.ok(statuses.filter((item) => item.id !== 'tmux').every((item) => item.installable))
+  assert.deepEqual(statuses.filter(item => item.installable).map(item => item.id), Object.values(RUNTIMES).filter(runtime => runtime.install).map(runtime => runtime.id))
   assert.equal(statuses.find((item) => item.id === 'tmux')?.installable, false)
 })
 
@@ -38,7 +38,7 @@ test('등록된 런타임은 표면별로 공식 CLI 또는 고정 ACP 인증 �
     assert.deepEqual(runtimeLoginSpec('claude', CLAUDE_CONSOLE_LOGIN_METHOD_ID).args.slice(-3), ['auth', 'login', '--console'])
     assert.equal(RUNTIMES.antigravity.surface, 'acp')
     assert.equal(resolvedTerminalSpec('antigravity'), null)
-    assert.ok(RUNTIMES.antigravity.install?.().args[0]?.endsWith('/server/installAntigravityAcp.ts'))
+    if (RUNTIMES.antigravity.install) assert.equal(path.basename(RUNTIMES.antigravity.install().args[0]), 'installAntigravityAcp.ts')
     assert.equal(RUNTIMES.tmux.surface, 'terminal')
     assert.equal(RUNTIMES.tmux.terminalLaunch, 'shell')
     assert.equal(path.basename(resolvedTerminalSpec('tmux')?.cmd ?? ''), 'tmux')
@@ -63,7 +63,9 @@ test('등록된 런타임은 표면별로 공식 CLI 또는 고정 ACP 인증 �
     assert.equal(RUNTIMES.cursor.spec?.().env?.NO_OPEN_BROWSER, '1')
     // Prime Agent — 공식 인스톨러 + Mew 소유 RPC→ACP 어댑터
     const primeInstall = RUNTIMES.prime.install?.()
-    assert.ok(primeInstall?.args[1]?.includes('prime-agent/install.sh'), '공식 인스톨러 URL을 쓴다')
+    if (process.platform !== 'win32' || process.arch === 'x64') {
+      assert.ok(primeInstall?.args.some(arg => /prime-agent\/install\.(sh|ps1)/.test(arg)), '공식 인스톨러 URL을 쓴다')
+    } else assert.equal(primeInstall, undefined)
     assert.equal(RUNTIMES.prime.spec?.().cmd, process.execPath)
     assert.ok(RUNTIMES.prime.spec?.().args[0]?.endsWith('/server/primeAdapter.ts'))
   } finally {

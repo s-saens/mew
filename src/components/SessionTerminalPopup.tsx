@@ -7,14 +7,53 @@ import { useWorkspaceBrowser } from '../workspace/workspace-browser-context'
 // **반드시 body로 포털한다.** 모바일 이름표(ProjectPeek)가 transform을 써서 fixed 자손의 containing
 // block이 되기 때문에, 그 안에 두면 inset-0이 화면이 아니라 이름표 상자 크기로 잡혀 팝업이 손톱만 해진다.
 // data-cmd-overlay도 함께 붙인다 — 없으면 팝업 안을 누를 때 이름표가 닫히며 팝업까지 사라진다.
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { useOverlayDismiss } from '@mew/ui'
+import { DialogFrame, useOverlayDismiss } from '@mew/ui'
+import { uiText } from '@mew/ui/i18n-core'
 
 import { outsideTerminal } from '../utils/terminalFocus'
 import { useI18n } from '../i18n'
 
 const TmuxTerminal = lazy(() => import('@mew/tmux-term').then(module => ({ default: module.TmuxTerminal })))
+
+export function SessionTerminalOutputPopup({ title, output, status, tone, onClose }: {
+  title: string
+  output: string
+  status: string
+  tone: 'muted' | 'success' | 'danger'
+  onClose: () => void
+}) {
+  const titleId = useId()
+  const outputRef = useRef<HTMLPreElement>(null)
+  const followOutput = useRef(true)
+
+  useEffect(() => {
+    const element = outputRef.current
+    if (element && followOutput.current) element.scrollTop = element.scrollHeight
+  }, [output])
+
+  return <DialogFrame labelledBy={titleId} onClose={onClose} className="flex h-full max-h-[92dvh] max-w-3xl flex-col border-edge-bright bg-surface-raised" overlayClassName="p-3 sm:p-4">
+    <div className="flex items-center gap-2 border-b border-edge px-3 py-2.5">
+      <PlayGlyph className="shrink-0 text-accent-strong" />
+      <div id={titleId} className="min-w-0 truncate text-sm font-semibold text-ink">{title}</div>
+    </div>
+    <pre ref={outputRef} tabIndex={0} aria-label={uiText('실행 로그')}
+      onScroll={event => {
+        const element = event.currentTarget
+        followOutput.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24
+      }}
+      className="min-h-0 flex-1 select-text overflow-auto whitespace-pre-wrap wrap-anywhere bg-surface-deep p-3 font-mono text-xs text-ink outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent">
+      {output || uiText('출력 없음')}
+    </pre>
+    <div className="flex items-center gap-2 border-t border-edge px-3 py-2">
+      <span role="status" className={`min-w-0 flex-1 text-xs ${tone === 'danger' ? 'text-danger-strong' : tone === 'success' ? 'text-success-ink' : 'text-ink-muted'}`}>{status}</span>
+      <button type="button" onClick={onClose} className="shrink-0 rounded border border-edge-strong px-3 py-1 text-sm text-ink-secondary hover:bg-surface-hover">
+        {uiText('닫기')}
+      </button>
+    </div>
+  </DialogFrame>
+}
 
 export function SessionTerminalPopup({
   title,

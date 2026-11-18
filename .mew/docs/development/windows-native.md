@@ -1,7 +1,7 @@
 ---
 title: "OS execution layer and Windows native support"
-description: "Owns Windows native execution contracts for psmux, Job Objects, private ACLs, authenticated named pipes, and platform releases. Distinguishes this implementation from the default npm-managed WSL path and separates isolated checks from actual Windows acceptance."
-updated: "2026-11-17"
+description: "Owns Windows native execution contracts for psmux, Job Objects, private ACLs, authenticated named pipes, runtime installers, and platform releases. Covers the default npm-managed WSL path and Windows acceptance limits."
+updated: "2026-11-18"
 상위파일:
   - "architecture.md"
   - "../operations/cli-release.md"
@@ -64,7 +64,7 @@ Native execution uses the existing owner setup flow, loopback server, browser op
 
 Recurring tasks run every minute through a single Task Scheduler entry for the current user with standard privileges, identified by a hash of the state path. The private `windows-schedules.cron` uses 5-field cron expressions supporting numbers, ranges, lists, steps, and month/day-of-week aliases, along with PowerShell commands, evaluated in OS local time. A file stamp prevents duplicates within the same minute, and saving an empty configuration removes only mew's task. When the server starts from a new runtime, it updates the runner path for saved schedules. Existing Windows Task Scheduler entries are not modified. The task has a 1-minute limit, and each control call has a 30-second limit; long-running agent tasks run in separate psmux sessions. Tasks run while logged in, with no contract to retroactively run tasks missed during logout or sleep.
 
-General commands and project buttons also use PowerShell syntax. Existing Bash commands must be adapted to the execution environment. Windows automatic installation is not provided for Cursor and Prime's Unix automatic installers or the currently registered Antigravity distribution. Check each provider's Windows support for provider executables, login, and DAP engines.
+General commands and project buttons also use PowerShell syntax. Use Windows-compatible commands on a native server. Cursor supports the provider's PowerShell installer in a fresh directory, and Prime supports its official PowerShell installer on x64. The pinned Antigravity ACP distribution has no native Windows installer. See [Runtime settings](../../../docs/configuration/agent-runtimes.md#installation-login-and-subscriptions).
 
 ## Redistribution notices
 

@@ -124,7 +124,7 @@ import { isRuntimeLoginMethod, runtimeLoginSpec } from './agentRuntimes.ts'
 import { terminalAuthFromHost } from './agentHost.ts'
 import { authFailureMessageFromOutput, browserLoginDetailsFromOutput, prepareAgentAuthTerminal, readAgentAuthTerminalStatus } from './agentAuthTerminal.ts'
 import { resolveWorkspaceLink } from './workspaceLinks.ts'
-import { installRuntime, logoutRuntime, runtimeStatusesAsync, RuntimeInstallError, uninstallRuntime } from './agentRuntimeInstall.ts'
+import { installRuntime, logoutRuntime, runtimeInstallResult, runtimeStatusesAsync, RuntimeInstallError, uninstallRuntime } from './agentRuntimeInstall.ts'
 import { readRuntimeAccount } from './agentAccount.ts'
 import { AgentDefaultError, readAgentDefault, writeAgentDefault } from './agentDefaults.ts'
 import { AgentCwdError, resolveAgentCwd, suggestAgentCwds } from './agentCwd.ts'
@@ -2458,10 +2458,21 @@ export function createApiApp() {
 
   app.post('/agent-runtimes/:id/install', requireFeature('agent'), async (req, res) => {
     try {
-      res.json(await installRuntime(String(req.params.id)))
+      const result = await installRuntime(String(req.params.id), req.query.background === '1')
+      res.status(result.attempt ? 202 : 200).json(result)
     } catch (err) {
       handleError(res, err)
     }
+  })
+
+  app.get('/agent-runtimes/:id/install', requireFeature('agent'), (req, res) => {
+    res.setHeader('Cache-Control', 'no-store')
+    try {
+      const attempt = typeof req.query.attempt === 'string' ? req.query.attempt : ''
+      const result = runtimeInstallResult(String(req.params.id), attempt)
+      if (result) res.json(result)
+      else res.status(404).json({ error: '설치 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.' })
+    } catch (err) { handleError(res, err) }
   })
 
   app.delete('/agent-runtimes/:id/install', requireFeature('agent'), async (req, res) => {

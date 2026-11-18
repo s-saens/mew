@@ -6,10 +6,46 @@ import test, { after } from 'node:test'
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-runtime-status-'))
 process.env.MEW_DATA_DIR = temporary
-const { runtimeStatusesAsync } = await import('./agentRuntimeInstall.ts')
+const { installRuntime, runtimeStatusesAsync } = await import('./agentRuntimeInstall.ts')
 const { RUNTIMES, runtimeInstallationCommand } = await import('./agentRuntimes.ts')
 const { writeAgentSetting, deleteAgentSetting } = await import('./agentSettings.ts')
 after(() => fs.rmSync(temporary, { recursive: true, force: true }))
+
+test('an invalid saved path for an already-installed runtime points to settings instead of reinstalling', async t => {
+  const original = RUNTIMES.kimi.installationCommand
+  RUNTIMES.kimi.installationCommand = () => process.execPath
+  t.after(() => {
+    RUNTIMES.kimi.installationCommand = original
+    deleteAgentSetting('kimi')
+  })
+  writeAgentSetting('kimi', { cmd: path.join(temporary, 'missing-kimi') })
+  const status = async () => (await runtimeStatusesAsync()).find(row => row.id === 'kimi')!
+  assert.equal((await status()).installed, false)
+  assert.equal((await status()).installable, false)
+  assert.equal((await status()).installBlocker, 'configured-command')
+  await assert.rejects(installRuntime('kimi'), /경로를 수정하거나 비워 주세요/)
+  deleteAgentSetting('kimi')
+  assert.equal((await status()).installed, true)
+  assert.equal((await status()).installBlocker, undefined)
+})
+
+test('Codex with a connector and no host CLI still needs installation', async t => {
+  const original = RUNTIMES.codex.installationCommand
+  const originalCli = process.env.MEW_AGENT_CODEX_CLI_CMD
+  RUNTIMES.codex.installationCommand = () => process.execPath
+  t.after(() => {
+    RUNTIMES.codex.installationCommand = original
+    if (originalCli === undefined) delete process.env.MEW_AGENT_CODEX_CLI_CMD
+    else process.env.MEW_AGENT_CODEX_CLI_CMD = originalCli
+  })
+  const status = async () => (await runtimeStatusesAsync()).find(row => row.id === 'codex')!
+  process.env.MEW_AGENT_CODEX_CLI_CMD = path.join(temporary, 'missing-codex')
+  assert.equal((await status()).connectorInstalled, true)
+  assert.equal((await status()).installed, false)
+  assert.equal((await status()).installable, true)
+  process.env.MEW_AGENT_CODEX_CLI_CMD = process.execPath
+  assert.equal((await status()).installed, true)
+})
 
 test('runtime status reads share async PATH probes and never construct launch-only host CLI settings', async t => {
   const previousPath = process.env.PATH
@@ -19,6 +55,7 @@ test('runtime status reads share async PATH probes and never construct launch-on
   const gate = new Promise<void>(resolve => { release = resolve })
   const started = new Promise<void>(resolve => { scanning = resolve })
   const sync = t.mock.method(fs, 'accessSync', () => { throw new Error('synchronous executable probe forbidden') })
+  t.mock.method(fs.promises, 'stat', async () => ({ isFile: () => true }))
   t.mock.method(fs.promises, 'access', async (file: fs.PathLike) => {
     probes.push(String(file))
     if (String(file) === '/fixture/bin/hermes') { scanning(); await gate; return }
@@ -50,6 +87,7 @@ test('changed runtime command settings do not join an obsolete status scan or re
   let release!: () => void, scanning!: () => void, newProbes = 0
   const gate = new Promise<void>(resolve => { release = resolve })
   const started = new Promise<void>(resolve => { scanning = resolve })
+  t.mock.method(fs.promises, 'stat', async () => ({ isFile: () => true }))
   t.mock.method(fs.promises, 'access', async (file: fs.PathLike) => {
     if (file === oldCommand) { scanning(); await gate; throw new Error('old executable removed') }
     if (file === newCommand) { newProbes++; return }

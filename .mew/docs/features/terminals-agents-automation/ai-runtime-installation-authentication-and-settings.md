@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "AI runtime installation, authentication, and execution settings"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-10-31"
+updated: "2026-11-18"
 status_hash: "ce50d3fa70fce93520dfd200e419db9b718cebd2b370a52a9250e624fc80aed1"
 files: ["src/components/RuntimeInstallProgress.tsx", "src/components/AgentPanel.tsx", "src/components/RuntimeSettingsModal.tsx", "src/components/agentRuntimes.tsx", "server/agentRuntimes.ts", "server/agentRuntimeInstall.ts", "server/agentDefaults.ts"]
 commits: []
-description: "Feature contract for agent runtime installation, authentication, and model, effort, and permission defaults. Covers lazy runtime-picker update actions, connector status, runtime removal, execution-settings reset, composer defaults, and provider-specific interfaces."
+description: "Feature contract for background runtime installation, the picker’s installation and update terminal buttons, executable readiness, authentication, and model, effort, and permission defaults. Covers failed attempts, provider-specific installers, and runtime settings."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -36,10 +36,11 @@ description: "Feature contract for agent runtime installation, authentication, a
 <!-- mew:implementation:start -->
 ## Implementation details
 
-- The runtime picker renders before the separate update check completes. Installed rows show an action only for available automatically supported individual updates; Codex and Claude map to their host CLI updates. The existing system permission, job state, idle checks, and errors apply. The [update contract](../appearance-accounts-operations/application-updates-and-operations.md) owns execution.
+- The runtime picker renders before the separate update check completes. Installed rows offer available, automatically supported individual updates. Codex and Claude map to their host CLI updates. The update action becomes a terminal button when a session starts. It stays available after completion while the session exists. The [update contract](../appearance-accounts-operations/application-updates-and-operations.md) owns session access and execution.
 
-- Selector rows and the settings dialog display installation status and logs using the shared `RuntimeInstallProgress`. They poll approximately every 1 second and stop after completion. Height-limited logs follow new output while preserving the scroll position when reading earlier logs. Progress is queried again on refresh or reentry.
-- The server keeps the latest installation status and the last 12,000 characters of output for each runtime in memory. It resets them on retry, and Antigravity also outputs download size and percentage, verification, and extraction stages.
+- Installation starts a server-side command and replaces the install action with a terminal button. The read-only popup polls output approximately once per second, follows new output, and preserves the scroll position while the user reads earlier output. Closing it leaves the attempt running. The picker stays open after installation so the user can inspect the result or select the installed runtime. Failed attempts retain their output and offer a retry.
+- The server acknowledges background starts independently of installer completion. Attempt-specific reads return the outcome of the accepted installation even if a client connection is interrupted. The server keeps the latest attempt and its last 12,000 characters per runtime in memory. A retry replaces that attempt. See [ADR 0188](../../decisions/0188-agent-runtime-installation-attempts.md).
+- Presence checks follow the executable selected for launch. If an account’s saved executable is missing and the default is installed, the picker directs the user to the executable setting. Saving or resetting settings refreshes the open runtime list. The [runtime guide](../../../../docs/configuration/agent-runtimes.md) lists provider and host prerequisites.
 
 - The management section makes execution-settings reset and runtime removal visible. Each requires confirmation; unsupported automatic removals remain disabled with manual-removal guidance. Reset clears account-scoped execution settings, not saved model defaults or provider login.
 - Runtime settings separate installation and account controls from advanced execution settings, explain Claude and Codex connector scope, and support clearing command/argument overrides and removing individual saved environment variables. Other masked values are preserved.
