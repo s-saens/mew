@@ -8,7 +8,7 @@ updated: "2026-11-11"
 status_hash: "b325d279cf16e291b2bcddda7cc0d70268647e336403acba780cb1081da44668"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-startup-queue.tsx", "src/utils/agent-startup-queue.ts", "src/hooks/use-agent-event-state.ts", "src/hooks/use-agent-work-history.ts", "src/utils/agent-work-loader.ts", "src/hooks/use-agent-tab-previews.ts", "src/hooks/use-agent-session-previews.ts", "src/utils/agent-tab-previews.ts", "src/utils/agentFold.ts", "src/hooks/useGridDrag.ts", "server/agentHost.ts", "server/agentWs.ts", "server/agentTranscript.ts", "server/agent-history-preview.ts", "server/agent-tab-preview.ts", "server/user-ui-routes.ts", "server/agent-session-search-service.ts", "server/agent-transcript-search.ts", "server/agent-runtime-history-search.ts"]
 commits: []
-description: "Agent conversation feedback, collapsed summaries, expanded answer controls and hover behavior, Reply buttons and composer previews, history search, queues, drafts, session conflicts, and restoration. Covers recovery indicators and relay liveness."
+description: "Agent conversation feedback, collapsed summaries, expanded answer controls and hover behavior, Reply buttons, composer previews, and keyboard behavior, history search, queues, drafts, session conflicts, and restoration. Covers recovery indicators and relay liveness."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -58,7 +58,7 @@ description: "Agent conversation feedback, collapsed summaries, expanded answer 
 
 Select Reply beside a user question or at the right of an agent answer. The button is available with the message collapsed or expanded. Horizontal swipes in the conversation follow the [mobile tab gesture rules](../../development/ui-workspace-layout.md#mobile-dock-and-panel-switching). Messages without text, such as attachment-only messages, cannot be selected.
 
-The composer shows the source and a single-line excerpt above the input. Selecting another message replaces the preview. Cancel reply removes the preview and keeps the draft. A preview alone cannot be sent. When you send, queue, or schedule the reply, Mew includes the full selected text as a Markdown quote. A successful submission clears the selection.
+A compact card above the input shows the reply icon, the source, and a single-line excerpt. Selecting another message replaces the preview. Cancel reply removes the preview and keeps the draft. On mobile, tapping Cancel reply leaves an open keyboard visible and a closed keyboard hidden, even if the editor still has focus after dismissal. A preview alone cannot be sent. When you send, queue, or schedule the reply, Mew includes the full selected text as a Markdown quote. A successful submission clears the selection.
 
 The selection is local to the conversation and clears when you reset it or load a conversation from history. The preview is hidden in CLI mode, while editing a queued message, and in history previews.
 

@@ -70,7 +70,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
-  const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/MentionTextarea.tsx', 'src/components/DockWorkspace.tsx', 'packages/ui/src/panel-notice.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/agent-reply-preview.tsx', 'src/components/MentionTextarea.tsx', 'src/components/DockWorkspace.tsx', 'packages/ui/src/panel-notice.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
     + await fs.readFile(`${root}/packages/ui/src/loading-indicator.css`, 'utf8')
   const browser = await connectTestBrowser()
@@ -183,7 +183,41 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
         assert.equal(await composerValue(draft), 'Draft before first connection')
         assert.equal(await draft.evaluate(el => el.ownerDocument.activeElement === el), true)
         assert.ok((await preview.boundingBox())!.y < (await draft.boundingBox())!.y)
-        await preview.getByRole('button', { name: '답장 취소' }).click()
+        const dismissReply = preview.getByRole('button', { name: '답장 취소' })
+        const editorFocused = () => draft.evaluate(el => el.ownerDocument.activeElement === el)
+        if (width === 390) {
+          // Android Back can dismiss the OS keyboard while leaving the editor focused.
+          await dismissReply.tap()
+          assert.equal(await editorFocused(), false, 'a touch close drops stale focus when the keyboard is hidden')
+          await questionReply.tap()
+          await preview.waitFor()
+          await draft.evaluate(el => el.blur())
+          await dismissReply.tap()
+          assert.equal(await editorFocused(), false, 'closing a preview never focuses an unfocused mobile editor')
+
+          // Both viewports can already be smaller before a reply preview is shown.
+          await draft.focus()
+          await draft.evaluate(el => {
+            const win = el.ownerDocument.defaultView!
+            Object.defineProperty(win, 'innerHeight', { configurable: true, value: 600 })
+            Object.defineProperty(win.visualViewport!, 'height', { configurable: true, value: 600 })
+            win.visualViewport!.dispatchEvent(new win.Event('resize'))
+            return new Promise<void>(resolve => win.requestAnimationFrame(() => win.requestAnimationFrame(() => resolve())))
+          })
+          await questionReply.tap()
+          await preview.waitFor()
+          await dismissReply.tap()
+          assert.equal(await editorFocused(), true, 'closing a preview keeps focus when the keyboard was already open')
+          await draft.evaluate(el => {
+            const win = el.ownerDocument.defaultView!
+            Reflect.deleteProperty(win, 'innerHeight')
+            Reflect.deleteProperty(win.visualViewport!, 'height')
+            win.visualViewport!.dispatchEvent(new win.Event('resize'))
+          })
+        } else {
+          await dismissReply.click()
+          assert.equal(await editorFocused(), true)
+        }
         await preview.waitFor({ state: 'hidden' })
         assert.equal(await composerValue(draft), 'Draft before first connection')
 

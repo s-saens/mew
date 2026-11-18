@@ -6,6 +6,8 @@ import { useAgentPromptFeedback } from '../hooks/use-agent-prompt-feedback'
 import { HeaderSelect } from './agent-header-select'
 import { AgentPromptDrafts } from './agent-prompt-drafts'
 import { AgentExecutionToggles } from './agent-execution-toggles'
+import { AgentReplyPreview } from './agent-reply-preview'
+import { usesTouchKeyboard } from '@mew/ui/virtual-keyboard'
 import { useAgentExecutionOptions } from '../hooks/use-agent-execution-options'
 import { useAgentInputDraft } from '../hooks/use-agent-input-draft'
 import { RuntimeInstallProgress } from './RuntimeInstallProgress'
@@ -4644,20 +4646,11 @@ function AgentSessionView({
           </div>
         </div>
           {defaultsToast}
-          {showReplyPreview && replyTarget && <div ref={composerReplyRef} data-agent-reply-preview
-            className="flex min-w-0 shrink-0 items-center gap-2 rounded border-l-2 border-accent bg-surface-raised py-0.5 pl-2 pr-0.5">
-            <div className="min-w-0 flex-1" role="status">
-              <div className="truncate text-xs font-semibold text-ink">{replyTarget.kind === 'user' ? uiText('내 메시지에 답장') : uiText('에이전트에게 답장')}</div>
-              <div className="truncate text-xs text-ink-secondary">{replyTarget.text.replace(/\s+/g, ' ')}</div>
-            </div>
-            <HoverTipLayer className="shrink-0">
-              <button type="button" aria-label={uiText('답장 취소')} data-tip={uiText('답장 취소')}
-                onPointerDown={keepFocusOnPress} onClick={() => { setReplyTarget(null); focusComposerInput() }}
-                className="flex h-9 w-9 items-center justify-center rounded text-ink-secondary hover:bg-surface hover:text-ink focus-visible:outline-2 focus-visible:outline-accent">
-                <Xmark width={16} height={16} aria-hidden="true" />
-              </button>
-            </HoverTipLayer>
-          </div>}
+          <AgentReplyPreview ref={composerReplyRef} target={showReplyPreview ? replyTarget : null}
+            onDismiss={() => {
+              setReplyTarget(null)
+              if (!usesTouchKeyboard()) focusComposerInput()
+            }} />
           <div data-agent-input className={`relative flex min-h-0 flex-1 rounded bg-surface ${composerCliMode ? 'ring-1 ring-inset ring-accent/40' : ''}`}>
           <div ref={composerEditorRef} className="flex min-h-8 flex-1">
           <MentionTextarea

@@ -52,7 +52,7 @@ createRoot(document.getElementById('root')).render(<I18nProvider><div style={{he
   }] })
   const chunk = bundle.output.find(item => item.type === 'chunk')!
   const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
-  const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/agent-attachment-icon.tsx', 'src/components/agent-document-tag.tsx', 'src/components/MentionTextarea.tsx', 'packages/ui/src/action-menu.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
+  const content = (await Promise.all(['src/components/AgentPanel.tsx', 'src/components/agent-reply-preview.tsx', 'src/components/agent-attachment-icon.tsx', 'src/components/agent-document-tag.tsx', 'src/components/MentionTextarea.tsx', 'packages/ui/src/action-menu.tsx'].map(file => fs.readFile(`${root}/${file}`, 'utf8')))).join('\n')
   const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
   const browser = await connectTestBrowser()
   try {
