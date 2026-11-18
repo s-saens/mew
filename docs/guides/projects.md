@@ -1,6 +1,6 @@
 ---
 title: "Projects and file navigation"
-description: "Explains project selection, managed and external project paths, single- and multi-project modes, files, Git operations, and per-account GitHub connections. Covers setup, shortcuts, optional disk deletion, and the multi-project database limitation."
+description: "Explains project selection, managed and external project paths, single- and multi-project modes, files, Git operations, and per-account GitHub connections. Covers setup, shortcuts, managed and external project deletion, and the multi-project database limitation."
 updated: "2026-11-17"
 상위파일:
   - "MOC.md"
@@ -87,9 +87,9 @@ As you scroll the list, expanded folders and parent documents stack at the top b
 
 ### Permanently delete a project
 
-Right-click a project and choose **Delete** to remove its registration from everyone's project list. The confirmation leaves files on disk by default; select **Also delete the project folder and files from disk** to permanently delete the folder and its contents. Owners can perform this shared deletion. **Remove from My Projects** only removes your shortcut and leaves the shared registration available.
+Owners can right-click a project and choose **Delete**. For projects in the Mew-managed folder (usually `~/.mew/projects`), the confirmation warns that deletion permanently erases the folder and its contents. For external projects, the confirmation leaves files on disk by default. Select **Also delete the project folder and files from disk** if you also want to erase the files. **Remove from My Projects** removes only your shortcut.
 
-Choose **Delete permanently** and review the project and folder shown in the confirmation. Cancel is selected initially. Confirm only when you intend to delete those files, including any uncommitted work; Mew cannot undo this operation. Mew protects the filesystem root, the server user's home, instance-data and registry folders, Mew's source root, and parent folders containing them. While deletion runs, the confirmation stays open and cannot be submitted again. If it fails, the error and target remain available for retry. If Mew reports that the deletion API is unavailable, the server operator must update and restart the Mew server before you retry. Rebuilding browser assets alone does not load a new server API. Cancel before submitting deletion to close the confirmation without deleting the folder.
+Review the path in the confirmation before choosing **Delete permanently**. Cancel is selected initially. Confirm only when you intend to delete those files, including any uncommitted work; Mew cannot undo this operation. Mew protects the filesystem root, the server user's home, instance-data and registry folders, Mew's source root, and parent folders containing them. While deletion runs, the confirmation stays open and cannot be submitted again. If it fails, the error and target remain available for retry. If Mew reports that the deletion API is unavailable, the server operator must update and restart the Mew server before you retry. Rebuilding browser assets alone does not load a new server API. Cancel before submitting deletion to close the confirmation without deleting the folder.
 
 ### Create a missing project path
 

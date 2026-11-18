@@ -391,9 +391,12 @@ test('filesystem deletion failure preserves catalog and shortcuts for recovery',
   assert.equal(fs.existsSync(created.path), true)
 })
 
-test('unregister preserves files, excludes discovery, prevents stale saves, and permits explicit relinking', async () => {
+test('unregister preserves external files, excludes discovery, prevents stale saves, and permits explicit relinking', async () => {
   const store = fixture(), account = 'unregister-owner@example.test'
-  const created = await store.create(account, 'preserved', false)
+  const external = path.join(temporary, `external-unregister-${sequence}`, 'preserved')
+  fs.mkdirSync(path.join(external, '.mew'), { recursive: true })
+  store.link('parent@example.test', path.dirname(external))
+  const created = store.link(account, external)
   const child = path.join(created.path, 'nested')
   fs.mkdirSync(path.join(child, '.mew'), { recursive: true })
   fs.writeFileSync(path.join(created.path, 'keep.txt'), 'kept')
@@ -406,4 +409,21 @@ test('unregister preserves files, excludes discovery, prevents stale saves, and 
   assert.deepEqual(store.writeMine(account, stale).paths, [])
   store.link(account, created.path)
   assert.equal(store.list(account).some(project => project.path === created.path), true)
+})
+
+test('managed projects cannot be unregistered without explicitly deleting their files', async () => {
+  const store = fixture(), account = 'managed-delete-owner@example.test'
+  const created = await store.create(account, 'managed-delete', false)
+  const linked = fs.realpathSync(path.join(created.path, '.mew', 'wiki'))
+  const ancestor = fs.realpathSync(path.dirname(store.managedRoot))
+  store.link(account, linked)
+  store.link(account, ancestor)
+  const snapshot = fs.readFileSync(store.file, 'utf8')
+  for (const directory of [created.path, linked, ancestor]) {
+    assert.throws(() => store.delete(directory, false), error => error instanceof ProjectRegistryError && error.status === 409)
+    assert.equal(fs.existsSync(directory), true)
+  }
+  assert.equal(fs.readFileSync(store.file, 'utf8'), snapshot)
+  assert.deepEqual(store.delete(created.path).removedPaths, [created.path, linked])
+  assert.equal(fs.existsSync(created.path), false)
 })

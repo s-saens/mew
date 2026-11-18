@@ -1,8 +1,8 @@
 ---
 title: "Shared projects and project setup"
-description: "Records shared registry creation, discovery, personal shortcuts, and the November 6 setup and deletion work. Includes the November 7 invisible deletion-error diagnosis and direct four-choice project setup, followed by horizontal icon-and-name presentation and the immediate catalog refresh and file-preserving registration removal."
+description: "Records shared registry creation, discovery, personal shortcuts, and the November 6 setup and deletion work. Includes the November 7 invisible deletion-error diagnosis and direct four-choice project setup, followed by horizontal icon-and-name presentation and the immediate catalog refresh and file-preserving registration removal. Records the managed-project permanent deletion rule and its verification."
 created: "2026-11-02"
-updated: "2026-11-17"
+updated: "2026-11-18"
 ---
 
 ## Purpose and resulting behavior
@@ -260,3 +260,9 @@ Local verification passed the project deletion and collapse browser regressions,
 Owners can remove shared project registration and account shortcuts while retaining files, or explicitly select disk deletion in the confirmation. An exclusion prevents discovery and stale account saves from restoring an unregistered subtree; explicit linking restores it. Registration removal uses the recorded path without following a replacement symlink when reconciling active workspaces. A separate non-destructive API avoids sending this request to an older server's permanent deletion endpoint. See [ADR 0187](../decisions/0187-project-registration-removal.md).
 
 Local isolated registry, API, and browser checks passed 25 tests; lint passed with warnings. The documentation checker reported 39 existing link errors. The selected build passed on retry after unrelated concurrent test type errors were resolved; no deployment or server restart was performed. Moving existing projects into the managed root is not implemented: path-keyed account state, active sessions, and Git worktree references require coordinated migration and verification before a filesystem move can be exposed.
+
+## Permanent deletion for managed projects — 2026-11-18
+
+The Delete confirmation now requires permanent deletion for projects in Mew's managed root. It displays the folder path and an irreversible deletion warning. The registry rejects registration-only requests for those projects. See [ADR 0191](../decisions/0191-managed-project-permanent-deletion.md).
+
+All 28 focused Chromium, registry, and API tests passed. The build passed and lint completed with warnings. Documentation descriptions passed, and the link check reported 39 existing errors. Verification was local. The running server was not restarted and the change was not deployed.

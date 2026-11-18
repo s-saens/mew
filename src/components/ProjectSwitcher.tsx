@@ -364,7 +364,7 @@ export function ProjectSwitcher({ paths, activePath, pendingPath, fallbackLabel,
       {canOpen && onRemove && paths.includes(contextMenu.path) && <ActionMenuItem icon={<Xmark />} onClick={() => onRemove(contextMenu.path)}>{deleteCopy.removeFromMine}</ActionMenuItem>}
       {canDelete && onDelete && <ActionMenuItem icon={<Trash />} danger onClick={() => setDeletingPath(contextMenu.path)}>{deleteCopy.remove}</ActionMenuItem>}
     </ActionMenu>}
-    {deletingPath && canDelete && onDelete && <ProjectDeleteDialog path={deletingPath} onDelete={async (path, deleteFiles) => {
+    {deletingPath && canDelete && onDelete && <ProjectDeleteDialog key={deletingPath} path={deletingPath} onDelete={async (path, deleteFiles) => {
       let notified = false
       const notifyDeleted = () => { if (!notified) { notified = true; setDeletedProject({ path }) } }
       await onDelete(path, notifyDeleted, deleteFiles)

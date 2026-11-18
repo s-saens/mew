@@ -1,9 +1,11 @@
 ---
 title: "0187 — Remove project registration without deleting files"
-description: "Extends the project deletion contract with owner-only removal of a registered project tree while preserving files by default and excluding it from automatic rediscovery."
+description: "Extends the project deletion contract with owner-only removal of a registered project tree while preserving files by default and excluding it from automatic rediscovery. ADR 0191 limits this option to external project trees."
 created: "2026-11-17"
 status: accepted
 ---
+
+[ADR 0191](0191-managed-project-permanent-deletion.md) supersedes this decision for Mew-managed projects.
 
 ## Context
 

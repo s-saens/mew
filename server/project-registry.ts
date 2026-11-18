@@ -308,6 +308,9 @@ export class ProjectRegistry {
     if ([...this.pendingDirectories].some(pending => withinPath(canonical, pending))) throw new ProjectRegistryError('프로젝트 작업이 진행 중입니다. 완료 후 다시 시도하세요.', 409)
     const affected = (candidate: string) => withinPath(canonical, path.resolve(candidate))
     const removedPaths = state.projects.filter(project => affected(project.path)).map(project => project.path)
+    if (!removeFiles && removedPaths.some(project => this.isInManagedRoot(project))) {
+      throw new ProjectRegistryError('Mew 관리 프로젝트는 영구 삭제만 할 수 있습니다.', 409)
+    }
     const affectedAccounts: string[] = []
     state.projects = state.projects.filter(project => !affected(project.path))
     state.deletedPaths = [...new Set([...(state.deletedPaths ?? []), ...removedPaths])]

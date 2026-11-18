@@ -1,6 +1,6 @@
 ---
 title: "App Startup, Server Architecture, and State Files"
-description: "Server and CLI entry points, state-file ownership, shared project catalogs, immediate snapshots, managed cloning, asynchronous nested discovery, and per-account active roots. Defines personal shortcuts, project registration removal, deletion and cleanup, protected paths, browser startup ownership, and legacy account selection alongside explicit workspace sessions."
+description: "Server and CLI entry points, state-file ownership, shared project catalogs, immediate snapshots, managed cloning, asynchronous nested discovery, and per-account active roots. Defines personal shortcuts, external project registration removal, managed project deletion and cleanup, protected paths, browser startup ownership, and legacy account selection alongside explicit workspace sessions."
 updated: "2026-11-16"
 상위파일:
   - "MOC.md"
@@ -117,7 +117,7 @@ When YAML is missing, its first read migrates all accounts' `rootProjects` from 
 | `POST /api/project-registry` with `{ mode: "clone", url }` | Clones a public GitHub/GitLab HTTPS repository or an account-authorized private GitHub repository into the managed root, registers it, and pins it for the caller. Returns `{ project, state }`. |
 | `GET /api/project-registry/repositories` | Returns the caller’s `{ connected, repositories: [{ name, fullName, url, private }] }` GitHub repository list, including permitted organization/private repositories across all pages. Disconnected accounts receive `false` and an empty list; responses are no-store. |
 | `PUT /api/project-registry/mine` with `{ path, added }` | Adds or removes only the caller's shortcut and returns `{ state }`. |
-| `DELETE /api/project-registry/registration` with `{ path }` | Owner-only: removes the project tree from the catalog and all accounts without deleting files. |
+| `DELETE /api/project-registry/registration` with `{ path }` | Owner-only: removes an external project tree from the catalog and all accounts without deleting files. Returns 409 if the tree includes a registered project in the Mew-managed root. |
 | `DELETE /api/project-registry` with `{ path }` | Owner-only: permanently deletes the registered folder and registered descendants, removes all accounts' related shortcuts and compatibility metadata, and returns `{ ok: true, removedPaths, state }` with the caller's resulting `StoredRootProjects` or `null`. |
 | `GET/PUT /api/user-ui/root-projects` | Compatible personal-list API backed by YAML instead of the old JSON field. |
 
@@ -129,7 +129,7 @@ The project selection panel uses `ProjectAddInline` for name-only creation, clon
 
 ### Permanent project deletion
 
-The owner can also remove registration without deleting the folder using the separate `DELETE /api/project-registry/registration` endpoint. It removes the registered target and descendants, account shortcuts, and affected active roots, and records an `excludedPaths` subtree to prevent automatic discovery or stale shortcut saves from re-registering the folder. Explicit linking clears an applicable exclusion. Registration-only removal reconciles lexical paths so a replaced symlink cannot clear another project’s active workspace. The separate endpoint prevents an older server from interpreting a file-preserving request as permanent deletion. [ADR 0187](../decisions/0187-project-registration-removal.md) extends the deletion decision.
+The owner can also remove an external project registration without deleting the folder using the separate `DELETE /api/project-registry/registration` endpoint. It removes the registered target and descendants, account shortcuts, and affected active roots, and records an `excludedPaths` subtree to prevent automatic discovery or stale shortcut saves from re-registering the folder. Explicit linking clears an applicable exclusion. Registration-only removal reconciles lexical paths so a replaced symlink cannot clear another project’s active workspace. The separate endpoint prevents an older server from interpreting a file-preserving request as permanent deletion. If the registered tree includes a project inside the canonical managed root, this endpoint returns 409 before changing the registry, workspace state, or files. [ADR 0191](../decisions/0191-managed-project-permanent-deletion.md) records the managed-project restriction.
 
 `DELETE /api/project-registry` is separate from removing a personal shortcut. It accepts an explicitly registered canonical project path and recursively deletes the real directory, including uncommitted files and nested projects. Both managed and linked folders use this boundary. After successful folder deletion, remove the target and every registered descendant from `projects`, all accounts' personal paths, and matching legacy icon/group references. The caller receives the removed registered paths and their remaining shortcut state.
 

@@ -8,6 +8,8 @@ const messages = {
     deleteFiles: '디스크에서도 프로젝트 폴더와 파일을 삭제',
     irreversible: '디스크에서 삭제하면 되돌릴 수 없습니다.',
     detail: '모든 사용자의 프로젝트 목록에서 제거합니다. 체크하지 않으면 디스크의 파일은 유지됩니다.',
+    managedDetail: '주의: Mew가 관리하는 프로젝트 폴더와 모든 파일이 디스크에서 영구 삭제됩니다. 이 작업은 되돌릴 수 없습니다.',
+    locationUnavailable: '프로젝트 위치를 확인하지 못했습니다. 창을 닫고 다시 시도하세요.',
     cancel: '취소', deleting: '삭제 중…', unavailable: '지금은 프로젝트를 삭제할 수 없습니다. 잠시 후 다시 시도하세요.',
   },
   en: {
@@ -17,6 +19,8 @@ const messages = {
     deleteFiles: 'Also delete the project folder and files from disk',
     irreversible: 'Deleting files from disk cannot be undone.',
     detail: 'This removes the project from everyone’s project list. Files remain on disk unless checked.',
+    managedDetail: 'This permanently deletes the Mew-managed project folder and all its files from disk. You cannot undo this action.',
+    locationUnavailable: 'Could not verify the project location. Close this dialog and try again.',
     cancel: 'Cancel', deleting: 'Deleting…', unavailable: 'Cannot delete the project right now. Please try again shortly.',
   },
   'zh-CN': {
@@ -26,6 +30,8 @@ const messages = {
     deleteFiles: '同时删除磁盘上的项目文件夹和文件',
     irreversible: '从磁盘删除文件后无法撤销。',
     detail: '项目将从所有用户的列表中移除。未勾选时磁盘文件会保留。',
+    managedDetail: '此操作将从磁盘永久删除由 Mew 管理的项目文件夹及其中的所有文件，且无法撤销。',
+    locationUnavailable: '无法确认项目位置。请关闭此对话框后重试。',
     cancel: '取消', deleting: '正在删除…', unavailable: '暂时无法删除项目，请稍后重试。',
   },
   ja: {
@@ -35,6 +41,8 @@ const messages = {
     deleteFiles: 'ディスクからプロジェクトフォルダーとファイルも削除する',
     irreversible: 'ディスクからファイルを削除すると元に戻せません。',
     detail: 'すべてのユーザーのプロジェクト一覧から削除します。チェックしなければディスク上のファイルは残ります。',
+    managedDetail: 'Mew が管理するプロジェクトフォルダーとその中のすべてのファイルをディスクから完全に削除します。この操作は元に戻せません。',
+    locationUnavailable: 'プロジェクトの場所を確認できませんでした。このダイアログを閉じてから、もう一度お試しください。',
     cancel: 'キャンセル', deleting: '削除中…', unavailable: '現在プロジェクトを削除できません。しばらくしてから再試行してください。',
   },
 } satisfies Record<Locale, Record<string, string>>
