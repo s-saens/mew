@@ -34,3 +34,5 @@ The [0.1.7 prerelease](https://github.com/s-saens/mew/releases/tag/mew-termux-v0
 ## Termux command
 
 The 0.1.8 installer reuses the 0.1.7 source archive and registers `mew` in Termux's command directory after setup succeeds. It preserves existing commands that it does not own and forwards launcher arguments from any working directory.
+
+The [0.1.8 prerelease](https://github.com/s-saens/mew/releases/tag/mew-termux-v0.1.8) installer and source matched the verified files after anonymous download. The build and lint passed. The CLI suite passed 79 tests with one opt-in skip, including command forwarding, failed setup, and preservation of an existing command. The documentation checker reported 39 existing broken links. Command registration has been tested in an isolated fixture. Android device verification remains open.
