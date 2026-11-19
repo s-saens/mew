@@ -168,14 +168,14 @@ On other distributions, install the equivalent packages first. Follow [Finish se
 From a native Termux terminal, download the pinned Mew source and run setup in one command:
 
 ```bash
-pkg install -y curl && curl -fsSL https://github.com/s-saens/mew/releases/download/mew-termux-v0.1.6/install-termux.sh | bash
+pkg install -y curl && curl -fsSL https://github.com/s-saens/mew/releases/download/mew-termux-v0.1.7/install-termux.sh | bash
 ```
 
-Setup installs source in `~/.local/opt/mew-termux-0.1.6` and uses defaults without prompting. A fresh setup uses `~/mew-workspace` and picks a port starting at 5000. It preserves existing configuration and prepares a local PostgreSQL database when no external `DATABASE_URL` is configured. Open the printed setup link in your phone browser to create the first administrator.
+Setup installs source in `~/.local/opt/mew-termux-0.1.7` and uses defaults without prompting. A fresh setup uses `~/mew-workspace` and picks a port starting at 5000. It preserves existing configuration and prepares a local PostgreSQL database when no external `DATABASE_URL` is configured. After the local authentication endpoint responds, setup prints the first-owner link and opens it in the phone browser when `termux-open-url` is available. Keep the link private.
 
 Termux is experimental and full setup has not been verified. When running the source setup directly in Termux, it offers to install a missing Node LTS and npm, compiler, make, Python, and tmux using `pkg` without sudo. If Node fails to start because of mismatched Termux libraries, update the installed Termux packages with `pkg update` and `pkg upgrade`, then check `node --version` before retrying.
 
-Run the same command again to retry setup. Use `bash ~/.local/opt/mew-termux-0.1.6/mew status` to check the instance. The downloaded source has no Git history. Server-side Chrome and Playwright features are unavailable on native Termux.
+To replace an expired or exposed link on a running instance, run `bash ~/.local/opt/mew-termux-0.1.7/mew setup-link`. If setup reports an HTTP startup failure, check the server log at the path in its error. The downloaded source has no Git history. Server-side Chrome and Playwright features are unavailable on native Termux.
 
 ### Finish setup
 
