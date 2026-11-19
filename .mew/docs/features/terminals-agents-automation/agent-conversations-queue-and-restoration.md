@@ -8,7 +8,7 @@ updated: "2026-11-18"
 status_hash: "b325d279cf16e291b2bcddda7cc0d70268647e336403acba780cb1081da44668"
 files: ["src/components/AgentPanel.tsx", "src/components/agent-startup-queue.tsx", "src/utils/agent-startup-queue.ts", "src/hooks/use-agent-event-state.ts", "src/hooks/use-agent-work-history.ts", "src/utils/agent-work-loader.ts", "src/hooks/use-agent-tab-previews.ts", "src/hooks/use-agent-session-previews.ts", "src/utils/agent-tab-previews.ts", "src/utils/agentFold.ts", "src/hooks/useGridDrag.ts", "server/agentHost.ts", "server/agentWs.ts", "server/agentTranscript.ts", "server/agent-history-preview.ts", "server/agent-tab-preview.ts", "server/user-ui-routes.ts", "server/agent-session-search-service.ts", "server/agent-transcript-search.ts", "server/agent-runtime-history-search.ts"]
 commits: []
-description: "Agent conversations, bubble controls and question spacing, linked replies, composer feedback, queues, drafts, history search, and session restoration. Covers navigation to reply sources, keyboard behavior, session conflicts, recovery indicators, and relay liveness."
+description: "Agent conversations, bubble controls and question spacing, linked replies, composer feedback, queues, drafts, history search, and session restoration. Covers navigation to reply sources and project or server file links, keyboard behavior, session conflicts, recovery indicators, and relay liveness."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -53,6 +53,10 @@ description: "Agent conversations, bubble controls and question spacing, linked 
 - [Terminal and agent usage](../../../../docs/guides/terminal-agents.md) · [Supervision, queue, and restoration contract](../../development/agent-sessions.md)
 
 ## Detailed behavior
+
+### File links in agent answers
+
+`GET /api/agent-file-link` resolves links to existing regular files against the request workspace. Project files retain their project-relative targets and normal file access checks. When the target falls outside project routing, the resolver returns an absolute server-file target only for accounts with both agent and server file access. This also covers files in workspace folders excluded from project routing, such as `.data/`. The editor opens server-file targets through its existing external tab and file APIs. Line links preserve the source line, and archives use the existing download view. See the [terminal and agent guide](../../../../docs/guides/terminal-agents.md).
 
 ### Reply to a message
 
@@ -131,6 +135,8 @@ HTML-escape language names and wrap long names within the panel width. Keep the 
 Display sent attachments as inline icon tags by file type at their reference positions in the user bubble's body. Display them inside the user bubble even when only attachments are sent or the pending queue is executed, and provide no remove button. Detailed display criteria for photo previews, opening files, and restoring past attachments follow the [input and attachment contract](agent-input-mentions-skills-and-attachments.md).
 
 Build attachment URLs from the `project` and `path` stored on the attachment rather than the current document scope. This correctly retrieves root `.mew/assets/` attachments even while viewing Documents. The server accepts both current `.mew/assets/` and legacy `.mew/files/` paths for attachments in new messages and pending queue edits, as well as image references from older clients, preserving display metadata. For old transcripts without attachment metadata, restore tags from references to either path remaining in the body. Do not retroactively recover files with neither metadata nor body references. Do not duplicate photo or file bytes in transcripts ([storage contract](../../development/conversation-storage.md)).
+
+2026-11-19 validation: Fifteen targeted tests passed, including external and hidden paths, permission checks, and a scoped browser link click that retains the source line. The production build, lint, and wiki description check passed. The full document check reported the 39 existing link errors. Verification used local fixtures. Live server behavior requires loading the updated server code.
 
 2026-10-21 validation: Before the fix, WS regression tests reproduced missing photo and PDF metadata for `.mew/assets/` and transmission of only legacy paths. After the fix, 41 related tests passed, including attachment-only sending, older image references, queue editing, execution, and reconnection with mock Codex and Claude. In 1 isolated Chromium UI test, verified tags above bubbles, photo previews, file links, and restoration after refresh on desktop and mobile in both themes. Type checks, targeted lint, and documentation checks passed. No actual provider calls, build, or production server restart were performed.
 

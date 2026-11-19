@@ -1,3 +1,4 @@
+import { externalTabPath } from '../utils/externalFiles'
 import { useWorkspaceApi } from '../api/workspace-api-context'
 import { useWorkspaceBrowser } from '../workspace/workspace-browser-context'
 import { useWorkspaceDesktop, useWorkspaceView } from '../workspace/workspace-view-context'
@@ -632,7 +633,9 @@ function handleMarkdownClick(e: MouseEvent<HTMLElement>, onOpenFile: OpenWorkspa
   e.stopPropagation()
   void resolveAgentFileLink(href)
     .then(({ target }) => {
-      if (target) onOpenFile(target.project, target.path, target.line)
+      if (!target) return
+      if ('external' in target) onOpenFile('.workspace', externalTabPath(target.path), target.line)
+      else onOpenFile(target.project, target.path, target.line)
     })
     .catch(console.error)
 }

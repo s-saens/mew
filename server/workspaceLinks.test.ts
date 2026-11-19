@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import test from 'node:test'
+import test, { after } from 'node:test'
+import { pathToFileURL } from 'node:url'
 import { resolveWorkspaceLinkAt } from './workspaceLinks.ts'
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-workspace-links-'))
@@ -14,6 +15,10 @@ fs.writeFileSync(path.join(docsRoot, 'guide', 'start.md'), '# 시작')
 fs.writeFileSync(path.join(projectRoot, 'src', 'main.ts'), 'export {}')
 fs.writeFileSync(path.join(root, 'AGENTS.md'), '# rules')
 
+const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-external-links-'))
+after(() => {
+  for (const directory of [root, outside]) fs.rmSync(directory, { recursive: true, force: true })
+})
 const roots = { workspaceRoot: root, docsRoot, projects: ['app'] }
 
 test('절대경로와 :줄을 프로젝트 상대경로로 바꾼다', () => {
@@ -46,4 +51,25 @@ test('워크스페이스 루트 파일은 홈 스코프로 열고 바깥·URL·�
   assert.equal(resolveWorkspaceLinkAt('https://example.com/file.ts', roots), null)
   assert.equal(resolveWorkspaceLinkAt('/tmp/outside.ts:1', roots), null)
   assert.equal(resolveWorkspaceLinkAt('app/src/missing.ts:1', roots), null)
+})
+
+test('server file access resolves external and project-hidden files with source lines', () => {
+  const external = path.join(outside, '외부 문서.md')
+  fs.writeFileSync(external, '# external')
+  assert.equal(resolveWorkspaceLinkAt(external, roots), null)
+  assert.deepEqual(resolveWorkspaceLinkAt(pathToFileURL(external).href + '#L12', roots, true), {
+    external: true, path: external, line: 12,
+  })
+  const hidden = path.join(root, '.data', 'benchmark.md')
+  fs.mkdirSync(path.dirname(hidden))
+  fs.writeFileSync(hidden, '# benchmark')
+  assert.equal(resolveWorkspaceLinkAt(hidden, roots), null)
+  assert.deepEqual(resolveWorkspaceLinkAt(hidden + ':7', roots, true), {
+    external: true, path: hidden, line: 7,
+  })
+  assert.deepEqual(resolveWorkspaceLinkAt('AGENTS.md', roots, true), {
+    project: '.workspace', path: 'AGENTS.md', line: null,
+  })
+  assert.equal(resolveWorkspaceLinkAt(outside, roots, true), null)
+  assert.equal(resolveWorkspaceLinkAt('file://remote.example/test.md', roots, true), null)
 })

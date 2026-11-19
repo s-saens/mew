@@ -178,6 +178,15 @@ test('account capabilities and canonical file rules are enforced across HTTP and
     assert.equal(access.rows.find(row => row.subject === 'guest')?.avatarDataUrl, null)
     assert.equal((await request('/admin/access/feature', 'PUT', { subject: member.email, feature: 'agent', enabled: true }, 'owner')).status, 200)
     assert.equal(policy.canUse(member, 'agent'), true)
+    const externalPath = path.join(temp, 'outside.md')
+    fs.writeFileSync(externalPath, '# External')
+    const externalLink = `/agent-file-link?href=${encodeURIComponent(externalPath + ':2')}`
+    assert.deepEqual(await (await request(externalLink)).json(), { target: null })
+    policy.setFeature(member.email!, 'serverFiles', true)
+    assert.deepEqual(await (await request(externalLink)).json(), { target: { external: true, path: externalPath, line: 2 } })
+    assert.deepEqual(await (await request(`/fs/file?path=${encodeURIComponent(externalPath)}`)).json(), { path: externalPath, content: '# External' })
+    policy.setFeature(member.email!, 'serverFiles', null)
+
     assert.equal(policy.canUse(member, 'terminal'), false)
     assert.equal((await request(cwdSuggestions)).status, 200, 'agent-only folder suggestions remain available')
     assert.equal((await request('/agent-sets')).status, 200)

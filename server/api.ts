@@ -806,14 +806,14 @@ export function createApiApp() {
     }
   })
 
-  // 에이전트 답변의 로컬 파일 링크 — 셸을 쓸 수 있는 역할만 서버 절대경로를 프로젝트 경로로 바꿀 수 있다.
+  // Agent links use project paths when possible. Server file access also permits external tabs.
   app.get('/agent-file-link', requireFeature('agent'), (req, res) => {
     const href = req.query.href
     if (typeof href !== 'string') {
       res.status(400).json({ error: '파일 링크가 없습니다' })
       return
     }
-    res.json({ target: resolveWorkspaceLink(href) })
+    res.json({ target: resolveWorkspaceLink(href, canUse(authOf(req), 'serverFiles')) })
   })
 
   // 주소창 입력을 세션을 끊기 전에 검증한다. 파일 접근 범위는 넓히지 않는다 — ACP/CLI 권한은 이미 OS 사용자 범위다.

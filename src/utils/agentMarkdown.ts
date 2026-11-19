@@ -8,6 +8,8 @@ import MarkdownIt from 'markdown-it'
  * 에이전트 창의 답변을 한 규칙으로 그린다.
  */
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
+const validateMarkdownLink = md.validateLink
+md.validateLink = href => /^file:\/\/(?:localhost)?\//i.test(href) || validateMarkdownLink(href)
 const fence = md.renderer.rules.fence
 const codeBlock = md.renderer.rules.code_block
 
@@ -122,7 +124,7 @@ export function agentMarkdownHrefFromClick(target: EventTarget | null): string |
 
 /** 웹·메일·페이지 앵커는 브라우저에 맡기고, 경로처럼 생긴 링크만 서버의 워크스페이스 해석기로 보낸다. */
 export function isAgentWorkspaceHref(href: string): boolean {
-  if (/^file:/i.test(href)) return true
+  if (/^file:|^[a-z]:[\\/]/i.test(href)) return true
   return !/^(?:[a-z][a-z0-9+.-]*:|#|\/\/)/i.test(href)
 }
 

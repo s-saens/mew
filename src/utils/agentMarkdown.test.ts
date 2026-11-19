@@ -7,9 +7,15 @@ test('워크스페이스 경로와 외부 링크를 가른다', () => {
   assert.equal(isAgentWorkspaceHref('/home/me/work/app.ts:12'), true)
   assert.equal(isAgentWorkspaceHref('app/src/main.ts#L4'), true)
   assert.equal(isAgentWorkspaceHref('file:///home/me/work/app.ts:12'), true)
+  assert.equal(isAgentWorkspaceHref('C:/work/app.ts:12'), true)
   assert.equal(isAgentWorkspaceHref('https://example.com'), false)
   assert.equal(isAgentWorkspaceHref('ftp://example.com/file'), false)
   assert.equal(isAgentWorkspaceHref('#section'), false)
+})
+
+test('agent Markdown renders local file URLs and rejects remote file hosts', () => {
+  assert.match(renderMarkdown('[read](file:///tmp/report.md:12)'), /href="file:\/\/\/tmp\/report\.md:12"/)
+  assert.doesNotMatch(renderMarkdown('[read](file://remote.example/tmp/report.md)'), /<a /)
 })
 
 test('에이전트 마크다운은 링크를 클릭 가능한 앵커로 그린다', () => {

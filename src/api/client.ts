@@ -91,11 +91,7 @@ export type AgentModelOption = { modelId: string; name: string }
 
 export type AgentThinkingOption = { configId: string; options: { id: string; name: string }[] }
 
-export interface WorkspaceFileLink {
-  project: string
-  path: string
-  line: number | null
-}
+export type WorkspaceFileLink = { path: string; line: number | null } & ({ project: string } | { external: true })
 
 export interface AgentCwdSuggestions {
   directory: string
