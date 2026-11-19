@@ -1,6 +1,6 @@
 ---
 title: "Termux setup prerequisites"
-description: "Records Termux prerequisite detection, the one-command source installer, verification results, and remaining Android installation limits."
+description: "Records Termux prerequisites, unattended installation, first-owner HTTP readiness, verification results, and remaining Android installation limits."
 created: "2026-11-16"
 updated: "2026-11-16"
 ---
@@ -24,3 +24,7 @@ The [Termux prerelease](https://github.com/s-saens/mew/releases/tag/mew-termux-v
 The updated installer uses the source setup defaults and preserves existing settings. It uses Termux PostgreSQL with a private Unix socket when no external database is configured. It skips server-side browser preparation on Android and loads Playwright only when a supported host starts a browser session.
 
 The [0.1.6 prerelease](https://github.com/s-saens/mew/releases/tag/mew-termux-v0.1.6) installer and source archive passed anonymous download and checksum verification. A clean Linux extraction passed dependency installation, the project build, and all 28 focused tests. The local CLI suite passed 79 tests and skipped the optional live PostgreSQL test. Lint passed with existing warnings. The documentation checker reported 39 existing broken links. No Android device was available to verify end-to-end setup.
+
+## First-owner link readiness
+
+The Termux launcher now checks the local authentication endpoint before reporting startup or printing the setup link. The default address matches the IPv4 loopback bind. The launcher opens the private link with the Termux browser command when available, and `setup-link` renews it without rebuilding.

@@ -68,7 +68,18 @@ load_config() {
   set +a
 }
 
-url() { printf 'http://localhost:%s' "${MEW_TEAM_PORT:-5000}"; }
+url() {
+  local host=localhost
+  if is_termux; then
+    host="${MEW_BIND:-127.0.0.1}"
+    case "$host" in
+      0.0.0.0) host=127.0.0.1 ;;
+      ::) host='[::1]' ;;
+      *:*) host="[$host]" ;;
+    esac
+  fi
+  printf 'http://%s:%s' "$host" "${MEW_TEAM_PORT:-5000}"
+}
 
 # ── requirements ────────────────────────────────────────────────────────────
 
@@ -185,9 +196,19 @@ running_pid() {
   printf '%s' "$pid"
 }
 
+wait_for_termux_http() {
+  if ! "${MEW_NODE:-node}" "$APP/tools/termux-ready.mjs" "$(url)" "$1"; then
+    die "Mew did not answer on $(url). Check $LOG before opening the setup link."
+  fi
+}
+
 start_server() {
   local pid
-  if pid=$(running_pid); then say "already running (pid $pid) — $(url)"; return 0; fi
+  if pid=$(running_pid); then
+    if is_termux; then wait_for_termux_http "$pid"; fi
+    say "already running (pid $pid) — $(url)"
+    return 0
+  fi
   [ -f dist/index.html ] || die "not built yet — run: ./mew setup"
   prepare_source_browsers check || die "browser dependencies are incomplete — run: npm run browsers:install"
   if is_termux && [ -z "${DATABASE_URL:-}" ]; then
@@ -199,6 +220,10 @@ start_server() {
   nohup "${MEW_NODE:-node}" server/serve.ts >>"$LOG" 2>&1 &
   echo $! >"$PIDFILE"
   disown || true
+  if is_termux; then
+    wait_for_termux_http "$(cat "$PIDFILE")"
+    return
+  fi
   sleep 1
   running_pid >/dev/null || { tail -n 20 "$LOG" >&2; die "failed to start — see $LOG"; }
 }
@@ -238,6 +263,28 @@ create_first_owner() {
     });
   ') || die "invalid administrator setup response"
   if [ -n "$token" ]; then FIRST_OWNER_SETUP_URL="$(url)/#setup=$token"; fi
+}
+
+print_first_owner_link() {
+  if [ -n "${FIRST_OWNER_SETUP_URL:-}" ]; then
+    say "Create your administrator account in your browser using this private setup link:"
+    say "$FIRST_OWNER_SETUP_URL"
+    if is_termux && command -v termux-open-url >/dev/null 2>&1; then
+      termux-open-url "$FIRST_OWNER_SETUP_URL" || true
+    fi
+  else
+    say "Next: open $(url) and sign in with your existing account."
+  fi
+}
+
+cmd_setup_link() {
+  is_termux || die "setup-link is available on native Termux"
+  load_config
+  local pid
+  pid=$(running_pid) || die "Mew is not running. Start it with: bash $APP/mew start"
+  wait_for_termux_http "$pid"
+  create_first_owner
+  print_first_owner_link
 }
 
 # ── commands ────────────────────────────────────────────────────────────────
@@ -306,12 +353,7 @@ cmd_setup() {
   say ""
   say "mew is running: $(url)"
   say ""
-  if [ -n "${FIRST_OWNER_SETUP_URL:-}" ]; then
-    say "Create your administrator account in your browser using this private setup link:"
-    say "$FIRST_OWNER_SETUP_URL"
-  else
-    say "Next: open the URL above and sign in with your existing account."
-  fi
+  print_first_owner_link
   if ! $unattended && [ -t 0 ]; then remote_access_guide; fi
 }
 
@@ -355,6 +397,7 @@ usage() {
 mew — a browser workspace for a folder on your machine
 
   ./mew setup           install, configure and start (safe to re-run)
+  ./mew setup-link      reopen first-owner setup on a running Termux instance
   ./mew remote-access [account|cloudflare|tailscale|none]   show owner registration or existing network setup instructions
   ./mew start | stop    start / stop the server
   ./mew restart         restart it
@@ -367,6 +410,7 @@ EOF
 
 case "${1:-setup}" in
   setup) cmd_setup "${2:-}" ;;
+  setup-link) cmd_setup_link ;;
   remote-access) load_config; remote_access_guide "${2:-account}" ;;
   update) cmd_update ;;
   status) cmd_status ;;
