@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-revision=89971c6dd3896c9bf01d05dd895de8b4837de44d
-checksum=87a7b1af887d6d0b354c910dfee51427af071c4e403358ae7107f33dad73a2b0
-version=0.1.6
+revision=c9030bb988d99b86a2085e7b82d8886188eced88
+checksum=ebd51f44e4a6b5144477d1b5889d76003f55c4e5119e5ed0d455c5c5af265410
+version=0.1.7
 release_url="https://github.com/s-saens/mew/releases/download/mew-termux-v$version"
 install_dir="$HOME/.local/opt/mew-termux-$version"
 marker="$install_dir/.mew-termux-source"
