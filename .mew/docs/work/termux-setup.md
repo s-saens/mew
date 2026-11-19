@@ -28,3 +28,5 @@ The [0.1.6 prerelease](https://github.com/s-saens/mew/releases/tag/mew-termux-v0
 ## First-owner link readiness
 
 The Termux launcher now checks the local authentication endpoint before reporting startup or printing the setup link. The default address matches the IPv4 loopback bind. The launcher opens the private link with the Termux browser command when available, and `setup-link` renews it without rebuilding.
+
+The [0.1.7 prerelease](https://github.com/s-saens/mew/releases/tag/mew-termux-v0.1.7) installer and source matched their verified downloads. A clean source extraction passed dependency installation, build, and 24 tests covering readiness and first-owner setup. The CLI suite passed 79 tests with one opt-in skip. Lint passed with existing warnings and the documentation checker reported 39 existing broken links. Browser behavior on the reporting Android device remains unverified.
