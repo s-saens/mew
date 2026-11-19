@@ -19,7 +19,7 @@ test('Termux bootstrap installs verified source and runs setup without prompts',
   const source = path.join(directory, 'source')
   const archive = path.join(directory, 'source.tar.gz')
   const installer = path.join(directory, 'install.sh')
-  const destination = path.join(home, '.local/opt/mew-termux-0.1.6')
+  const destination = path.join(home, '.local/opt/mew-termux-0.1.7')
   for (const folder of [home, bin, source]) await fs.mkdir(folder)
   await fs.writeFile(path.join(source, 'package-lock.json'), '{}')
   await fs.writeFile(path.join(source, 'mew'), 'set -e; test ! -t 0; test "$*" = "setup --termux-defaults"; printf "setup\n" >> setup.log\n')
