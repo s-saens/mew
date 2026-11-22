@@ -46,6 +46,7 @@ export function MobileKeyBar({
   onToggleCtrl,
   onToggleShift,
   onEsc,
+  onAttach,
   onTab,
   onArrow,
   onComment,
@@ -62,6 +63,7 @@ export function MobileKeyBar({
   onToggleCtrl: () => void
   onToggleShift: () => void
   onEsc: () => void
+  onAttach?: () => void
   onTab: () => void
   onArrow: (dir: 'up' | 'down' | 'left' | 'right') => void
   /** 주면 댓글 아이콘이 뜬다 — 선택(없으면 커서) 자리에 댓글을 단다. 폰에는 Alt+Shift+C가 없다 */
@@ -128,7 +130,14 @@ export function MobileKeyBar({
         ? 'pointer-events-none fixed inset-x-0 bottom-0 z-20 flex items-end gap-1.5 px-1.5 py-1.5 max-[360px]:gap-1 max-[360px]:px-1'
         : 'relative z-20 flex shrink-0 items-center gap-0.5 overflow-x-auto border-t border-edge bg-surface-deep px-1.5 py-1 max-[360px]:gap-0 max-[360px]:px-1'}>
         <div className={floating ? 'flex min-w-0 flex-1 items-center gap-0.5 min-[400px]:gap-1' : 'contents'}>
-          <KeyButton stretch={stretch} floating={floating} label="Esc" onClick={onEsc} />
+          {floating && onAttach ? (
+            <div className="grid min-w-6 max-w-10 flex-1 gap-0.5">
+              <KeyButton floating label={uiText("파일 첨부")} onClick={onAttach}>
+                <KeyIcon><path d="m20.5 11.5-8.2 8.2a5 5 0 0 1-7.1-7.1l8.2-8.2a3.5 3.5 0 1 1 5 5l-8.2 8.2a2 2 0 1 1-2.8-2.8l7.5-7.5" /></KeyIcon>
+              </KeyButton>
+              <KeyButton floating label="Esc" onClick={onEsc} />
+            </div>
+          ) : <KeyButton stretch={stretch} floating={floating} label="Esc" onClick={onEsc} />}
           <KeyButton stretch={stretch} floating={floating} label="Tab" onClick={onTab} />
           <KeyButton stretch={stretch} floating={floating} label="Ctrl" active={ctrlActive} onClick={onToggleCtrl} />
           <KeyButton stretch={stretch} floating={floating} label="Shift" active={shiftActive} onClick={onToggleShift} />

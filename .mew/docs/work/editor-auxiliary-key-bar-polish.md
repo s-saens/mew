@@ -1,8 +1,8 @@
 ---
 title: "Editor auxiliary key bar polish"
-description: "Records the 2026-10-30 initial auxiliary-key polish and subsequent replacement of the editor bar surface with rounded translucent floating keys and a rightmost inverted-T arrow cluster. Covers the 2026-10-31 immediate arrow contact, hold repetition, and drag-direction follow-up, terminal compatibility, removal of keyboard-opening editor focus requests, local regression checks, and physical-device verification limits."
+description: "Records floating auxiliary keys, arrow contact and repetition, editor focus preservation, and the mobile Hotview attachment button above Esc. Covers local browser regressions, terminal compatibility, and physical-device verification limits."
 created: "2026-10-30"
-updated: "2026-10-31"
+updated: "2026-11-22"
 ---
 
 The current contract is [Mobile auxiliary key bar](../development/ui-editor-input.md#mobile-auxiliary-key-bar). The initial polish below was followed by the floating editor controls described in the next section.
@@ -67,3 +67,9 @@ Local verification:
 - Scoped oxlint completed without errors; existing React ref, effect, memoization, and dependency warnings remain in the editor components. The Impeccable detector found no issues in the changed components. Scoped `git diff --check` passed.
 
 Headless Chromium cannot display an OS keyboard. Physical Android/iOS keyboard behavior remains unverified. No deployment, launcher, or server lifecycle operation was performed.
+
+## Mobile Hotview attachment button
+
+Added a paperclip above Esc so users can pick a file from editable mobile Hotview. The button uses the existing upload path to insert a link without requesting editing focus. See the [mobile key layout](../development/ui-editor-input.md#mobile-auxiliary-key-bar) and [attachment contract](../features/document-code-media-editing/links-file-references-and-attachments.md).
+
+In isolated Chromium, the editor keyboard fixture verified placement, native picker invocation, upload, link insertion, and focus at 320px and 390px. It also checked visibility by editor mode, edit access, and desktop width. The editor viewport, shared keys, arrow gestures, and terminal key fixtures passed. The build and scoped lint completed without errors. The repository documentation check reported 39 broken links outside the changed documents. Physical-device verification and deployment were outside this run.

@@ -143,7 +143,6 @@ function markdownForAsset(url: string, name: string, mimetype: string): string {
   return `[${name}](${url})`
 }
 
-// paste로 붙일 수 없는 파일 타입용 — 항상 순수 링크로 삽입 (/upload 커맨드 전용)
 function markdownForLink(url: string, name: string): string {
   return `[${name}](${url})`
 }
@@ -372,7 +371,7 @@ export const Editor = forwardRef<
   // 가리키게 되므로, editor.commands 등은 이 ref로 항상 최신 인스턴스를 참조해야 한다
   const editorRef = useRef<TiptapEditor | null>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
-  const uploadPosRef = useRef<number | null>(null)
+  const uploadTargetRef = useRef<{ pos: number; focus: boolean } | null>(null)
   const { uploads, trackedApi } = useUploadProgress(api)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [drawing, setDrawing] = useState<DrawingSession | null>(null)
@@ -2168,22 +2167,24 @@ export const Editor = forwardRef<
     else ed.chain().focus().insertContent(content).run()
   }
 
-  // /upload 커맨드 전용 — 어떤 파일이든 항상 순수 링크로 삽입
-  async function insertUploadAsLink(file: File, pos: number | null) {
+  async function insertUploadAsLink(file: File, pos: number, focus: boolean) {
+    const ed = editorRef.current
+    const targetPath = pathRef.current
+    if (!ed || readOnlyRef.current) return
     setUploadError(null)
     try {
       const { url, name } = await trackedApi.uploadAsset(file)
-      const markdown = markdownForLink(url, name)
-      const ed = editorRef.current
-      if (pos != null && ed) ed.chain().focus().insertContentAt(pos, markdown).run()
-      else ed?.chain().focus().insertContent(markdown).run()
+      if (ed.isDestroyed || editorRef.current !== ed || pathRef.current !== targetPath || readOnlyRef.current) return
+      const chain = ed.chain()
+      if (focus) chain.focus()
+      chain.insertContentAt(pos, markdownForLink(url, name)).run()
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : uiText("업로드 실패"))
     }
   }
 
-  function openUploadPicker(pos: number) {
-    uploadPosRef.current = pos
+  function openUploadPicker(pos: number, focus = true) {
+    uploadTargetRef.current = { pos, focus }
     uploadInputRef.current?.click()
   }
 
@@ -2223,10 +2224,10 @@ export const Editor = forwardRef<
 
   function handleUploadInputChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
-    const pos = uploadPosRef.current
+    const target = uploadTargetRef.current
     event.target.value = ''
-    uploadPosRef.current = null
-    if (file) insertUploadAsLink(file, pos)
+    uploadTargetRef.current = null
+    if (file && target) void insertUploadAsLink(file, target.pos, target.focus)
   }
 
   // 핸들러가 참조하는 ref 동기화 — editorProps 핸들러는 생성 시점 클로저에 얼어붙어(위 ref 선언부
@@ -2252,7 +2253,6 @@ export const Editor = forwardRef<
       data-editor-body
       className={`editor-root relative flex h-full flex-col overflow-auto bg-surface-deep${frontmatter ? ' has-frontmatter' : ''}`}
     >
-      {/* /upload 커맨드 전용 숨은 파일 인풋 — accept 없이 모든 타입, 모바일에서도 네이티브 피커가 뜬다 */}
       <input ref={uploadInputRef} type="file" onChange={handleUploadInputChange} style={{ display: 'none' }} />
       {/* 찾기 바는 스크롤 컨테이너(.editor-root)에 sticky로 붙는 높이 0짜리 앵커 안에 둔다 — 본문을 밀지
           않으면서 스크롤을 내려도 화면 위에 남는다. 앵커 없이 absolute만 쓰면 문서 맨 위에 박혀 같이 밀려 올라간다.
@@ -2391,6 +2391,7 @@ export const Editor = forwardRef<
             onToggleCtrl={() => setKeyBarCtrl((v) => !v)}
             onToggleShift={() => setKeyBarShift((v) => !v)}
             onEsc={handleKeyBarEsc}
+            onAttach={editor && !readOnly ? () => openUploadPicker(editor.state.selection.from, false) : undefined}
             onTab={handleKeyBarTab}
             onArrow={handleKeyBarArrow}
             onComment={onStartComment}

@@ -56,19 +56,47 @@ function Fixture(){const [state,setState]=React.useState(defaults);const handle=
       const url = new URL(route.request().url())
       if (url.pathname === '/api/comments') return route.fulfill({ json: { threads: [] } })
       if (url.pathname === '/api/members') return route.fulfill({ json: { members: [] } })
+      if (url.pathname === '/api/upload') {
+        assert.match(route.request().postData() ?? '', /filename="notes.txt"/)
+        return route.fulfill({ json: { path: 'fixture.txt', name: 'notes.txt', mimetype: 'text/plain' } })
+      }
       if (url.pathname.startsWith('/api/')) return route.fulfill({ json: [] })
       return route.fulfill(url.pathname === '/app.js' ? { contentType: 'text/javascript', body: entry.code }
         : { contentType: 'text/html', body: `<!doctype html><html class="${theme === 'dark' ? 'dark' : ''}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><div id="root"></div><script type="module" src="/app.js"></script></html>` })
     })
     await page.goto('http://mew-mobile-editor-keyboard.test/')
     const button = page.locator('[data-mobile-editor-keyboard-button]')
+    const attach = page.getByRole('button', { name: '파일 첨부', exact: true })
     const pressBody = (content: ReturnType<typeof page.locator>, x: number) => width < 768
       ? content.tap({ position: { x, y: 10 } })
       : content.click({ position: { x, y: 10 } })
+    if (width < 768) {
+      const content = page.locator('.ProseMirror')
+      await content.waitFor()
+      await pressBody(content, 40)
+      await page.keyboard.press('End')
+      await page.locator('[data-outside]').tap()
+      const esc = page.getByRole('button', { name: 'Esc', exact: true })
+      const attachBox = (await attach.boundingBox())!
+      const escBox = (await esc.boundingBox())!
+      assert.equal(attachBox.x, escBox.x, 'Attach is directly above Esc')
+      assert.equal(attachBox.width, escBox.width)
+      assert.ok(attachBox.y + attachBox.height <= escBox.y)
+      assert.ok(attachBox.width >= 24 && attachBox.height >= 32)
+      await page.evaluate('window.bodyFocusRequests=[]')
+      const [picker] = await Promise.all([page.waitForEvent('filechooser'), attach.tap()])
+      await picker.setFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('attachment') })
+      await page.waitForFunction('document.querySelector("[data-fixture]").dataset.value.includes("notes.txt")')
+      assert.equal((await page.locator('[data-fixture]').getAttribute('data-value'))!.trimEnd(),
+        'Alpha selected text omega.[notes.txt](/api/asset?path=fixture.txt&project=docs)')
+      assert.deepEqual(await page.evaluate('window.bodyFocusRequests'), [], 'attaching does not request editing focus')
+      assert.equal(await content.evaluate(el => el === el.ownerDocument.activeElement), false)
+    }
     for (const mode of [{}, { viewMode: 'plain' }, { path: 'fixture.ts', viewMode: 'plain' }]) {
       await page.evaluate(`window.resetFixture(${JSON.stringify(mode)})`)
       const content = page.locator('.ProseMirror, .cm-content')
       await content.waitFor()
+      if (width >= 768 || mode.viewMode) await attach.waitFor({ state: 'hidden' })
       assert.equal(await button.count(), 0, 'the editor has no floating keyboard control')
       assert.equal(await content.getAttribute('virtualkeyboardpolicy'), null)
       assert.equal(await content.getAttribute('inputmode'), null)
@@ -151,10 +179,11 @@ function Fixture(){const [state,setState]=React.useState(defaults);const handle=
       assert.equal(await page.evaluate('window.keyboardCalls'), 0)
       assert.equal(await page.evaluate('window.keyboardHides'), 0)
     }
-    for (const state of [{ editable: false }, { loading: true }, { revalidating: true }, { anchorPreview: { lineStart: 1, lineEnd: 1 } }, { path: 'preview.svg', content: '<svg/>', viewMode: 'hotview' }, { path: 'image.png' }]) {
+    for (const state of [{ editable: false }, { loading: true }, { revalidating: true }, { viewMode: 'plain', anchorPreview: { lineStart: 1, lineEnd: 1 } }, { path: 'preview.svg', content: '<svg/>', viewMode: 'hotview' }, { path: 'image.png' }]) {
       await page.evaluate(`window.resetFixture(${JSON.stringify(state)})`)
       await page.waitForTimeout(50)
       assert.equal(await button.count(), 0, JSON.stringify(state))
+      await attach.waitFor({ state: 'hidden' })
     }
     await page.evaluate('window.resetFixture({})')
     await page.locator('.ProseMirror').waitFor()
