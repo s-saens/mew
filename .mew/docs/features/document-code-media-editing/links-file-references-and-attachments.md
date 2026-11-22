@@ -8,7 +8,7 @@ updated: "2026-11-18"
 status_hash: "7de6eaf2f2c15edc7c1f36bdcbbfd8639072863ca76586cd4dcc07f7c56c6cc2"
 files: ["packages/editor/src/editor/LinkTooltip.tsx", "packages/editor/src/editor/file-link.ts", "packages/editor/src/editor/editor.css", "packages/editor/src/ResizableImage.tsx", "packages/editor/src/MediaNodes.ts", "src/components/EditorPane.tsx", "src/utils/editor-image-url.ts", "packages/editor/src/editor/image-source-context.ts", "packages/editor/src/Editor.tsx", "packages/editor/src/types.ts"]
 commits: []
-description: "Markdown links, file references, and attachments in the editor. Covers navigation, file mentions, relative image paths, mobile Hotview attachment picking, upload progress, permissions, temporary storage and Git behavior, and playback restrictions."
+description: "Markdown links, file references, and attachments in the editor. Covers navigation, file mentions, relative image paths, Hotview image, audio, and video embeds, upload progress, permissions, temporary storage and Git behavior, and playback restrictions."
 상위파일:
   - "MOC.md"
   - "_document-code-media-editing.md"
@@ -21,7 +21,7 @@ description: "Markdown links, file references, and attachments in the editor. Co
 ### Scope
 
 - Provides link insertion and editing, file mentions, file uploads and drops, image pasting, and resizing.
-- In editable mobile Hotview, **Attach file** uses the same file picker and link upload as **Upload File** in the slash menu. It inserts the link at the cursor or at the start of the selection.
+- In editable mobile Hotview, **Attach file** uses the same file picker as **Upload File** in the slash menu. Both embed images, audio, and video based on the upload's media type and insert links for other files. The paperclip inserts at the cursor or the start of the selection.
 - Show each pending file’s name and [PercentIndicator](../../development/ui-recovery-feedback.md#percent-indicator), including images, video, audio, and other files. Keep the indicator visible while the server completes the request.
 - Hotview `@` file candidates are queried across the current file's entire project scope. For Documents documents, the scope is all of Documents, including folders collapsed in the explorer or not yet queried. Existing file viewing permissions apply, and case-insensitive filename prefix autocomplete displays up to 8 candidates.
 - Internal file links are distinguished as inline items with icons and backgrounds. Subdocuments of the current document and other internal documents retain the same border, with leading icons distinguished as a down-and-right arrow and a document icon, respectively. Files outside the configured Docs folder display a diagonal arrow on the right of the existing item. External URLs remain underlined hyperlinks.

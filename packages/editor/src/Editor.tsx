@@ -143,10 +143,6 @@ function markdownForAsset(url: string, name: string, mimetype: string): string {
   return `[${name}](${url})`
 }
 
-function markdownForLink(url: string, name: string): string {
-  return `[${name}](${url})`
-}
-
 function isPasteableMedia(mimetype: string): boolean {
   return mimetype.startsWith('image/') || mimetype.startsWith('audio/') || mimetype.startsWith('video/')
 }
@@ -2144,14 +2140,19 @@ export const Editor = forwardRef<
   // editorRef.current를 쓰는 이유는 위 editorRef 선언부 주석 참고 — handlePaste·handleDrop이
   // 생성 시점 클로저에 얼어붙어 이 함수를 호출하는데, 그때 캡처된 editor는 아직 null이거나
   // 곧 파괴될 이전 인스턴스라 editor.chain()이 "Cannot read properties of null" 크래시를 냈다.
-  async function insertUpload(file: File, pos?: number) {
+  async function insertUpload(file: File, pos?: number, focus = true) {
+    const ed = editorRef.current
+    const targetPath = pathRef.current
+    if (!ed || readOnlyRef.current) return
     setUploadError(null)
     try {
       const { url, name, mimetype } = await trackedApi.uploadAsset(file)
+      if (ed.isDestroyed || editorRef.current !== ed || pathRef.current !== targetPath || readOnlyRef.current) return
       const markdown = markdownForAsset(url, name, mimetype)
-      const ed = editorRef.current
-      if (pos != null && ed) ed.chain().focus().insertContentAt(pos, markdown).run()
-      else ed?.chain().focus().insertContent(markdown).run()
+      const chain = ed.chain()
+      if (focus) chain.focus()
+      if (pos != null) chain.insertContentAt(pos, markdown).run()
+      else chain.insertContent(markdown).run()
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : uiText("업로드 실패"))
     }
@@ -2165,22 +2166,6 @@ export const Editor = forwardRef<
     const content = [{ type: 'text', text }]
     if (pos != null) ed.chain().focus().insertContentAt(pos, content).run()
     else ed.chain().focus().insertContent(content).run()
-  }
-
-  async function insertUploadAsLink(file: File, pos: number, focus: boolean) {
-    const ed = editorRef.current
-    const targetPath = pathRef.current
-    if (!ed || readOnlyRef.current) return
-    setUploadError(null)
-    try {
-      const { url, name } = await trackedApi.uploadAsset(file)
-      if (ed.isDestroyed || editorRef.current !== ed || pathRef.current !== targetPath || readOnlyRef.current) return
-      const chain = ed.chain()
-      if (focus) chain.focus()
-      chain.insertContentAt(pos, markdownForLink(url, name)).run()
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : uiText("업로드 실패"))
-    }
   }
 
   function openUploadPicker(pos: number, focus = true) {
@@ -2227,7 +2212,7 @@ export const Editor = forwardRef<
     const target = uploadTargetRef.current
     event.target.value = ''
     uploadTargetRef.current = null
-    if (file && target) void insertUploadAsLink(file, target.pos, target.focus)
+    if (file && target) void insertUpload(file, target.pos, target.focus)
   }
 
   // 핸들러가 참조하는 ref 동기화 — editorProps 핸들러는 생성 시점 클로저에 얼어붙어(위 ref 선언부

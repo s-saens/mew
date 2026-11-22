@@ -1,6 +1,6 @@
 ---
 title: "Editor auxiliary key bar polish"
-description: "Records floating auxiliary keys, arrow contact and repetition, editor focus preservation, and the mobile Hotview attachment button above Esc. Covers local browser regressions, terminal compatibility, and physical-device verification limits."
+description: "Records floating auxiliary keys, arrow gestures, editor focus preservation, and the mobile Hotview attachment button above Esc. Covers media embedding through both file picker entry points, browser regressions, terminal compatibility, and physical-device verification limits."
 created: "2026-10-30"
 updated: "2026-11-22"
 ---
@@ -73,3 +73,5 @@ Headless Chromium cannot display an OS keyboard. Physical Android/iOS keyboard b
 Added a paperclip above Esc so users can pick a file from editable mobile Hotview. The button uses the existing upload path to insert a link without requesting editing focus. See the [mobile key layout](../development/ui-editor-input.md#mobile-auxiliary-key-bar) and [attachment contract](../features/document-code-media-editing/links-file-references-and-attachments.md).
 
 In isolated Chromium, the editor keyboard fixture verified placement, native picker invocation, upload, link insertion, and focus at 320px and 390px. It also checked visibility by editor mode, edit access, and desktop width. The editor viewport, shared keys, arrow gestures, and terminal key fixtures passed. The build and scoped lint completed without errors. The repository documentation check reported 39 broken links outside the changed documents. Physical-device verification and deployment were outside this run.
+
+The attachment button and slash-menu upload now share the editor's media-aware insertion path. The browser regression reproduced the link-only behavior and then verified image, video, and audio elements and their saved Markdown from both pickers, plus text-file links from the button. The browser fixture used mocked uploads and verified the presence of media controls. The Markdown, inline audio, and relative-image regression suite passed 32 tests.

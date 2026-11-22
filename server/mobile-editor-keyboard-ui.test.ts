@@ -6,6 +6,12 @@ import { build } from 'rolldown'
 import { compile } from '@tailwindcss/node'
 import { connectTestBrowser } from './test-browser.ts'
 
+const mediaAttachments = [
+  { name: 'photo.png', mimeType: 'image/png', tag: 'img' },
+  { name: 'clip.mp4', mimeType: 'video/mp4', tag: 'video' },
+  { name: 'voice.mp3', mimeType: 'audio/mpeg', tag: 'audio' },
+] as const
+
 test('editor body taps allow native keyboard focus and typing without a floating button', {
   timeout: 60_000,
 }, async t => {
@@ -57,7 +63,10 @@ function Fixture(){const [state,setState]=React.useState(defaults);const handle=
       if (url.pathname === '/api/comments') return route.fulfill({ json: { threads: [] } })
       if (url.pathname === '/api/members') return route.fulfill({ json: { members: [] } })
       if (url.pathname === '/api/upload') {
-        assert.match(route.request().postData() ?? '', /filename="notes.txt"/)
+        const body = route.request().postData() ?? ''
+        const media = mediaAttachments.find(file => body.includes(`filename="${file.name}"`))
+        if (media) return route.fulfill({ json: { path: media.name, name: media.name, mimetype: media.mimeType } })
+        assert.match(body, /filename="notes.txt"/)
         return route.fulfill({ json: { path: 'fixture.txt', name: 'notes.txt', mimetype: 'text/plain' } })
       }
       if (url.pathname.startsWith('/api/')) return route.fulfill({ json: [] })
@@ -91,6 +100,31 @@ function Fixture(){const [state,setState]=React.useState(defaults);const handle=
         'Alpha selected text omega.[notes.txt](/api/asset?path=fixture.txt&project=docs)')
       assert.deepEqual(await page.evaluate('window.bodyFocusRequests'), [], 'attaching does not request editing focus')
       assert.equal(await content.evaluate(el => el === el.ownerDocument.activeElement), false)
+    }
+    if (width !== 320) for (const media of mediaAttachments) {
+      await page.evaluate('window.resetFixture({})')
+      const content = page.locator('.ProseMirror')
+      await content.getByText('Alpha selected text omega.', { exact: true }).waitFor()
+      await pressBody(content, 40)
+      await page.keyboard.press('End')
+      const fromSlashMenu = width >= 768
+      if (fromSlashMenu) await page.keyboard.type(' /upload')
+      const pick = fromSlashMenu
+        ? () => page.getByRole('button', { name: '파일 업로드 파일 첨부' }).click()
+        : () => attach.tap()
+      const [picker] = await Promise.all([page.waitForEvent('filechooser'), pick()])
+      await picker.setFiles({ name: media.name, mimeType: media.mimeType, buffer: Buffer.from('attachment') })
+      const assetUrl = `/api/asset?path=${media.name}&project=docs`
+      const embed = content.locator(`${media.tag}[src="${assetUrl}"]`)
+      await embed.waitFor()
+      if (media.tag !== 'img') assert.notEqual(await embed.getAttribute('controls'), null)
+      const markdown = (await page.locator('[data-fixture]').getAttribute('data-value'))!
+      const expected = media.tag === 'img'
+        ? `![photo](${assetUrl})`
+        : `<${media.tag} src="${assetUrl}" controls></${media.tag}>`
+      assert.ok(markdown.includes(expected), markdown)
+      assert.ok(markdown.startsWith('Alpha selected text omega.'), markdown)
+      assert.ok(!markdown.includes('/upload'), markdown)
     }
     for (const mode of [{}, { viewMode: 'plain' }, { path: 'fixture.ts', viewMode: 'plain' }]) {
       await page.evaluate(`window.resetFixture(${JSON.stringify(mode)})`)
