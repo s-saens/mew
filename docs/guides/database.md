@@ -1,7 +1,7 @@
 ---
 title: "Table Databases (/db)"
-description: "Explains document databases with CLI-managed Postgres or an external connection, opening and editing tables, recorded document references, row/column controls, conversion and undo, calendar/Gantt views, search, grouping, sorting, and keyboard navigation. Covers primary columns, linked-page title and filename changes, sharing, read-only references, and backups."
-updated: "2026-11-17"
+description: "Explains Postgres setup, document references, table editing, conversion and undo, calendar and Gantt views, search, grouping, sorting, and keyboard navigation. Covers primary columns, linked-page body and property edits, filename changes, sharing, read-only references, and backups."
+updated: "2026-11-23"
 상위파일:
   - "MOC.md"
 ---
@@ -92,7 +92,7 @@ Changing the primary column's type to **Page** creates a subpage for each row, u
 
 Editing a page-type primary value immediately updates its displayed name in the explorer and open tabs, like editing a Task title. After saving, the linked file is renamed to match, and the page button uses its confirmed new path. Existing bodies, supported links, and open drafts are retained. If the page has children, its folder and representative file are renamed together. A page moved elsewhere stays in that location; later title edits rename it there. Failed saves restore the confirmed title without overwriting newer input.
 
-Saving a linked subpage also requires the database feature and permission to modify all project files, as required for DB editing.
+In multi-project mode, open the existing subpage as a file to edit and save its body. Mew keeps the page's on-disk properties and linkage. Use single-project mode to edit its properties or the table. Edits that synchronize with the table require the database feature and permission to modify all project files.
 
 For example, if the **Title** primary column contains `송상훈` and the **Age** number column contains `27`, the created page is titled `송상훈` and its frontmatter stores `나이: 27` as a number. Changing the age in the table updates the page property, and changing it on the page updates the table. Multi-select values are shared as YAML arrays.
 

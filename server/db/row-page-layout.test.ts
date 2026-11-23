@@ -127,7 +127,9 @@ test('page title edits rename files and links while preserving row identity, fie
   const current = view('Books/_Books.md')
   ;(await syncDatabasePages('docs', current, q)).commit()
   const old = records.get(rowId)!.path, next = 'Books/거북목 알리미.md'
-  const original = fs.readFileSync(path.join(root, old), 'utf8').replace(/description:.*\n/, 'description: Authored description\ncustom: keep\n') + '\n# Notes\nBody\n'
+  const original = fs.readFileSync(path.join(root, old), 'utf8')
+    .replace(/^description:.*\n/m, '')
+    .replace('\n---\n', '\ndescription: Authored description\ncustom: keep\n---\n') + '\n# Notes\nBody\n'
   delete (records.get(rowId)!.baseline as { pathTitle?: string }).pathTitle // Existing installations have only shared field baselines.
   fs.writeFileSync(path.join(root, old), original)
   fs.writeFileSync(path.join(root, 'Reference.md'), `[row](${encodeURI(old)}#notes)\n[[${old}|row]]\n\`${old}\`\n`)

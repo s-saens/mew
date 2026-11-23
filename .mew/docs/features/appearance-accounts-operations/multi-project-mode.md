@@ -1,9 +1,9 @@
 ---
 title: "Multi-project mode"
-description: "Optional desktop multi-project mode with independent compact workspaces, movement and resizing, shared controls, project selection, lifecycle, centered project error recovery, and the current Postgres limitation."
+description: "Optional desktop multi-project mode with independent compact workspaces, movement, resizing, shared controls, project selection, and lifecycle and error recovery. Covers linked page body saves and the single-project requirement for database tools and properties."
 status: implemented
 created: "2026-11-06"
-updated: "2026-11-17"
+updated: "2026-11-23"
 ---
 
 # Multi-project mode
@@ -80,7 +80,7 @@ These choices fill gaps in the visual references and keep geometry independent o
 
 ## Current limitation
 
-Postgres databases and DB-bound page saves are unavailable in multi-project panels until their shared catalog is isolated by root. The database entry controls are hidden in compact project views, and explicit requests are blocked before pool access or a DB-bound Markdown write. Ordinary files and Markdown remain supported. Use single-project mode for the existing database workflow. The exact API and file-operation boundaries belong to [Scoped workspace sessions](../../development/workspace-sessions.md#current-postgres-restriction).
+Multi-project panels can save body edits to existing database-linked pages. These saves preserve the page's current properties and linkage. Use single-project mode to edit linked-page properties or work with the database itself. See the [scoped workspace contract](../../development/workspace-sessions.md#current-postgres-restriction) for request behavior and conflict handling.
 
 Automated browser fixtures establish the recorded local behavior; they do not establish live agent-provider execution, physical-device IME behavior, or production Mewlink recovery. The [work record](../../work/multi-project-mode.md) lists those limits separately from passing checks.
 
@@ -95,5 +95,6 @@ Automated browser fixtures establish the recorded local behavior; they do not es
 7. Background gradients remain continuous; resources, notifications, active-session accounting, settings, and Mewpet are owned once per browser workspace.
 8. Desktop compact panels work with mouse, touch, external keyboards, IME, and accessible labels. Actual mobile layout and its restoration remain independent.
 9. Reload, remote reconnect, permission changes, project deletion, corrupt local layout data, and failed saves have explicit recovery paths. Local and Mewlink transports preserve the same project boundary.
+10. Body edits to linked row pages save in their panel's actual working root and preserve newer properties. A changed binding or conflicting body edit triggers save conflict recovery.
 
 Implementation evidence belongs in the [work record](../../work/multi-project-mode.md). These criteria are requirements, not claims of passing checks.

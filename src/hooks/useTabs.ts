@@ -19,13 +19,15 @@ import { canOpenEditorFile } from '../utils/editor-open-policy.ts'
 import { uiText } from '@mew/ui/i18n-core'
 import { activePaneTab, mostRecentTab, nextTabNavigation, recordPaneActivation, remapTabNavigation, type TabNavigation } from '../utils/editor-tab-navigation'
 import { registerTaskDocumentSync, type TaskDocumentChange } from '../utils/task-document-sync'
-import { splitFrontmatter } from '@mew/editor/frontmatter'
+import { rebaseDatabasePageBody, splitFrontmatter } from '@mew/editor/frontmatter'
 import { alignEditorPaneSlots, normalizeStoredTabs, reconcileEditorTabs, storedEditorTabs, type EditorTabState, type StoredTabs } from '../utils/editor-tab-state.ts'
 export type { StoredTabs } from '../utils/editor-tab-state.ts'
 import { clearTitlePreviews, documentAbsolutePath, previewDatabaseDocumentTitle, previewDocumentTitle, remapTitlePreviews, subscribeTitlePreviews, titlePreviews, withDocumentTitle } from '../utils/document-title-preview'
 
 function savedBuffer(current: string, submitted: string, saved: string): string {
   if (saved === submitted) return current
+  const rebasedBody = rebaseDatabasePageBody(submitted, current, saved)
+  if (rebasedBody !== null) return rebasedBody
   try { return mergeTaskFrontmatter(submitted, current, saved, false) } catch { return current }
 }
 

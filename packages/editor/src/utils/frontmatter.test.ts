@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { parse } from 'yaml'
-import { changeFrontmatterType, frontmatterSelections, frontmatterType, joinFrontmatter, splitFrontmatter, type FrontmatterField } from './frontmatter.ts'
+import { changeFrontmatterType, frontmatterSelections, frontmatterType, joinFrontmatter, rebaseDatabasePageBody, replaceFrontmatterBody, splitFrontmatter, type FrontmatterField } from './frontmatter.ts'
 
 test('titleless frontmatter stays separate and does not gain a title when edited', () => {
   const header = 'description: "Research description"\ntags:\n  - one\n  - two\ncount: 42 # retained'
@@ -26,6 +26,18 @@ test('horizontal rules and malformed titleless YAML remain body text', () => {
   for (const content of ['---\nA heading\n---\nBody', '---\nvalue: [broken\n---\nBody', '---\n{description: text}\n---\nBody']) {
     assert.deepEqual(splitFrontmatter(content), { frontmatter: null, body: content })
   }
+})
+
+test('pending row page body edits keep the properties returned by a save', () => {
+  const header = '\uFEFF---\r\ntitle: Row # comment\r\n_mew_database: database\r\n_mew_row: row\r\n---\r\n\r\n'
+  const submitted = header + 'Submitted'
+  const draft = replaceFrontmatterBody(submitted, 'Still typing')
+  const saved = submitted.replace('Row # comment', 'Updated row # comment')
+  assert.equal(draft, header + 'Still typing')
+  assert.equal(rebaseDatabasePageBody(submitted, draft, saved), saved.replace('Submitted', 'Still typing'))
+  assert.equal(rebaseDatabasePageBody(submitted, draft.replace('Row # comment', 'A local title'), saved), null)
+  assert.equal(rebaseDatabasePageBody(submitted, draft, saved.replace('Submitted', 'Other body')), null)
+  assert.equal(rebaseDatabasePageBody(submitted, draft, saved.replace('_mew_row: row', '_mew_row: replacement')), null)
 })
 
 test('field settings survive serialization, renaming and ordering without changing YAML property values', () => {

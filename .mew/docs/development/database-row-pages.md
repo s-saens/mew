@@ -1,8 +1,8 @@
 ---
 title: "Database row pages and field synchronization"
-description: "Database row-page paths, confirmed title renames, legacy UUID migration, shared frontmatter fields, save baselines, wiki-scoped descriptions, and permissions. Defines structural mutation ordering, recovery boundaries, detaching, and live row/schema updates."
+description: "Defines row-page paths, title renames, UUID migration, wiki-scoped descriptions, shared fields, permissions, and save baselines. Covers body saves in multi-project mode, structural mutations, recovery, detaching, and live row and schema updates."
 created: "2026-11-03"
-updated: "2026-11-03"
+updated: "2026-11-23"
 상위파일: "document-pages.md"
 ---
 
@@ -30,7 +30,13 @@ Frontmatter `title` is shared with the primary column, and other columns use the
 
 `server/db/rowPages.ts` compares paths, last shared values, and column names in `mew.row_pages` to apply only fields changed in frontmatter to the DB. The baseline's `pathTitle` records the last filename-synchronized title separately from the current shared values. Older baselines fall back to their stored primary value. Row-page autosaves and background file-watcher refreshes update shared fields while retaining `pathTitle`; a subsequent ordinary query or edit performs any deferred rename. Background refreshes cannot deliver mutations to a requesting browser, so they must leave structural changes for that request. DB changes write the corresponding fields back to the file while preserving the body and other properties. Renaming a column removes the old frontmatter key. All values to be changed are validated, and if the DB transaction fails, files and renames are rolled back too. This recovery handles runtime exceptions; it is not a persistent file transaction that recovers from forced process termination.
 
-`server/db/rowPageIntegration.ts` connects file autosaving and external file watching. File saves also require the DB capability and project-wide modification permission. Comparison against the save baseline `expectedContent` prevents an older draft with only body edits from overwriting the latest shared fields, and saves are rejected if the same field was changed to different values. Regular document saves and moves do not depend on Postgres availability. Document moves adjust linked paths; if the recorded file is missing, recovery searches within the project for a document matching both linkage UUIDs. Symlinks, hidden folders, archives, and access-blocked folders are excluded from this recovery search, and no candidate is automatically chosen if multiple candidates exist for the same row.
+`server/db/rowPageIntegration.ts` connects file autosaving and external file watching. Saves that synchronize linked fields require the DB capability and project-wide modification permission. Comparison against the save baseline `expectedContent` prevents an older draft with only body edits from overwriting the latest shared fields, and saves are rejected if the same field was changed to different values. Regular document saves and moves do not depend on Postgres availability. Document moves adjust linked paths; if the recorded file is missing, recovery searches within the project for a document matching both linkage UUIDs. Symlinks, hidden folders, archives, and access-blocked folders are excluded from this recovery search, and no candidate is automatically chosen if multiple candidates exist for the same row.
+
+### Multi-project body saves
+
+An explicitly scoped file request can edit the body of an existing linked page in its actual working root. Mew compares the submitted frontmatter with the save baseline to distinguish a body edit from a property edit. A successful body save retains the exact frontmatter from disk, including newer shared field values and the DB and row identifiers. The save uses the file path and file permission checks for the scoped request and performs no Postgres synchronization. See the [scoped workspace contract](workspace-sessions.md#current-postgres-restriction).
+
+If both the draft and the file changed the body to different content, the save returns HTTP 409. It also returns HTTP 409 if the page disappeared or its binding changed since opening. Resolve the conflict against the current file before retrying. Use single-project mode to change properties or linkage.
 
 ### Detaching and live updates
 

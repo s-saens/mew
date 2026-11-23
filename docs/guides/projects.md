@@ -1,7 +1,7 @@
 ---
 title: "Projects and file navigation"
-description: "Explains project selection, managed and external project paths, single- and multi-project modes, files, Git operations, and per-account GitHub connections. Covers setup, shortcuts, managed and external project deletion, and the multi-project database limitation."
-updated: "2026-11-17"
+description: "Explains project selection, managed and external project paths, single- and multi-project modes, files, Git operations, and per-account GitHub connections. Covers setup, shortcuts, project deletion, and linked-page editing in multi-project mode."
+updated: "2026-11-23"
 상위파일:
   - "MOC.md"
 ---
@@ -55,7 +55,7 @@ Multi-project mode starts with the current project in one narrow, full-height pa
 - Click **X** in the project header to close that project panel. Running agent and terminal sessions continue; closing a panel does not stop them or remove the project from My projects.
 - Return to single-project mode to work on the active project with the existing desktop layout. Returning to multi-project mode restores its panels and arrangement. Mode and layout are remembered separately in this browser for your account. Phones continue to show one workspace.
 
-Postgres database tools and saves of database-bound pages are currently unavailable in multi-project panels. Use single-project mode for those workflows. Ordinary files and Markdown editing remain available. See the [feature contract](../../.mew/docs/features/appearance-accounts-operations/multi-project-mode.md) for scope and limitations.
+You can edit and save the body of an existing linked database page from a multi-project panel. Switch to single-project mode to edit the page's properties or use database tools. [Opening rows as subpages](database.md#opening-rows-as-subpages)
 
 ### Switch and organize My projects
 

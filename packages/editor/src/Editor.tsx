@@ -38,7 +38,7 @@ import { AudioNode, VideoNode, Youtube, YOUTUBE_URL_RE } from './MediaNodes'
 import { Database } from './database/Database'
 import { DbReferencePicker } from './database/DbReferencePicker'
 import { flattenFiles, prefixMatch, isExternalHref, relativeLinkPath, resolveRelativePath } from './utils/fuzzy'
-import { splitFrontmatter, joinFrontmatter, todayDate, type FrontmatterData } from './utils/frontmatter'
+import { splitFrontmatter, joinFrontmatter, replaceFrontmatterBody, todayDate, type FrontmatterData } from './utils/frontmatter'
 import { sourceLineOfPos } from './utils/sourceLine'
 import { clipboardTextSerializer } from './utils/clipboardText'
 import { isSvgMarkup, svgFileName } from './utils/svgPaste'
@@ -822,7 +822,9 @@ export const Editor = forwardRef<
         localMarkdownRef.current = { editor, doc: editor.state.doc, body: markdown }
         // Collaboration-only annotation identities do not change file contents.
         if (markdown !== previousBody) {
-          if (frontmatter) {
+          if (frontmatter?.fields.some(field => field.key === '_mew_database')) {
+            onChange(replaceFrontmatterBody(value, markdown))
+          } else if (frontmatter) {
             onChange(joinFrontmatter(bumpUpdated(frontmatter), markdown))
           } else {
             onChange(markdown)

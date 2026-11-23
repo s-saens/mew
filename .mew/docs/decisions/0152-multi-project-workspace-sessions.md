@@ -1,9 +1,9 @@
 ---
 title: "0152 — Compose multi-project workspaces from scoped sessions"
-description: "Accepts one application shell with immutable workspace clients, root-scoped state and subscriptions, and explicit compact presentation for optional multi-project mode. Records implementation and local integration evidence, versioned compatibility, Postgres limits, alternatives, and unverified production performance."
+description: "Accepts one application shell with immutable workspace clients, root-scoped state and subscriptions, and explicit compact presentation for optional multi-project mode. Records compatibility, Postgres isolation limits, the follow-up decision to allow linked-page body edits, and local integration evidence."
 status: accepted
 created: "2026-11-06"
-updated: "2026-11-07"
+updated: "2026-11-23"
 ---
 
 ## Context
@@ -62,6 +62,12 @@ Explicit Postgres access is currently blocked because the shared pool/catalog ha
 
 Keep editor and session ownership stable through presentation changes. Integration checks must establish undo, selection, IME, draft, and live-session retention; accepting this architecture does not claim that every lifecycle path is already verified. The shared native Browser retains its [single account session and active viewer](../development/browser-desktop.md#permissions-profiles-and-lifecycle). Localhost app viewers retain their separate proxy contract.
 
+### Follow-up on linked row-page saves
+
+The initial guard also rejected body edits to linked Markdown pages. The accepted follow-up permits body saves through the scoped file path and preserves the frontmatter on disk. A body edit needs only the workspace's file, and the save baseline protects against overwriting a concurrent body edit or a different binding.
+
+Enabling Postgres synchronization for these requests would require authoritative root ownership. The current catalog identifies pages by project name and relative path, and a copied page can carry the same DB and row IDs into another root. Keeping the entire page read-only would also block edits that need only the scoped filesystem. Property editing and database access therefore continue through the single-project workflow. [Multi-project body save contract](../development/database-row-pages.md#multi-project-body-saves)
+
 ## Alternatives
 
 | Alternative | Assessment |
@@ -77,4 +83,4 @@ The decision is accepted. Request resolution, immutable clients, scoped cache/qu
 
 Measure one, three, and ten panels before claiming efficient scaling. Record heavy tools, listeners/subscriptions, requests, memory, and responsiveness against a documented fixture. Prefer shared services, coalesced reads, lazy tool loading, and listener teardown over per-panel copies. Hidden rendering may pause under existing visibility rules while recoverable drafts and running execution sessions retain their owners.
 
-The [work record](../work/multi-project-mode.md) owns staged progress, checks actually performed, failures, and remaining gates. The architecture is accepted independently of those checks; the current source-level database restriction remains a deliberate limit until its replacement is implemented and verified.
+The architecture is accepted. Full database access in explicit scopes requires a verified replacement for the current catalog boundary. The staged progress, checks, failures, and remaining gates are in the [work record](../work/multi-project-mode.md).

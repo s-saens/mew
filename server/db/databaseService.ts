@@ -5,7 +5,7 @@ import { quoteIdent, quoteVerifiedIdent, projectSchema, newTableName, newColumnN
 import * as catalog from './catalog.ts'
 import type { DatabaseRow, ColumnRow } from './catalog.ts'
 import { publishDbEvent, type DbEvent } from './hub.ts'
-import { decoratePageRows, readPageEdits, syncDatabasePages } from './rowPages.ts'
+import { decoratePageRows, readPageEdits, syncDatabasePages, withRowPageFileLock } from './rowPages.ts'
 import { recordPageMutation } from './page-mutations.ts'
 import { editSelection, type OptionEdit } from '../../shared/selection-options.ts'
 import { DATABASE_INITIAL_ROWS, DATABASE_TEXT_COLUMN_NAME } from '../../shared/database-defaults.ts'
@@ -315,37 +315,39 @@ async function withManagedChange<T>(
   operation: (tx: Exec, db: DatabaseRow, columns: ColumnRow[]) => Promise<T>,
 ): Promise<{ value: T; view: DatabaseView }> {
   await ensureCatalog()
-  let pageChanges: Awaited<ReturnType<typeof syncDatabasePages>> | undefined
-  const events: DbEvent[] = []
-  let result: { value: T; view: DatabaseView }
-  try {
-    result = await withTransaction(async (tx) => {
-      await tx(`SELECT id FROM mew.databases WHERE id = $1 AND project = $2 FOR UPDATE`, [id, project])
-      const db = await getDatabaseOrThrow(tx, project, id)
-      if (db.kind !== 'managed') throw new DbReadOnlyError('참조(external) 데이터베이스는 편집할 수 없습니다')
-      let columns = await ensurePrimary(tx, db)
-      const initial = view(db, columns, await readManagedRows(db, columns, tx))
-      for (const edit of await readPageEdits(project, initial, tx)) {
-        const saved = await setCell(tx, db, columns, edit.rowId, edit.columnId, edit.value)
-        events.push({ type: 'row.update', rowId: edit.rowId, columnId: edit.columnId, value: saved })
-      }
-      const value = await operation(tx, db, columns)
-      columns = await catalog.listColumns(tx, id)
-      const current = view(db, columns, await readManagedRows(db, columns, tx))
-      if (JSON.stringify(initial.columns) !== JSON.stringify(current.columns)) events.push({ type: 'schema', columns: current.columns })
-      pageChanges = await syncDatabasePages(project, current, tx)
-      const decorated = await decoratePageRows(project, current, tx)
-      return { value, view: decorated }
-    })
-  } catch (err) {
-    if (pageChanges) await pageChanges.rollback()
-    if (pgErrorCode(err) === '23505') throw new DbValidationError('대표열 값은 다른 행과 중복될 수 없습니다')
-    if (pgErrorCode(err) === '23502' || pgErrorCode(err) === '23514') throw new DbValidationError('대표열 값은 비워 둘 수 없습니다')
-    throw err
-  }
-  if (pageChanges) { await pageChanges.commit(); recordPageMutation(pageChanges.mutation) }
-  for (const event of events) publishDbEvent(project, id, event)
-  return result
+  return withRowPageFileLock(project, async () => {
+    let pageChanges: Awaited<ReturnType<typeof syncDatabasePages>> | undefined
+    const events: DbEvent[] = []
+    let result: { value: T; view: DatabaseView }
+    try {
+      result = await withTransaction(async (tx) => {
+        await tx(`SELECT id FROM mew.databases WHERE id = $1 AND project = $2 FOR UPDATE`, [id, project])
+        const db = await getDatabaseOrThrow(tx, project, id)
+        if (db.kind !== 'managed') throw new DbReadOnlyError('참조(external) 데이터베이스는 편집할 수 없습니다')
+        let columns = await ensurePrimary(tx, db)
+        const initial = view(db, columns, await readManagedRows(db, columns, tx))
+        for (const edit of await readPageEdits(project, initial, tx)) {
+          const saved = await setCell(tx, db, columns, edit.rowId, edit.columnId, edit.value)
+          events.push({ type: 'row.update', rowId: edit.rowId, columnId: edit.columnId, value: saved })
+        }
+        const value = await operation(tx, db, columns)
+        columns = await catalog.listColumns(tx, id)
+        const current = view(db, columns, await readManagedRows(db, columns, tx))
+        if (JSON.stringify(initial.columns) !== JSON.stringify(current.columns)) events.push({ type: 'schema', columns: current.columns })
+        pageChanges = await syncDatabasePages(project, current, tx)
+        const decorated = await decoratePageRows(project, current, tx)
+        return { value, view: decorated }
+      })
+    } catch (err) {
+      if (pageChanges) await pageChanges.rollback()
+      if (pgErrorCode(err) === '23505') throw new DbValidationError('대표열 값은 다른 행과 중복될 수 없습니다')
+      if (pgErrorCode(err) === '23502' || pgErrorCode(err) === '23514') throw new DbValidationError('대표열 값은 비워 둘 수 없습니다')
+      throw err
+    }
+    if (pageChanges) { await pageChanges.commit(); recordPageMutation(pageChanges.mutation) }
+    for (const event of events) publishDbEvent(project, id, event)
+    return result
+  })
 }
 
 async function setCell(tx: Exec, db: DatabaseRow, columns: ColumnRow[], rowId: string, columnId: string, value: unknown): Promise<unknown> {

@@ -19,7 +19,7 @@ export interface FrontmatterData {
 }
 
 // 닫는 --- 뒤의 개행을 전부 삼킨다 (하나만 삼키면 split→join을 반복할 때마다 빈 줄이 하나씩 늘어남)
-const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---(?:(?:\r?\n)+|$)/
+const FRONTMATTER_RE = /^(?:\uFEFF)?---\r?\n([\s\S]*?)\r?\n---(?:(?:\r?\n)+|$)/
 // 키가 비어 있어도 허용한다 — 필드명을 지우고 새로 입력하는 도중(빈 키 상태)에도 필드가
 // 사라지면 안 된다. 필드 삭제는 오직 × 버튼으로만 한다. 값에 콜론이 있어도 첫 콜론까지만 키로 본다.
 const FIELD_LINE_RE = /^([^:\n]*):\s*(.*)$/
@@ -167,6 +167,26 @@ export function joinFrontmatter(frontmatter: FrontmatterData, body: string): str
     lines.push(`${f.key}: ${value}${settings}`)
   }
   return `---\n${lines.join('\n')}\n---\n\n${body}`
+}
+
+export function replaceFrontmatterBody(content: string, body: string): string {
+  const header = FRONTMATTER_RE.exec(content)?.[0]
+  if (!header) return body
+  return header + (header.endsWith('\n') || !body ? '' : '\n') + body
+}
+
+/** Keep typing that happened while a body save returned newer database metadata. */
+export function rebaseDatabasePageBody(submitted: string, draft: string, saved: string): string | null {
+  const base = splitFrontmatter(submitted)
+  const disk = splitFrontmatter(saved)
+  const binding = base.frontmatter?.fields.find(field => field.key === '_mew_database')?.value
+  if (!binding) return null
+  if (disk.body !== base.body || disk.frontmatter?.fields.find(field => field.key === '_mew_database')?.value !== binding) return null
+  const row = (page: ReturnType<typeof splitFrontmatter>) => page.frontmatter?.fields.find(field => field.key === '_mew_row')?.value
+  if (row(disk) !== row(base)) return null
+  const header = FRONTMATTER_RE.exec(submitted)?.[0]
+  if (!header || FRONTMATTER_RE.exec(draft)?.[0] !== header) return null
+  return replaceFrontmatterBody(saved, draft.slice(header.length))
 }
 
 export function todayDate(): string {

@@ -1,8 +1,8 @@
 ---
 title: "Multi-project mode implementation and verification"
-description: "Original design, staged implementation, and local verification of optional desktop multi-project mode. Records scoped requests and execution, retained compact workspaces, fractional zoom sizing, live panel rearrangement, lifecycle regressions, synthetic measurements, operational limits, selector and header follow-ups, and independent remote tool panels."
+description: "Design, implementation, and local verification of optional desktop multi-project mode. Records scoped requests, retained workspaces, board and selector follow-ups, independent remote tool panels, and linked row-page body saves."
 created: "2026-11-06"
-updated: "2026-11-09"
+updated: "2026-11-23"
 ---
 
 # Multi-project mode implementation plan
@@ -240,3 +240,9 @@ The new isolated Chromium regression failed before the change and passed afterwa
 Remote browser and remote desktop now open as independent multi-project board panels, so closing or changing a project does not close them. They share board movement and sizing while retaining the last active project for project-scoped actions. The [feature contract](../features/appearance-accounts-operations/multi-project-mode.md#shared-and-local-controls) owns the behavior; [workspace layout](../development/ui-workspace-layout.md#multi-project-board-and-compact-presentation) owns the layout.
 
 Local checks passed for the 11 board model tests, a mocked-transport browser fixture for menu entry, movement, restoration, permission revocation, and mode changes, and an embedded remote desktop component fixture. `npm run build` and `npm run lint` passed with warnings. `npm run check:docs` validated 767 descriptions but reported 37 existing missing links outside these changes. Actual remote connections, physical devices, and fullscreen behavior remain unverified. No deployment or server lifecycle operation was performed; the build updates assets served by a running instance.
+
+## Linked database page body saves — 2026-11-23
+
+The scoped file API now saves body edits to existing linked pages. It preserves on-disk frontmatter, checks the body and binding against the save baseline, and serializes writes with managed database changes for the same project root. Hotview retains the original YAML on body edits. The editor also keeps typing that occurs while a save returns newer properties. The [row-page contract](../development/database-row-pages.md#multi-project-body-saves) describes the save and conflict behavior.
+
+Local verification passed for 33 tests, including scoped HTTP saves and conflicts, Hotview autosave in Chromium, pending body edits, and row-page layout. Three PostgreSQL integration tests skipped because `MEW_DB_TEST_DATABASE_URL` was absent. `npm run build` and `npm run lint` passed with warnings. `npm run check:docs` validated descriptions and reported 39 missing links outside the changed files. Deployment and server lifecycle operations were outside this verification.

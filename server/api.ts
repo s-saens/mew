@@ -13,7 +13,7 @@ import { recordChangeIp, requestIp } from './change-ip.ts'
 import { DocumentPages, DocumentPageError } from './document-pages.ts'
 import { saveDatabaseRowPage, remapDatabaseRowPages } from './db/rowPageIntegration.ts'
 import { saveDocumentDatabaseReferences, refreshDocumentDatabaseReferences, mutateDocumentDatabaseReferences } from './db/documentReferenceIntegration.ts'
-import { RowPageError } from './db/rowPages.ts'
+import { hasDatabasePageBinding, RowPageError } from './db/rowPages.ts'
 import { DbValidationError } from './db/databaseService.ts'
 import { DocumentGraphIndex } from './document-graph.ts'
 import { subscribeFileCatalog } from './fileCatalog.ts'
@@ -1456,18 +1456,24 @@ export function createApiApp() {
 
   // 커밋 시점 내용을 디스크에 쓰고 커밋한다 — "내부 링크 라벨 = title" 동기화까지 PUT /file과
   // 동일하게 처리해야 하므로 그 로직을 공유한다.
-  async function writeAndCommit(project: string, relPath: string, content: string, action: 'add' | 'update', commitMessage?: string, mayEdit: (relPath: string) => boolean = () => true, mayEditDatabase = false, previousContent?: string) {
+  async function writeAndCommit(project: string, relPath: string, content: string, action: 'add' | 'update', commitMessage?: string, mayEdit: (relPath: string) => boolean = () => true, mayEditDatabase = false) {
     const absPath = resolveProjectPath(project, relPath)
-    const previous = previousContent ?? (fs.existsSync(absPath) ? fs.readFileSync(absPath, 'utf8') : '')
-    content = await saveDatabaseRowPage(project, relPath, content, undefined, mayEditDatabase) ?? content
-    fs.mkdirSync(path.dirname(absPath), { recursive: true })
-    fs.writeFileSync(absPath, content, 'utf-8')
+    const previous = fs.existsSync(absPath) ? fs.readFileSync(absPath, 'utf8') : ''
+    const sharedContent = await saveDatabaseRowPage(project, relPath, content, undefined, mayEditDatabase)
+    if (sharedContent !== null) content = sharedContent
+    else {
+      fs.mkdirSync(path.dirname(absPath), { recursive: true })
+      fs.writeFileSync(absPath, content, 'utf-8')
+    }
     // 협업 브리지가 이 쓰기를 "우리 메아리"로 걸러내게 기록 (외부 AI 변경만 방에 주입되도록)
     noteAppWrite(absPath, content)
     await saveDocumentDatabaseReferences(project, relPath, content, previous)
     noteFileContentChanged(project, relPath)
     if (action === 'add') await refreshCatalogPaths(project, [relPath])
+    return { commit: await commitWrittenFile(project, relPath, content, action, commitMessage, mayEdit), content }
+  }
 
+  async function commitWrittenFile(project: string, relPath: string, content: string, action: 'add' | 'update', commitMessage: string | undefined, mayEdit: (relPath: string) => boolean) {
     // "내부 링크 라벨 = 대상 문서 title" 정책(docs 전용): 커밋 시점에만 title 변경을 감지해
     // 참조 문서들의 라벨을 전파한다 — 자동저장마다 하면 타이핑 중인 미완성 title이 퍼지므로,
     // 기준은 마지막 커밋(HEAD)의 title이다.
@@ -1512,22 +1518,20 @@ export function createApiApp() {
         return
       }
       const taskPath = path.relative(workspacePaths.root, absPath).split(path.sep).join('/')
+      const previous = isNew ? '' : fs.readFileSync(absPath, 'utf8')
       if (typeof expectedContent === 'string' && isTaskDocumentPath(taskPath)) {
         if (isNew) {
           res.status(409).json({ error: '태스크 문서가 삭제되거나 이동되었습니다. 목록을 다시 불러오세요.' })
           return
         }
-        content = mergeTaskFrontmatter(expectedContent, content, fs.readFileSync(absPath, 'utf8'))
+        if (!workspaceContext.getStore()?.explicit || ![previous, expectedContent, content].some(hasDatabasePageBinding)) {
+          content = mergeTaskFrontmatter(expectedContent, content, previous)
+        }
       }
-      const previous = isNew ? '' : fs.readFileSync(absPath, 'utf8')
       const sharedContent = await saveDatabaseRowPage(project, relPath, content, expectedContent, canUse(authOf(req), 'database') && unrestrictedFiles(authOf(req), project, true))
       if (sharedContent !== null) content = sharedContent
       const saved = content !== submittedContent ? { content } : {}
-      const contentChanged = isNew || fs.readFileSync(absPath, 'utf8') !== content
-      if (doCommit) {
-        const result = await writeAndCommit(project, relPath, content, isNew ? 'add' : 'update', undefined, target => fileAccess(authOf(req), project, target).edit, canUse(authOf(req), 'database') && unrestrictedFiles(authOf(req), project, true), previous)
-        res.json({ ok: true, commit: result, ...saved })
-      } else {
+      if (sharedContent === null) {
         if (authOf(req).role === 'guest') {
           const fd = fs.openSync(absPath, 'r+')
           try {
@@ -1539,14 +1543,16 @@ export function createApiApp() {
           fs.mkdirSync(path.dirname(absPath), { recursive: true })
           fs.writeFileSync(absPath, content, 'utf-8')
         }
-        if (contentChanged) recordChangeIp(absPath, requestIp(req), content)
-        // 자동저장(비커밋) 경로 — 협업 브리지가 메아리로 무시하도록 기록
-        noteAppWrite(absPath, content)
-        await saveDocumentDatabaseReferences(project, relPath, content, previous)
-        noteFileContentChanged(project, relPath)
-        if (isNew) await refreshCatalogPaths(project, [relPath])
-        res.json({ ok: true, commit: null, ...saved })
       }
+      if (!doCommit && (isNew || previous !== content)) recordChangeIp(absPath, requestIp(req), content)
+      noteAppWrite(absPath, content)
+      await saveDocumentDatabaseReferences(project, relPath, content, previous)
+      noteFileContentChanged(project, relPath)
+      if (isNew) await refreshCatalogPaths(project, [relPath])
+      const result = doCommit
+        ? await commitWrittenFile(project, relPath, content, isNew ? 'add' : 'update', undefined, target => fileAccess(authOf(req), project, target).edit)
+        : null
+      res.json({ ok: true, commit: result, ...saved })
     } catch (err) {
       handleError(res, err)
     }
@@ -1573,7 +1579,7 @@ export function createApiApp() {
       }
       await requireGitConnection(projectRoot(project))
       const result = await writeAndCommit(project, relPath, content, 'update', `${project}: revert ${relPath} to ${hash.slice(0, 7)}`, target => fileAccess(authOf(req), project, target).edit, canUse(authOf(req), 'database') && unrestrictedFiles(authOf(req), project, true))
-      res.json({ ok: true, content, commit: result })
+      res.json({ ok: true, ...result })
     } catch (err) {
       handleError(res, err)
     }
@@ -1777,7 +1783,7 @@ export function createApiApp() {
         res.json({ ok: true, count: 0, commit: null })
         return
       }
-      const commit = await writeAndCommit(project, relPath, content, 'update', `${project}: replace in ${relPath} (${count})`, target => fileAccess(authOf(req), project, target).edit, canUse(authOf(req), 'database') && unrestrictedFiles(authOf(req), project, true))
+      const { commit } = await writeAndCommit(project, relPath, content, 'update', `${project}: replace in ${relPath} (${count})`, target => fileAccess(authOf(req), project, target).edit, canUse(authOf(req), 'database') && unrestrictedFiles(authOf(req), project, true))
       res.json({ ok: true, count, commit })
     } catch (err) {
       if (err instanceof SyntaxError) {

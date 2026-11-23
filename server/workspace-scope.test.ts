@@ -74,7 +74,7 @@ test('same-account scoped HTTP, resources, snapshots, navigation, and subscripti
   const scopes = roots.map(root => ({ workspacePath: root, projectPath: root }))
   const terminals: string[] = [], killed: string[] = []
   t.mock.method(tmuxManager, 'list', async () => terminals.map(name => ({ name, windows: 1, attached: false, createdAt: 0 })))
-  t.mock.method(tmuxManager, 'create', async (name: string) => { terminals.push(name) })
+  t.mock.method(tmuxManager, 'startCommand', async (name: string) => { terminals.push(name) })
   t.mock.method(tmuxManager, 'kill', async (name: string) => { killed.push(name); terminals.splice(terminals.indexOf(name), 1) })
   const request = (route: string, scope?: WorkspaceScope, body?: object, method = body ? 'POST' : 'GET', headers: Record<string, string> = {}) => fetch(origin + (scope ? workspaceScopeUrl('/api' + route, scope) : '/api' + route), {
     method, headers: { Cookie: cookie, ...headers, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined,
@@ -144,9 +144,48 @@ test('same-account scoped HTTP, resources, snapshots, navigation, and subscripti
   assert.equal((await request('/user-ui/editor-tabs?workspace=' + encodeURIComponent(roots[1]), scopes[0])).status, 409)
   assert.equal((await request('/db?project=docs', scopes[0])).status, 503, 'scoped database operations fail before accessing any Postgres pool')
   assert.equal((await request('/file', scopes[0], { project: '.workspace', path: 'ordinary.md', content: '# Ordinary document', workspace: roots[0] }, 'PUT')).status, 200, 'ordinary Markdown remains independent of optional database integration')
-  const boundPage = '---\n_mew_database: 11111111-1111-4111-8111-111111111111\n_mew_row: 22222222-2222-4222-8222-222222222222\n---\nBound page'
-  assert.equal((await request('/file', scopes[0], { project: '.workspace', path: 'bound.md', content: boundPage, workspace: roots[0] }, 'PUT')).status, 503)
-  assert.equal(fs.existsSync(path.join(roots[0], 'bound.md')), false, 'database-bound page guard runs before the file write')
+  await t.test('scoped linked-page saves preserve current metadata and isolate the edited file', async () => {
+    const boundPage = '---\n_mew_database: 11111111-1111-4111-8111-111111111111\n_mew_row: 22222222-2222-4222-8222-222222222222\nscore: 1\n---\nBound page'
+    const files = roots.map(root => path.join(root, 'bound.md'))
+    const save = (content: string, expectedContent?: string) => request('/file', scopes[0], {
+      project: '.workspace', path: 'bound.md', content, expectedContent, workspace: roots[0],
+    }, 'PUT')
+    assert.equal((await save(boundPage)).status, 503, 'a scoped save cannot create a bound page')
+    assert.equal(fs.existsSync(files[0]), false)
+
+    for (const file of files) fs.writeFileSync(file, boundPage)
+    const bodyEdit = boundPage.replace('Bound page', 'First body edit')
+    assert.equal((await save(bodyEdit)).status, 200, 'an existing linked page accepts a body edit without a baseline')
+    assert.equal(fs.readFileSync(files[0], 'utf8'), bodyEdit)
+
+    const newerMetadata = bodyEdit.replace('score: 1', 'score: 2 # changed by the table')
+    fs.writeFileSync(files[0], newerMetadata)
+    const submitted = bodyEdit.replace('First body edit', 'Second body edit')
+    const merged = newerMetadata.replace('First body edit', 'Second body edit')
+    const response = await save(submitted, bodyEdit)
+    assert.equal(response.status, 200)
+    assert.equal((await response.json() as { content: string }).content, merged)
+    assert.deepEqual(files.map(file => fs.readFileSync(file, 'utf8')), [merged, boundPage, boundPage])
+
+    assert.equal((await save(bodyEdit.replace('First body edit', 'Conflicting body edit'), bodyEdit)).status, 409)
+    assert.equal((await save(merged.replace('score: 2', 'score: 3'), merged)).status, 503)
+    assert.equal((await save('Second body edit', merged)).status, 503)
+    assert.equal(fs.readFileSync(files[0], 'utf8'), merged)
+
+    const rebound = merged.replace('22222222-2222-4222-8222-222222222222', '33333333-3333-4333-8333-333333333333')
+    fs.writeFileSync(files[0], rebound)
+    assert.equal((await save(merged.replace('Second body edit', 'Stale draft'), merged)).status, 409)
+    assert.equal(fs.readFileSync(files[0], 'utf8'), rebound)
+    fs.unlinkSync(files[0])
+    assert.equal((await save(merged.replace('Second body edit', 'Stale draft'), merged)).status, 409)
+    assert.equal(fs.existsSync(files[0]), false)
+
+    fs.writeFileSync(files[0], merged)
+    const drafts = ['Concurrent edit A', 'Concurrent edit B'].map(body => merged.replace('Second body edit', body))
+    const responses = await Promise.all(drafts.map(draft => save(draft, merged)))
+    assert.deepEqual(responses.map(result => result.status).sort(), [200, 409])
+    assert.equal(fs.readFileSync(files[0], 'utf8'), drafts[responses.findIndex(result => result.ok)])
+  })
   const malformed = await fetch(origin + '/api/workspace?mewWorkspacePath=' + encodeURIComponent(roots[0]) + '&mewWorkspacePath=' + encodeURIComponent(roots[1]), { headers: { Cookie: cookie } })
   assert.equal(malformed.status, 400)
   const guest = await fetch(origin + workspaceScopeUrl('/api/raw?project=.workspace&path=same.txt', scopes[0]))

@@ -1,8 +1,8 @@
 ---
 title: "Scoped workspace sessions"
-description: "Implemented request, client, cache, event, input-draft, terminal, and presentation boundaries for concurrent project workspaces. Defines capability negotiation, legacy selection compatibility, logical/worktree identity, command ownership, isolated geometry, and the explicit-scope Postgres restriction."
+description: "Defines request, client, cache, event, draft, terminal, and command ownership for concurrent workspaces. Covers compatibility, logical and worktree identity, isolated presentation and geometry, explicit-scope Postgres guards, and linked row-page body saves."
 created: "2026-11-07"
-updated: "2026-11-07"
+updated: "2026-11-23"
 ---
 
 # Scoped workspace sessions
@@ -108,7 +108,8 @@ Explicitly scoped requests currently fail closed for Postgres. The existing shar
 | `/api/db/ws` upgrade | HTTP 401 rejection before the upgrade under the current database authorization guard. Invalid scope/origin/authentication may be rejected earlier. |
 | Ordinary file reads, including Markdown source with DB frontmatter | Follow the normal file permission and read path. Embedded database views remain unavailable through the guarded DB APIs. |
 | Ordinary Markdown save | Uses the normal file save path without requiring Postgres. A UUID filename alone does not make a file DB-bound. |
-| Markdown save with a string-valued `_mew_database` frontmatter field in the existing file, submitted content, or expected baseline | HTTP 503 before writing the file. This also prevents bypassing the guard by removing an existing binding or creating a newly bound file. |
+| Existing database-linked Markdown page, body edit | Saves the body in the request's actual root and preserves the frontmatter on disk without accessing Postgres. A missing page, changed binding, or conflicting body edit returns HTTP 409. See [Database row pages](database-row-pages.md#multi-project-body-saves) for the save contract. |
+| Database-linked Markdown page, property edit or new binding | Use single-project mode. An explicit request cannot change linked-page frontmatter or create a database binding. |
 | Generic filesystem rename, move, or delete | Retains filesystem behavior; optional Postgres metadata synchronization is skipped. This is not support for the full DB-bound page lifecycle in explicit scope. |
 
 Keep these guards until catalog access, transactions, metadata synchronization, and live authorization can be verified for independent roots. Root-keyed event delivery alone is insufficient. [Database row pages](database-row-pages.md) remains authoritative for the full supported row-page lifecycle.

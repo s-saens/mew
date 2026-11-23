@@ -3,7 +3,7 @@ import path from 'node:path'
 import { isDbConfigured, exec } from './pool.ts'
 import { getView } from './databaseService.ts'
 import { projectRoot, resolveProjectPath, workspaceContext } from '../paths.ts'
-import { withRowPageDraft, withDeferredRowPageMoves, RowPageError, hasDatabasePageBinding } from './rowPages.ts'
+import { withRowPageDraft, withDeferredRowPageMoves, withRowPageFileLock, RowPageError, hasDatabasePageBinding, mergeScopedRowPageBody } from './rowPages.ts'
 import type { DocumentPageMove } from '../../shared/document-pages.ts'
 import { remapPagePath } from '../../shared/document-pages.ts'
 
@@ -36,7 +36,33 @@ export async function saveDatabaseRowPage(project: string, relative: string, con
   const file = resolveProjectPath(project, relative)
   try { previous = fs.readFileSync(file, 'utf8') } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
   const bound = [content, expected ?? '', previous].some(hasDatabasePageBinding)
-  if (workspaceContext.getStore()?.explicit && bound) throw new RowPageError('멀티프로젝트모드에서는 연결된 데이터베이스 페이지를 저장할 수 없습니다. 싱글프로젝트모드에서 다시 여세요.', 503)
+  if (workspaceContext.getStore()?.explicit) {
+    if (!bound) return null
+    return withRowPageFileLock(project, () => {
+      const target = resolveProjectPath(project, canonicalPath(project, relative))
+      let fd: number
+      try { fd = fs.openSync(target, 'r+') }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+        if (hasDatabasePageBinding(expected ?? previous)) {
+          throw new RowPageError('연결된 페이지가 이동 또는 삭제되었습니다. 페이지를 다시 열어 주세요.', 409)
+        }
+        throw new RowPageError('연결된 데이터베이스 페이지를 만들려면 싱글프로젝트모드에서 여세요.', 503)
+      }
+      try {
+        if (!fs.fstatSync(fd).isFile()) throw new RowPageError('일반 파일만 수정할 수 있습니다', 400)
+        const current = fs.readFileSync(fd, 'utf8')
+        const merged = mergeScopedRowPageBody(current, content, expected)
+        if (merged !== current) {
+          const bytes = Buffer.from(merged)
+          let offset = 0
+          while (offset < bytes.length) offset += fs.writeSync(fd, bytes, offset, bytes.length - offset, offset)
+          fs.ftruncateSync(fd, bytes.length)
+        }
+        return merged
+      } finally { fs.closeSync(fd) }
+    })
+  }
   if (!bound && !/[0-9a-f-]{36}\.md$/i.test(relative)) return null
   relative = canonicalPath(project, relative)
   const id = await boundDatabase(project, relative)

@@ -59,7 +59,8 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
   const saveStarted = new Promise<void>(resolve => { markSave = resolve })
   const readStarted = new Promise<void>(resolve => { markRead = resolve })
   const failureStarted = new Promise<void>(resolve => { markFailure = resolve })
-  const disk = new Map([['Old.md', '---\ntitle: Old\ndescription: Custom\n_mew_database: database\n_mew_row: row\n---\nOriginal body\n']])
+  const pageHeader = '---\n# Row-page metadata\ntitle: Old\ndescription: Custom\n_mew_database: database\n_mew_row: row\ndone: false # mew:field {"type":"text"}\n---\n'
+  const disk = new Map([['Old.md', pageHeader + 'Original body\n']])
   const errors: string[] = [], writes: string[] = []
   t.after(async () => { releaseSave?.(); releaseRead?.(); releaseFailure?.(); await page.unrouteAll({ behavior: 'wait' }); await browser.close() })
   page.on('pageerror', error => errors.push(error.message))
@@ -100,9 +101,16 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     return route.fulfill(url.pathname === '/app.js' ? { contentType: 'text/javascript', body: script } : { contentType: 'text/html', body: '<!doctype html><html><div id="root"></div><script type="module" src="/app.js"></script></html>' })
   })
   await page.goto('http://mew-database-title.test/')
-  await page.locator('[data-path="Old.md"]').click()
+  await page.locator('[data-path="Old.md"]').dblclick()
   const titleInput = page.getByRole('textbox', { name: 'Title', exact: true })
   await titleInput.waitFor()
+  const editor = page.locator('.tiptap[contenteditable="true"]')
+  await editor.locator('p').filter({ hasText: 'Original body' }).click()
+  await editor.press('End')
+  await page.keyboard.insertText(' edited in Hotview')
+  await page.waitForFunction('window.tabs.activeTab.savedContent.includes("Original body edited in Hotview")')
+  const savedPage = disk.get('Old.md')!
+  assert.equal(/^---\n[\s\S]*?\n---\n/.exec(savedPage)?.[0], pageHeader, 'body autosave retains the exact linked-page YAML and comments')
   const originalTabId = await page.evaluate<string>('window.tabs.activeTab.id')
   const cell = page.getByRole('region', { name: 'Database' }).getByRole('textbox', { name: 'Name', exact: true })
   await cell.fill('First')

@@ -19,6 +19,18 @@ export type PageEdit = { rowId: string; columnId: string; value: unknown }
 export class RowPageError extends Error { status: number; constructor(message: string, status = 400) { super(message); this.status = status } }
 
 const drafts = new AsyncLocalStorage<Map<string, { content: string; expected?: string }>>()
+const pendingFileChanges = new Map<string, Promise<unknown>>()
+
+/** A managed DB change can rewrite or roll back several files in the same project. */
+export async function withRowPageFileLock<T>(project: string, operation: () => T | Promise<T>): Promise<T> {
+  const root = fs.realpathSync(projectRoot(project))
+  const previous = pendingFileChanges.get(root) ?? Promise.resolve()
+  const pending = previous.catch(() => {}).then(operation)
+  pendingFileChanges.set(root, pending)
+  try { return await pending }
+  finally { if (pendingFileChanges.get(root) === pending) pendingFileChanges.delete(root) }
+}
+
 export function withRowPageDraft<T>(project: string, relative: string, content: string, run: () => Promise<T>, expected?: string): Promise<T> {
   return drafts.run(new Map([[resolveProjectPath(project, relative), { content, expected }]]), run)
 }
@@ -48,8 +60,8 @@ function read(project: string, relative: string): string | null {
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error }
 }
 
-function frontmatter(content: string | null): { doc: Document; body: string } {
-  if (content === null) return { doc: parseDocument(''), body: '\n' }
+function frontmatter(content: string | null): { doc: Document; body: string; header: string } {
+  if (content === null) return { doc: parseDocument(''), body: '\n', header: '' }
   const match = /^(?:\uFEFF)?---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)
   if (!match) throw new RowPageError('연결된 페이지의 프론트매터가 필요합니다')
   const doc = parseDocument(match[1])
@@ -57,12 +69,43 @@ function frontmatter(content: string | null): { doc: Document; body: string } {
     throw new RowPageError('페이지 프론트매터를 올바른 YAML 필드로 입력하세요')
   }
   if (isMap(doc.contents)) doc.contents.flow = false
-  return { doc, body: content.slice(match[0].length) }
+  return { doc, body: content.slice(match[0].length), header: match[0] }
+}
+
+function boundPage(content: string): ReturnType<typeof frontmatter> | null {
+  try {
+    const parsed = frontmatter(content)
+    return typeof parsed.doc.get('_mew_database') === 'string' ? parsed : null
+  } catch { return null }
 }
 
 export function hasDatabasePageBinding(content: string): boolean {
-  try { return typeof frontmatter(content).doc.get('_mew_database') === 'string' }
-  catch { return false }
+  return boundPage(content) !== null
+}
+
+/** Save only the body when the request cannot identify a Postgres catalog by root. */
+export function mergeScopedRowPageBody(current: string, incoming: string, expected = current): string {
+  const disk = boundPage(current), base = boundPage(expected)
+  if (!disk && !base) {
+    throw new RowPageError('연결된 데이터베이스 페이지를 만들려면 싱글프로젝트모드에서 여세요.', 503)
+  }
+  if (!disk || !base) {
+    throw new RowPageError('연결된 페이지가 이동, 삭제 또는 교체되었습니다. 페이지를 다시 열어 주세요.', 409)
+  }
+  if (disk.doc.get('_mew_database') !== base.doc.get('_mew_database') || disk.doc.get('_mew_row') !== base.doc.get('_mew_row')) {
+    throw new RowPageError('페이지의 데이터베이스 연결이 바뀌었습니다. 페이지를 다시 열어 주세요.', 409)
+  }
+  const next = boundPage(incoming)
+  const withoutClosingNewline = (header: string) => header.replace(/\r?\n$/, '')
+  if (!next || withoutClosingNewline(next.header) !== withoutClosingNewline(base.header)) {
+    throw new RowPageError('멀티프로젝트모드에서는 본문을 저장할 수 있습니다. 속성을 바꾸려면 싱글프로젝트모드에서 여세요.', 503)
+  }
+  const { body } = next
+  if (body === base.body) return current
+  if (disk.body !== base.body && disk.body !== body) {
+    throw new RowPageError('다른 곳에서 본문을 수정했습니다. 페이지를 다시 열어 주세요.', 409)
+  }
+  return (disk.header.endsWith('\n') || !body ? disk.header : disk.header + '\n') + body
 }
 
 function field(column: { id: string; name: string }, primary: string): string { return column.id === primary ? 'title' : column.name }
