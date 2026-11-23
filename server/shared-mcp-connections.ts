@@ -7,7 +7,7 @@ import { accessChanges, canUse } from './access-policy.ts'
 import { getUser } from './auth.ts'
 import { closeLoginDesktopJob, createLoginDesktopAuthSession } from './login-desktop.ts'
 import { readSharedMcpConfig, sharedMcpConfigIdentity, sharedMcpDirectory, type SharedMcpConfig } from './shared-mcp.ts'
-import { clearSharedMcpAuth, createSharedMcpConnection, markSharedMcpConnected, sharedMcpAuthStatus } from './shared-mcp-oauth.ts'
+import { classifySharedMcpError, clearSharedMcpAuth, createSharedMcpConnection, markSharedMcpConnected, sharedMcpAuthStatus, type AuthStatus, type SharedMcpToolSummary } from './shared-mcp-oauth.ts'
 import { createSharedMcpLocalTransport } from './shared-mcp-stdio.ts'
 
 export class SharedMcpConnectionError extends Error {
@@ -15,9 +15,15 @@ export class SharedMcpConnectionError extends Error {
   constructor(message: string, status = 400) { super(message); this.status = status }
 }
 
+export type SharedMcpAuthMode = 'desktop' | 'browser'
+
 interface RemoteConnection {
   transport: Transport & { finishAuth(code: string): Promise<void> }
   provider: { state?: () => string | Promise<string> }
+  close(): Promise<void>
+}
+
+interface ProbeResult extends SharedMcpToolSummary {
   close(): Promise<void>
 }
 
@@ -27,11 +33,11 @@ interface Dependencies {
   identity(config: SharedMcpConfig): string
   accountVersion(owner: string): number | null
   remote(directory: string, name: string, options: { redirectUrl: string; onAuthorization: (url: URL) => Promise<void>; signal: AbortSignal; isAuthorized: () => boolean }): Promise<RemoteConnection> | RemoteConnection
-  probe(transport: Transport, signal: AbortSignal): Promise<{ close(): Promise<void> }>
+  probe(transport: Transport, signal: AbortSignal): Promise<ProbeResult>
   stdio(config: SharedMcpConfig): Transport
-  authStatus(directory: string, name: string): Promise<{ status: 'disconnected' | 'connected' | 'needs_auth' | 'error'; error?: string }> | { status: 'disconnected' | 'connected' | 'needs_auth' | 'error'; error?: string }
+  authStatus(directory: string, name: string): Promise<AuthStatus> | AuthStatus
   clearAuth(directory: string, name: string): void | Promise<void>
-  connected(directory: string, name: string): void | Promise<void>
+  connected(directory: string, name: string, summary?: SharedMcpToolSummary): void | Promise<void>
   openBrowser(owner: string, job: string, url: string): Promise<string>
   closeBrowser(owner: string, job: string): Promise<void>
   timeout: number
@@ -51,7 +57,22 @@ const defaults: Dependencies = {
     try {
       if (signal.aborted) throw new Error('cancelled')
       await client.connect(transport)
-      return { close: async () => { signal.removeEventListener('abort', abort); await client.close() } }
+      let toolCount: number | undefined
+      let toolNames: string[] | undefined
+      if (!signal.aborted && client.getServerCapabilities()?.tools) {
+        try {
+          const listed = await client.listTools(undefined, { signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]) })
+          if (Array.isArray(listed?.tools)) {
+            toolCount = listed.tools.length
+            toolNames = listed.tools.map(tool => tool?.name).filter((value): value is string => typeof value === 'string')
+          }
+        } catch { /* Servers with partial tool listing support still pass initialize readiness. */ }
+      }
+      return {
+        ...(toolCount !== undefined ? { toolCount } : {}),
+        ...(toolNames?.length ? { toolNames } : {}),
+        close: async () => { signal.removeEventListener('abort', abort); await client.close() },
+      }
     } catch (error) {
       signal.removeEventListener('abort', abort)
       // A failed HTTP initialization must remain available for finishAuth().
@@ -81,6 +102,7 @@ interface Job {
   identity: string
   accountVersion: number | null
   authorized: () => boolean
+  authMode: SharedMcpAuthMode
   state: SharedMcpConnectionStatus
   controller: AbortController
   deadline?: NodeJS.Timeout
@@ -89,8 +111,9 @@ interface Job {
   listener?: http.Server
   transport?: Transport
   connection?: RemoteConnection
-  client?: { close(): Promise<void> }
+  client?: ProbeResult
   expectedState?: string
+  authorizationUrl?: string
   callbackCode?: string
   callbackResolve?: (code: string) => void
   callbackReject?: (error: Error) => void
@@ -112,7 +135,10 @@ export class SharedMcpConnections {
   private key(owner: string, name: string) { return JSON.stringify([this.deps.directory(owner), name]) }
   private state(job: Job, owner: string): SharedMcpConnectionStatus {
     const state = { ...job.state, ownsJob: job.owner === owner }
-    if (job.owner !== owner) delete state.streamUrl
+    if (job.owner !== owner) {
+      delete state.streamUrl
+      delete state.authMode
+    }
     return state
   }
   private name(value: unknown): string {
@@ -140,12 +166,13 @@ export class SharedMcpConnections {
     if (job?.state.status === 'error' && status.status !== 'connected' && this.deps.identity(config) === job.identity) return this.state(job, owner)
     return { name, ...status }
   }
-  start(owner: string, value: unknown, authorized: () => boolean): SharedMcpConnectionStatus {
+  start(owner: string, value: unknown, authorized: () => boolean, options: { mode?: SharedMcpAuthMode } = {}): SharedMcpConnectionStatus {
     const name = this.name(value), { directory, config } = this.config(owner, name)
+    const authMode: SharedMcpAuthMode = options.mode === 'browser' ? 'browser' : 'desktop'
     if (!authorized()) throw new SharedMcpConnectionError('에이전트 접근 권한이 없습니다.', 403)
     const existing = this.jobs.get(this.key(owner, name))
     if (existing?.active && this.valid(existing)) return this.state(existing, owner)
-    const job: Job = { id: `mcp-${randomUUID()}`, owner, name, directory, identity: this.deps.identity(config), accountVersion: this.deps.accountVersion(owner), authorized, state: { name, status: 'connecting' }, controller: new AbortController(), active: true }
+    const job: Job = { id: `mcp-${randomUUID()}`, owner, name, directory, identity: this.deps.identity(config), accountVersion: this.deps.accountVersion(owner), authorized, authMode, state: { name, status: 'connecting' }, controller: new AbortController(), active: true }
     this.jobs.set(this.key(owner, name), job)
     job.deadline = setTimeout(() => { void this.finish(job, { name, status: 'error', error: '연결 시간이 만료되었습니다. 다시 연결하세요.' }) }, this.deps.timeout)
     job.deadline.unref()
@@ -153,6 +180,42 @@ export class SharedMcpConnections {
     accessChanges.on('change', job.accessCheck)
     job.watcher = setInterval(job.accessCheck, this.deps.checkInterval); job.watcher.unref()
     void this.begin(job, config)
+    return this.state(job, owner)
+  }
+  /** Return the pending OAuth authorization URL only to the initiating owner in direct-browser mode. */
+  authorizationUrl(owner: string, value: unknown): string {
+    const name = this.name(value)
+    this.config(owner, name)
+    const job = this.jobs.get(this.key(owner, name))
+    if (!job?.active || !this.valid(job)) throw new SharedMcpConnectionError('진행 중인 MCP 로그인 요청이 없습니다.', 404)
+    if (job.owner !== owner) throw new SharedMcpConnectionError('로그인을 시작한 소유자만 인증 주소를 열 수 있습니다.', 403)
+    if (job.authMode !== 'browser' || !job.authorizationUrl) throw new SharedMcpConnectionError('직접 브라우저 로그인 주소가 아직 준비되지 않았습니다.', 409)
+    return job.authorizationUrl
+  }
+  /** Complete a pending direct-browser OAuth job using a pasted loopback redirect URL. */
+  submitCallback(owner: string, value: unknown, callbackInput: unknown): SharedMcpConnectionStatus {
+    const name = this.name(value)
+    this.config(owner, name)
+    const job = this.jobs.get(this.key(owner, name))
+    if (!job?.active || !this.valid(job)) throw new SharedMcpConnectionError('진행 중인 MCP 로그인 요청이 없습니다.', 404)
+    if (job.owner !== owner) throw new SharedMcpConnectionError('로그인을 시작한 소유자만 인증 응답을 완료할 수 있습니다.', 403)
+    if (typeof callbackInput !== 'string' || !callbackInput.trim() || callbackInput.length > 16_384) {
+      throw new SharedMcpConnectionError('리다이렉트된 콜백 URL을 확인하세요.', 400)
+    }
+    let parsed: URL
+    try { parsed = new URL(callbackInput.trim()) } catch { throw new SharedMcpConnectionError('올바른 콜백 URL을 붙여넣으세요.', 400) }
+    if (!sameState(parsed.searchParams.get('state'), job.expectedState)) {
+      throw new SharedMcpConnectionError('인증 상태(state)가 일치하지 않습니다. 현재 로그인 창에서 받은 URL을 사용하세요.', 403)
+    }
+    if (job.callbackCode) return this.state(job, owner)
+    const code = parsed.searchParams.get('code')
+    if (parsed.searchParams.has('error') || !code || code.length > 8192) {
+      void this.finish(job, { name: job.name, status: 'error', error: '로그인이 취소되었거나 승인에 실패했습니다. 다시 연결하세요.' })
+      throw new SharedMcpConnectionError('로그인이 취소되었거나 승인에 실패했습니다. 다시 연결하세요.', 400)
+    }
+    job.callbackCode = code
+    job.callbackResolve?.(code)
+    job.callbackResolve = undefined; job.callbackReject = undefined
     return this.state(job, owner)
   }
   async cancel(owner: string, value: unknown): Promise<SharedMcpConnectionStatus> {
@@ -196,14 +259,19 @@ export class SharedMcpConnections {
           const expected = await job.connection!.provider.state?.()
           if (!sameState(url.searchParams.get('state'), expected)) throw new Error('invalid-oauth-state')
           job.expectedState = expected
-          job.state = { name: job.name, status: 'needs_auth' }
+          if (job.authMode === 'browser') {
+            job.authorizationUrl = url.href
+            job.state = { name: job.name, status: 'needs_auth', authMode: 'browser' }
+            return
+          }
+          job.state = { name: job.name, status: 'needs_auth', authMode: 'desktop' }
           try {
             const streamUrl = await this.deps.openBrowser(job.owner, job.id, url.href)
             this.assertActive(job)
-            job.state = { name: job.name, status: 'needs_auth', streamUrl }
+            job.state = { name: job.name, status: 'needs_auth', authMode: 'desktop', streamUrl }
           } catch (error) {
             job.expectedState = undefined
-            if (job.active) throw error instanceof SharedMcpConnectionError ? error : new SharedMcpConnectionError('로그인 화면을 준비하지 못했습니다. Linux/WSL 호스트의 Chrome 및 로그인 화면 구성을 확인하세요.', 503)
+            if (job.active) throw error instanceof SharedMcpConnectionError ? error : new SharedMcpConnectionError('로그인 화면을 준비하지 못했습니다. Linux/WSL 호스트의 Chrome 및 로그인 화면 구성을 확인하거나, 직접 브라우저 로그인을 사용하세요.', 503)
             throw new Error('cancelled')
           }
         } })
@@ -213,6 +281,7 @@ export class SharedMcpConnections {
           if (!job.expectedState || !job.active) throw error
           const code = job.callbackCode ?? await new Promise<string>((resolve, reject) => { job.callbackResolve = resolve; job.callbackReject = reject })
           this.assertActive(job)
+          job.authorizationUrl = undefined
           job.state = { name: job.name, status: 'connecting' }
           await job.connection.transport.finishAuth(code)
           this.assertActive(job)
@@ -226,11 +295,20 @@ export class SharedMcpConnections {
         }
       }
       this.assertActive(job)
-      await this.deps.connected(job.directory, job.name)
+      const summary: SharedMcpToolSummary = {
+        ...(job.client?.toolCount !== undefined ? { toolCount: job.client.toolCount } : {}),
+        ...(job.client?.toolNames?.length ? { toolNames: job.client.toolNames } : {}),
+      }
+      await this.deps.connected(job.directory, job.name, summary)
       this.assertActive(job)
-      await this.finish(job, { name: job.name, status: 'connected' })
+      await this.finish(job, { name: job.name, status: 'connected', ...summary })
     } catch (error) {
-      if (job.active) await this.finish(job, { name: job.name, status: 'error', error: error instanceof SharedMcpConnectionError ? error.message : 'MCP에 연결하지 못했습니다. 서버 주소, 실행 명령 및 인증 설정을 확인하세요.' })
+      if (job.active) {
+        const message = error instanceof SharedMcpConnectionError
+          ? error.message
+          : classifySharedMcpError(error, config.command ? 'stdio' : 'remote').message
+        await this.finish(job, { name: job.name, status: 'error', error: message })
+      }
     } finally {
       // Resources can arrive after cancellation while a connection factory is settling.
       if (!job.active) await Promise.allSettled([job.client?.close(), job.connection?.close() ?? job.transport?.close()])
@@ -274,7 +352,7 @@ export class SharedMcpConnections {
     clearTimeout(job.deadline); clearInterval(job.watcher)
     if (job.accessCheck) accessChanges.off('change', job.accessCheck)
     job.controller.abort()
-    job.callbackReject?.(new Error('cancelled')); job.callbackReject = undefined; job.callbackResolve = undefined; job.callbackCode = undefined; job.expectedState = undefined
+    job.callbackReject?.(new Error('cancelled')); job.callbackReject = undefined; job.callbackResolve = undefined; job.callbackCode = undefined; job.expectedState = undefined; job.authorizationUrl = undefined
     job.cleanup = (async () => {
       const server = job.listener
       if (server) { server.close(); server.closeAllConnections() }

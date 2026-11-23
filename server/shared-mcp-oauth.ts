@@ -11,7 +11,17 @@ import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
 import type { SharedMcpConfig } from './shared-mcp.ts'
 import { readSharedMcpConfig, sharedMcpConfigIdentity } from './shared-mcp.ts'
 
-type AuthStatus = { status: 'disconnected' | 'connected' | 'needs_auth' | 'error'; error?: string }
+export type AuthStatus = {
+  status: 'disconnected' | 'connected' | 'needs_auth' | 'error'
+  error?: string
+  toolCount?: number
+  toolNames?: string[]
+  checkedAt?: string
+}
+export interface SharedMcpToolSummary {
+  toolCount?: number
+  toolNames?: string[]
+}
 type SavedTokens = OAuthTokens & { expires_at?: number }
 interface Credentials {
   client?: OAuthClientInformationMixed
@@ -32,6 +42,61 @@ export class SharedMcpLoginRequiredError extends Error {
   readonly code = 'MCP_LOGIN_REQUIRED'
   constructor() { super('Connect this MCP server in Mew first.') }
 }
+export class SharedMcpEnvError extends Error {
+  readonly code = 'MCP_ENV_MISSING'
+  readonly variable?: string
+  constructor(message: string, variable?: string) { super(message); this.variable = variable }
+}
+
+const SAFE_TOOL_NAME = /^[A-Za-z0-9][A-Za-z0-9_.:/@ -]{0,79}$/
+function sanitizeToolSummary(summary?: SharedMcpToolSummary): SharedMcpToolSummary {
+  if (!summary) return {}
+  const toolCount = typeof summary.toolCount === 'number' && Number.isInteger(summary.toolCount) && summary.toolCount >= 0 && summary.toolCount <= 10_000 ? summary.toolCount : undefined
+  const toolNames = Array.isArray(summary.toolNames)
+    ? [...new Set(summary.toolNames.filter((name): name is string => typeof name === 'string' && SAFE_TOOL_NAME.test(name)))].slice(0, 24)
+    : undefined
+  return { ...(toolCount !== undefined ? { toolCount } : {}), ...(toolNames?.length ? { toolNames } : {}) }
+}
+
+/** Map upstream/local failures to safe, actionable diagnostics without leaking raw bodies, tokens, or URLs. */
+export function classifySharedMcpError(error: unknown, kind: 'remote' | 'stdio' = 'remote'): { status: 'needs_auth' | 'error'; message: string } {
+  if (error instanceof SharedMcpLoginRequiredError) return { status: 'needs_auth', message: '인증이 필요합니다. 다시 로그인하세요.' }
+  if (error instanceof SharedMcpEnvError) {
+    if (error.variable && /^[A-Za-z_][A-Za-z0-9_]*$/.test(error.variable)) {
+      return { status: 'error', message: `필요한 환경 변수(${error.variable})가 설정되지 않았습니다.` }
+    }
+    return { status: 'error', message: 'MCP 환경 변수 설정을 확인하세요.' }
+  }
+  const err = error as { code?: unknown; status?: unknown; statusCode?: unknown; name?: unknown; message?: unknown; cause?: unknown } | null
+  const cause = (err?.cause && typeof err.cause === 'object' ? err.cause : undefined) as { code?: unknown; name?: unknown } | undefined
+  const code = typeof err?.code === 'string' ? err.code : typeof cause?.code === 'string' ? cause.code : ''
+  const httpStatus = typeof err?.status === 'number' ? err.status : typeof err?.statusCode === 'number' ? err.statusCode : undefined
+  const name = typeof err?.name === 'string' ? err.name : ''
+  const text = typeof err?.message === 'string' ? err.message : ''
+
+  if (httpStatus === 401 || name === 'UnauthorizedError' || /\b(?:401|unauthorized|invalid_token|invalid_grant)\b/i.test(text)) {
+    return { status: 'needs_auth', message: '인증이 만료되었거나 유효하지 않습니다. 다시 로그인하세요.' }
+  }
+  if (httpStatus === 403 || /\b403\b/.test(text)) {
+    return { status: 'error', message: 'MCP 서버 접근이 거부되었습니다(403). 계정 권한이나 토큰 설정을 확인하세요.' }
+  }
+  if (httpStatus === 404 || /\b404\b/.test(text)) {
+    return { status: 'error', message: 'MCP 엔드포인트를 찾을 수 없습니다(404). 서버 URL을 확인하세요.' }
+  }
+  if ((typeof httpStatus === 'number' && httpStatus >= 500 && httpStatus < 600) || /\b50[0234]\b/.test(text)) {
+    return { status: 'error', message: 'MCP 서버에서 오류가 발생했습니다. 잠시 후 다시 시도하세요.' }
+  }
+  if (kind === 'stdio') {
+    if (code === 'ENOENT' || /\bENOENT\b/.test(text)) return { status: 'error', message: '실행 명령을 찾을 수 없습니다(ENOENT). 설치 여부와 경로(PATH)를 확인하세요.' }
+    if (code === 'EACCES' || code === 'EPERM' || /\bEACCES\b/.test(text)) return { status: 'error', message: '실행 명령에 대한 실행 권한이 없습니다.' }
+  }
+  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return { status: 'error', message: '서버 주소를 찾을 수 없습니다. URL과 네트워크 연결을 확인하세요.' }
+  if (code === 'ECONNREFUSED') return { status: 'error', message: 'MCP 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.' }
+  if (code === 'ETIMEDOUT' || name === 'TimeoutError' || name === 'AbortError' || /\btimed?\s*out\b/i.test(text)) {
+    return { status: 'error', message: 'MCP 서버 응답 시간이 초과되었습니다. 네트워크와 서버 상태를 확인하세요.' }
+  }
+  return { status: 'error', message: 'MCP에 연결하지 못했습니다. 서버 주소, 실행 명령 및 인증 설정을 확인하세요.' }
+}
 
 function privateDirectory(directory: string) {
   let ancestor = path.resolve(directory)
@@ -47,7 +112,7 @@ function privateDirectory(directory: string) {
 export function expandSharedMcpValue(value: string, environment: NodeJS.ProcessEnv = process.env): string {
   return value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, key: string) => {
     const expanded = environment[key]
-    if (expanded === undefined) throw new Error('A required MCP environment variable is unavailable.')
+    if (expanded === undefined) throw new SharedMcpEnvError('A required MCP environment variable is unavailable.', key)
     return expanded
   })
 }
@@ -56,9 +121,9 @@ export function sharedMcpEnvironment(config: SharedMcpConfig): Record<string, st
   const definitions = config.env ?? {}, resolved = new Map<string, string>()
   const resolve = (key: string, trail: string[]): string => {
     if (resolved.has(key)) return resolved.get(key)!
-    if (trail.includes(key)) throw new Error('MCP environment variables contain a circular reference.')
+    if (trail.includes(key)) throw new SharedMcpEnvError('MCP environment variables contain a circular reference.')
     if (!Object.hasOwn(definitions, key)) {
-      if (process.env[key] === undefined) throw new Error('A required MCP environment variable is unavailable.')
+      if (process.env[key] === undefined) throw new SharedMcpEnvError('A required MCP environment variable is unavailable.', key)
       return process.env[key]!
     }
     const value = definitions[key].replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, reference: string) => {
@@ -125,17 +190,32 @@ export function sharedMcpAuthStatus(directory: string, name: string): AuthStatus
     const { root } = location(directory, name)
     const saved = credentials(root)
     if (saved?.status?.status === 'needs_auth' || saved?.status?.status === 'error') return saved.status
+    const metadata = saved?.status ? {
+      ...sanitizeToolSummary(saved.status),
+      ...(typeof saved.status.checkedAt === 'string' ? { checkedAt: saved.status.checkedAt } : {}),
+    } : {}
     if (saved?.tokens?.access_token) {
       if (saved.tokens.expires_at && saved.tokens.expires_at <= Date.now() && !saved.tokens.refresh_token) return { status: 'needs_auth' }
-      return { status: 'connected' }
+      return { status: 'connected', ...metadata }
     }
-    return saved?.status ?? { status: 'disconnected' }
-  } catch { return { status: 'error', error: 'MCP connection settings could not be read.' } }
+    return saved?.status ? { ...saved.status, ...metadata } : { status: 'disconnected' }
+  } catch (error) {
+    if (error instanceof SharedMcpEnvError) return { status: 'error', error: classifySharedMcpError(error).message }
+    return { status: 'error', error: 'MCP connection settings could not be read.' }
+  }
 }
-export function markSharedMcpConnected(directory: string, name: string) {
+export function markSharedMcpConnected(directory: string, name: string, summary?: SharedMcpToolSummary) {
   const { root } = location(directory, name)
   initializeStorage(root)
-  withStatus(root, { status: 'connected' })
+  withStatus(root, { status: 'connected', checkedAt: new Date().toISOString(), ...sanitizeToolSummary(summary) })
+}
+/** Degrade persisted readiness after a runtime relay failure so subsequent sessions do not keep failing on startup. */
+export function recordSharedMcpFailure(directory: string, name: string, status: 'needs_auth' | 'error', error: string) {
+  try {
+    const { root } = location(directory, name)
+    initializeStorage(root)
+    withStatus(root, { status, error, checkedAt: new Date().toISOString() })
+  } catch { /* Removed, unreadable, or symlink-blocked storage must not break teardown. */ }
 }
 export function clearSharedMcpAuth(directory: string, name: string) {
   const { root } = location(directory, name)
@@ -335,10 +415,18 @@ export function createSharedMcpConnection(directory: string, name: string, optio
   transport.send = async (message: JSONRPCMessage, sendOptions?: TransportSendOptions) => {
     try {
       await send(message, sendOptions)
-      if ('method' in message && message.method === 'initialize') update({ status: { status: 'connected' } })
+      if ('method' in message && message.method === 'initialize') {
+        const previous = load().status
+        update({ status: { status: 'connected', checkedAt: new Date().toISOString(), ...sanitizeToolSummary(previous) } })
+      }
     } catch (error) {
       if (!(error instanceof SharedMcpLoginRequiredError)) {
-        try { if (load().status?.status !== 'needs_auth') update({ status: { status: 'error', error: 'MCP connection failed. Try connecting again.' } }) } catch { /* Changed or revoked configurations stay invalid. */ }
+        try {
+          if (load().status?.status !== 'needs_auth') {
+            const classified = classifySharedMcpError(error, 'remote')
+            update({ status: { status: classified.status, error: classified.message, checkedAt: new Date().toISOString() } })
+          }
+        } catch { /* Changed or revoked configurations stay invalid. */ }
       }
       throw error
     }

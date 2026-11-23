@@ -5,4 +5,8 @@ export interface SharedMcpConnectionStatus {
   error?: string
   streamUrl?: string
   ownsJob?: boolean
+  authMode?: 'desktop' | 'browser'
+  toolCount?: number
+  toolNames?: string[]
+  checkedAt?: string
 }

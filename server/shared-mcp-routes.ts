@@ -1,7 +1,7 @@
 import express from 'express'
 import { canUse } from './access-policy.ts'
 import { authOf, requireAuthenticated, requireFeature, requireRole, resolveAuth } from './reqAuth.ts'
-import { SharedMcpConnectionError, SharedMcpConnections } from './shared-mcp-connections.ts'
+import { SharedMcpConnectionError, SharedMcpConnections, type SharedMcpAuthMode } from './shared-mcp-connections.ts'
 
 const connections = new SharedMcpConnections()
 
@@ -13,7 +13,7 @@ export function createSharedMcpRouter(store = connections) {
     try {
       const status = await store.status(authOf(req).email!, req.query.name)
       if (authOf(req).role !== 'owner') {
-        const { streamUrl: _streamUrl, ...summary } = status
+        const { streamUrl: _streamUrl, authMode: _authMode, ...summary } = status
         res.json(summary)
       } else res.json(status)
     } catch (error) { next(error) }
@@ -21,8 +21,15 @@ export function createSharedMcpRouter(store = connections) {
   router.post('/connect', requireRole('owner'), (req, res, next) => {
     try {
       const owner = authOf(req).email!
-      res.status(202).json(store.start(owner, req.body?.name, () => { const auth = resolveAuth(req); return auth.email === owner && auth.role === 'owner' && canUse(auth, 'agent') }))
+      const mode: SharedMcpAuthMode | undefined = req.body?.mode === 'browser' ? 'browser' : req.body?.mode === 'desktop' ? 'desktop' : undefined
+      res.status(202).json(store.start(owner, req.body?.name, () => { const auth = resolveAuth(req); return auth.email === owner && auth.role === 'owner' && canUse(auth, 'agent') }, mode ? { mode } : {}))
     } catch (error) { next(error) }
+  })
+  router.post('/authorize-url', requireRole('owner'), (req, res, next) => {
+    try { res.json({ url: store.authorizationUrl(authOf(req).email!, req.body?.name) }) } catch (error) { next(error) }
+  })
+  router.post('/callback', requireRole('owner'), (req, res, next) => {
+    try { res.json(store.submitCallback(authOf(req).email!, req.body?.name, req.body?.callbackUrl)) } catch (error) { next(error) }
   })
   router.post('/cancel', requireRole('owner'), async (req, res, next) => {
     try { res.json(await store.cancel(authOf(req).email!, req.body?.name)) } catch (error) { next(error) }

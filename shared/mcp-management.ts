@@ -23,7 +23,7 @@ export interface McpManagedServer {
   inferredGroup: boolean
   usage: McpUsageState
   effectiveEnabled: boolean
-  connection?: Pick<SharedMcpConnectionStatus, 'status' | 'error'>
+  connection?: Pick<SharedMcpConnectionStatus, 'status' | 'error' | 'toolCount' | 'checkedAt'>
 }
 
 export interface McpManagedGroup {
@@ -33,6 +33,7 @@ export interface McpManagedGroup {
   usage: McpUsageState
   members: string[]
   enabledCount: number
+  readyCount?: number
 }
 
 export interface McpCloudflarePreview {

@@ -5,7 +5,16 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
-import { createSharedMcpConnection, clearSharedMcpAuth, markSharedMcpConnected, sharedMcpAuthStatus, SharedMcpLoginRequiredError } from './shared-mcp-oauth.ts'
+import {
+  classifySharedMcpError,
+  createSharedMcpConnection,
+  clearSharedMcpAuth,
+  markSharedMcpConnected,
+  recordSharedMcpFailure,
+  sharedMcpAuthStatus,
+  SharedMcpEnvError,
+  SharedMcpLoginRequiredError,
+} from './shared-mcp-oauth.ts'
 
 function fixture() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-mcp-auth-'))
@@ -301,3 +310,44 @@ test('credential storage refuses symbolic links', async () => {
     assert.deepEqual(fs.readdirSync(outside), [])
   } finally { f.cleanup(); fs.rmSync(outside, { recursive: true, force: true }) }
 })
+
+test('classifySharedMcpError produces actionable diagnostics without leaking secrets', () => {
+  const missingEnv = classifySharedMcpError(new SharedMcpEnvError('A required MCP environment variable is unavailable.', 'GITHUB_TOKEN'))
+  assert.equal(missingEnv.status, 'error')
+  assert.match(missingEnv.message, /GITHUB_TOKEN/)
+  assert.doesNotMatch(missingEnv.message, /private|Bearer/i)
+
+  const unauth = classifySharedMcpError(Object.assign(new Error('HTTP 401 Bearer super-secret-token'), { status: 401 }))
+  assert.equal(unauth.status, 'needs_auth')
+  assert.doesNotMatch(unauth.message, /super-secret-token|Bearer/i)
+
+  const enoent = classifySharedMcpError(Object.assign(new Error('spawn my-secret-cmd ENOENT'), { code: 'ENOENT' }), 'stdio')
+  assert.equal(enoent.status, 'error')
+  assert.match(enoent.message, /실행 명령/)
+  assert.doesNotMatch(enoent.message, /my-secret-cmd/)
+
+  const forbidden = classifySharedMcpError(new Error('HTTP 403 Forbidden: private-detail'))
+  assert.equal(forbidden.status, 'error')
+  assert.match(forbidden.message, /403/)
+  assert.doesNotMatch(forbidden.message, /private-detail/)
+})
+
+test('markSharedMcpConnected persists tool summary and recordSharedMcpFailure degrades cached readiness', () => {
+  const f = fixture()
+  try {
+    markSharedMcpConnected(f.directory, 'demo', { toolCount: 3, toolNames: ['search', 'read', 'write'] })
+    const ready = sharedMcpAuthStatus(f.directory, 'demo')
+    assert.equal(ready.status, 'connected')
+    assert.equal(ready.toolCount, 3)
+    assert.deepEqual(ready.toolNames, ['search', 'read', 'write'])
+    assert.equal(typeof ready.checkedAt, 'string')
+
+    const degradedInput = classifySharedMcpError(new Error('HTTP 401 Unauthorized: Bearer secret-value'))
+    recordSharedMcpFailure(f.directory, 'demo', degradedInput.status, degradedInput.message)
+    const degraded = sharedMcpAuthStatus(f.directory, 'demo')
+    assert.equal(degraded.status, 'needs_auth')
+    assert.equal(degraded.toolCount, undefined)
+    assert.doesNotMatch(degraded.error ?? '', /secret-value|Bearer/i)
+  } finally { f.cleanup() }
+})
+

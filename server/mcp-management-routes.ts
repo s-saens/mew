@@ -11,7 +11,7 @@ function workingDirectory(value: unknown): string {
   return value
 }
 
-type ConnectionSummary = Pick<SharedMcpConnectionStatus, 'status' | 'error'>
+type ConnectionSummary = Pick<SharedMcpConnectionStatus, 'status' | 'error' | 'toolCount' | 'checkedAt'>
 
 /** Reads saved readiness only; listing and usage changes never connect to an upstream. */
 export function createMcpManagementRouter(store = new McpManagementStore(), status: (name: string) => ConnectionSummary = name => sharedMcpAuthStatus(store.directory, name)) {
@@ -19,17 +19,27 @@ export function createMcpManagementRouter(store = new McpManagementStore(), stat
   router.use((_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next() })
   router.use(requireAuthenticated, requireFeature('agent'))
   router.use((req, _res, next) => runWithAgentAccount(authOf(req).email, next))
-  const summarize = (inventory: McpManagementInventory, canManage: boolean): McpManagementInventory => ({
-    ...inventory, canManage,
-    servers: inventory.servers.map(server => {
+  const summarize = (inventory: McpManagementInventory, canManage: boolean): McpManagementInventory => {
+    const servers = inventory.servers.map(server => {
       let connection: ConnectionSummary
       try {
         const value = status(server.name)
-        connection = { status: value.status, ...(value.error ? { error: value.error } : {}) }
+        connection = {
+          status: value.status,
+          ...(value.error ? { error: value.error } : {}),
+          ...(typeof value.toolCount === 'number' ? { toolCount: value.toolCount } : {}),
+          ...(typeof value.checkedAt === 'string' ? { checkedAt: value.checkedAt } : {}),
+        }
       } catch { connection = { status: 'error', error: '연결 상태를 확인하지 못했습니다. 연결 설정을 확인하세요.' } }
       return { ...server, connection }
-    }),
-  })
+    })
+    const readyByName = new Map(servers.map(server => [server.name, server.effectiveEnabled && server.connection?.status === 'connected']))
+    const groups = inventory.groups.map(group => ({
+      ...group,
+      readyCount: group.members.filter(name => readyByName.get(name)).length,
+    }))
+    return { ...inventory, canManage, servers, groups }
+  }
   router.get('/', (req, res, next) => {
     try { res.json(summarize(store.list(workingDirectory(req.query.cwd)), authOf(req).role === 'owner')) }
     catch (error) { next(error) }

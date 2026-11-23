@@ -56,3 +56,22 @@ test('shared environment resolves materialized references independent of field o
   assert.equal(environment.TOKEN, 'private-fixture')
   assert.throws(() => sharedMcpEnvironment({ env: { MEW_SHARED_FIXTURE_A: '${MEW_SHARED_FIXTURE_B}', MEW_SHARED_FIXTURE_B: '${MEW_SHARED_FIXTURE_A}' } }), /circular reference/)
 })
+
+test('stdio bridge notifies onFailure when upstream send fails so cached status can degrade', async () => {
+  const input = new PassThrough(), output = new PassThrough()
+  const failures: unknown[] = []
+  const remote: Transport = {
+    start: async () => {},
+    send: async () => { throw new Error('HTTP 401 Unauthorized') },
+    close: async () => {},
+  }
+  const close = await relaySharedMcp(new StdioServerTransport(input, output), remote, {
+    onFailure: error => failures.push(error),
+  })
+  input.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) + '\n')
+  await new Promise(resolve => setTimeout(resolve, 30))
+  assert.equal(failures.length, 1)
+  assert.match(String(failures[0]), /401/)
+  await close()
+})
+

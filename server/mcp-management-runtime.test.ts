@@ -73,18 +73,24 @@ new AgentSideConnection(() => ({
     f.mutate({ action: 'usage', scope: 'project', target: 'server', id: 'api', enabled: true })
     markSharedMcpConnected(f.directory, 'bindings')
     const session = await AgentSession.start(runtime, { cmd: process.execPath, args: [adapter] }, f.cwd, undefined, undefined, undefined, { mcpServers: internal })
+    let latestMcpServers: string[] | undefined
+    const detach = session.attach(event => { if (event.type === 'meta') latestMcpServers = event.meta.mcpServers })
     try {
+      assert.deepEqual(latestMcpServers, ['api', 'bindings', 'independent'])
       assert.equal(readRequests().length, index * 3 + 1)
       f.mutate({ action: 'usage', scope: 'project', target: 'group', id: group.id, enabled: false })
       // Editing usage does not rewrite an already-created conversation.
       assert.equal(readRequests().length, index * 3 + 1)
+      assert.deepEqual(latestMcpServers, ['api', 'bindings', 'independent'])
       await session.loadSession('saved-managed-fixture')
+      assert.deepEqual(latestMcpServers, ['independent'])
       f.mutate({ action: 'usage', scope: 'project', target: 'group', id: group.id, enabled: true })
       f.mutate({ action: 'usage', scope: 'project', target: 'server', id: 'api', enabled: false })
       clearSharedMcpAuth(f.directory, 'bindings')
       session.clearAfterQueue()
       await until(() => readRequests().length === (index + 1) * 3 && !session.busy)
-    } finally { await session.disposeAndWait() }
+      assert.deepEqual(latestMcpServers, ['independent'])
+    } finally { detach(); await session.disposeAndWait() }
   }
   const expected = runtimes.flatMap(() => [
     ['api', 'bindings', 'independent'],

@@ -87,10 +87,12 @@ test('agent-enabled nonowners can read status without login streams and cannot c
   const token = createSession(email)
   const calls: unknown[][] = []
   const store = {
-    status: async (...args: unknown[]) => { calls.push(['status', ...args]); return { name: 'remote', status: 'needs_auth', streamUrl: '/private-owner-login' } },
+    status: async (...args: unknown[]) => { calls.push(['status', ...args]); return { name: 'remote', status: 'needs_auth', streamUrl: '/private-owner-login', authMode: 'browser' } },
     start: () => { throw new Error('denied start reached store') },
     cancel: () => { throw new Error('denied cancel reached store') },
     disconnect: () => { throw new Error('denied disconnect reached store') },
+    authorizationUrl: () => { throw new Error('denied authorize-url reached store') },
+    submitCallback: async () => { throw new Error('denied callback reached store') },
   } as unknown as SharedMcpConnections
   const app = express()
   app.use(express.json(), attachAuthContext)
@@ -108,8 +110,8 @@ test('agent-enabled nonowners can read status without login streams and cannot c
     assert.equal(status.status, 200)
     assert.deepEqual(await status.json(), { name: 'remote', status: 'needs_auth' })
     assert.deepEqual(calls.at(-1), ['status', email, 'remote'])
-    for (const action of ['connect', 'cancel', 'disconnect']) {
-      const denied = await fetch(`${base}/${action}`, { method: 'POST', headers, body: JSON.stringify({ name: 'remote' }) })
+    for (const action of ['connect', 'cancel', 'disconnect', 'authorize-url', 'callback']) {
+      const denied = await fetch(`${base}/${action}`, { method: 'POST', headers, body: JSON.stringify({ name: 'remote', callbackUrl: 'http://127.0.0.1/cb?code=1&state=2' }) })
       assert.equal(denied.status, 403)
     }
   }
@@ -117,3 +119,53 @@ test('agent-enabled nonowners can read status without login streams and cannot c
   assert.equal((await fetch(`${base}/status?name=remote`, { headers })).status, 403)
   assert.equal(calls.length, 2)
 })
+
+test('owner can start browser OAuth, fetch authorize URL with no-store, and submit callback', async t => {
+  const owner = 'mcp-browser-routes@example.test'
+  upsertUser(owner, { role: 'owner', hash: '', createdAt: Date.now(), passwordChangedAt: 0, mustChangePassword: false })
+  setFeature(owner, 'agent', true)
+  const token = createSession(owner)
+  const calls: unknown[][] = []
+  const store = {
+    status: async () => ({ name: 'remote', status: 'needs_auth', authMode: 'browser' }),
+    start: (account: string, name: unknown, _check: () => boolean, options?: { mode?: string }) => {
+      calls.push(['start', account, name, options?.mode])
+      return { name: 'remote', status: 'connecting', authMode: options?.mode }
+    },
+    cancel: async () => ({ name: 'remote', status: 'disconnected' }),
+    disconnect: async () => ({ name: 'remote', status: 'disconnected' }),
+    authorizationUrl: (account: string, name: unknown) => {
+      calls.push(['authorize-url', account, name])
+      return 'https://auth.example.test/authorize?state=abc'
+    },
+    submitCallback: (account: string, name: unknown, callbackUrl: unknown) => {
+      calls.push(['callback', account, name, callbackUrl])
+      return { name: 'remote', status: 'connected' }
+    },
+  } as unknown as SharedMcpConnections
+  const app = express()
+  app.use(express.json(), attachAuthContext)
+  app.use('/mcp', createSharedMcpRouter(store))
+  const server = http.createServer(app)
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.after(async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); removeUser(owner) })
+  const address = server.address()
+  assert.ok(address && typeof address !== 'string')
+  const base = `http://127.0.0.1:${address.port}/mcp`
+  const headers = { Cookie: `mew_session=${token}`, 'Content-Type': 'application/json' }
+
+  const started = await fetch(`${base}/connect`, { method: 'POST', headers, body: JSON.stringify({ name: 'remote', mode: 'browser' }) })
+  assert.equal(started.status, 202)
+  assert.deepEqual(calls.at(-1), ['start', owner, 'remote', 'browser'])
+
+  const authRes = await fetch(`${base}/authorize-url`, { method: 'POST', headers, body: JSON.stringify({ name: 'remote' }) })
+  assert.equal(authRes.status, 200)
+  assert.equal(authRes.headers.get('cache-control'), 'no-store')
+  assert.deepEqual(await authRes.json(), { url: 'https://auth.example.test/authorize?state=abc' })
+
+  const cbRes = await fetch(`${base}/callback`, { method: 'POST', headers, body: JSON.stringify({ name: 'remote', callbackUrl: 'http://127.0.0.1:4100/callback?code=ok&state=abc' }) })
+  assert.equal(cbRes.status, 200)
+  assert.deepEqual(await cbRes.json(), { name: 'remote', status: 'connected' })
+  assert.deepEqual(calls.at(-1), ['callback', owner, 'remote', 'http://127.0.0.1:4100/callback?code=ok&state=abc'])
+})
+

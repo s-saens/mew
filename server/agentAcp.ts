@@ -181,6 +181,8 @@ export type SessionMeta = {
   usage: Usage | null
   canLoad: boolean
   canList: boolean
+  /** Shared Mew MCP server names actually bound to the current ACP session. */
+  mcpServers?: string[]
 }
 
 /** 브라우저에 보여 줄 인증 방법. 비밀값과 실행 명령은 서버 밖으로 내보내지 않는다. */
@@ -426,6 +428,7 @@ export class AgentSession {
   busy = false
 
   #mcpServers: McpServer[] = []
+  #boundSharedMcpServers: string[] = []
   #account = agentSettingsAccount()
   #context: AgentContextBinding
   #gitEnv: NodeJS.ProcessEnv
@@ -545,13 +548,14 @@ export class AgentSession {
     }
   }
 
-  #sessionMcpServers(): McpServer[] {
+  #prepareSessionMcpServers(): { mcpServers: McpServer[]; sharedNames: string[] } {
     const directory = sharedMcpDirectory()
     const usage = resolveMcpUsage(this.cwd, directory)
-    return runWithAgentAccount(this.#account, () => [
-      ...sharedMcpServers(directory, name => sharedMcpAuthStatus(directory, name).status === 'connected', usage.include),
-      ...this.#mcpServers,
-    ])
+    const shared = runWithAgentAccount(this.#account, () =>
+      sharedMcpServers(directory, name => sharedMcpAuthStatus(directory, name).status === 'connected', usage.include),
+    )
+    const sharedNames = shared.flatMap(server => 'args' in server && Array.isArray(server.args) && typeof server.args[2] === 'string' ? [server.args[2]] : [])
+    return { mcpServers: [...shared, ...this.#mcpServers], sharedNames }
   }
 
   async #initializeWithTimeout(createSession: boolean | 'unless-load-supported' = true) {
@@ -637,7 +641,9 @@ export class AgentSession {
   }
 
   async #createSession() {
-    const created = await measureAgentPhase(this.runtime, 'session/new', () => this.#conn.newSession({ cwd: this.cwd, mcpServers: this.#sessionMcpServers(), ...skillRuntimeSessionOptions(this.runtime) }))
+    const prepared = this.#prepareSessionMcpServers()
+    const created = await measureAgentPhase(this.runtime, 'session/new', () => this.#conn.newSession({ cwd: this.cwd, mcpServers: prepared.mcpServers, ...skillRuntimeSessionOptions(this.runtime) }))
+    this.#boundSharedMcpServers = prepared.sharedNames
     this.#adopt(created.sessionId, created.models ?? null, created.modes ?? null, created.configOptions)
     this.#authRequired = false
     this.#authenticating = false
@@ -1410,8 +1416,10 @@ export class AgentSession {
         await this.#initializeWithTimeout(false)
       }
       if (this.#disposed) return
-      const created = await this.#conn.newSession({ cwd: this.cwd, mcpServers: this.#sessionMcpServers(), ...skillRuntimeSessionOptions(this.runtime) })
+      const prepared = this.#prepareSessionMcpServers()
+      const created = await this.#conn.newSession({ cwd: this.cwd, mcpServers: prepared.mcpServers, ...skillRuntimeSessionOptions(this.runtime) })
       if (this.#disposed) return
+      this.#boundSharedMcpServers = prepared.sharedNames
       this.#loadingEvents = null
       this.#clearFailed = false
       this.#resetHistory()
@@ -1449,8 +1457,9 @@ export class AgentSession {
     this.#loadingEvents = []
     let loaded: Awaited<ReturnType<ClientSideConnection['loadSession']>>
     let replay: AgentEvent[]
+    const prepared = this.#prepareSessionMcpServers()
     try {
-      loaded = await measureAgentPhase(this.runtime, 'session/load', () => this.#conn.loadSession({ sessionId, cwd: this.cwd, mcpServers: this.#sessionMcpServers(), ...skillRuntimeSessionOptions(this.runtime) }))
+      loaded = await measureAgentPhase(this.runtime, 'session/load', () => this.#conn.loadSession({ sessionId, cwd: this.cwd, mcpServers: prepared.mcpServers, ...skillRuntimeSessionOptions(this.runtime) }))
       replay = assignAgentBubbleIds(reconcileAgentTranscript(readAgentTranscript(this.runtime, this.cwd, sessionId), this.#loadingEvents))
     } catch (err) {
       // 일부 어댑터는 실패하기 전 update를 몇 개 흘리거나 모드를 바꾼다. 어느 쪽도 현재 세션에 남기지 않는다.
@@ -1464,6 +1473,7 @@ export class AgentSession {
 
     // ACP가 실제 기록을 확인한 뒤에만 이 탭의 기준 세션을 바꾼다. 실패한 ID를 먼저 저장하면 다음
     // 프롬프트까지 `session not found`로 이어지고 브라우저 복원 포인터에도 유령 ID가 남는다.
+    this.#boundSharedMcpServers = prepared.sharedNames
     this.#resetConversation()
     this.#adopt(sessionId, loaded.models ?? null, loaded.modes ?? null, loaded.configOptions)
     await this.#pushMeta()
@@ -1776,6 +1786,7 @@ export class AgentSession {
         usage: this.#usage,
         canLoad: this.#caps.loadSession === true,
         canList: this.#caps.sessionCapabilities?.list != null,
+        mcpServers: [...this.#boundSharedMcpServers],
       },
     }
   }

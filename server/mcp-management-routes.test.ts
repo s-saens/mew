@@ -31,7 +31,10 @@ test('group management keeps common owner-only, allows project usage, and summar
     req.auth = { email: role === 'owner' ? emails[0] : role === 'member' ? emails[1] : null, role, mustChangePassword: false }
     next()
   })
-  app.use('/mcp', createMcpManagementRouter(store, name => ({ status: status.get(name) ?? 'disconnected' })))
+  app.use('/mcp', createMcpManagementRouter(store, name => ({
+    status: status.get(name) ?? 'disconnected',
+    ...(status.get(name) === 'connected' ? { toolCount: 4, checkedAt: '2026-11-23T00:00:00.000Z' } : {}),
+  })))
   const server = http.createServer(app)
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   t.after(async () => {
@@ -55,6 +58,8 @@ test('group management keeps common owner-only, allows project usage, and summar
   const listed = JSON.parse(text) as McpManagementInventory
   assert.equal(listed.canManage, false)
   assert.equal(listed.servers[0].connection?.status, 'connected')
+  assert.equal(listed.servers[0].connection?.toolCount, 4)
+  assert.equal(listed.groups.find(group => group.id === 'cloudflare')?.readyCount, 1)
   assert.equal((await request('member', { action: 'usage', scope: 'common', target: 'group', id: 'cloudflare', enabled: false, revision: listed.revision })).status, 403)
   assert.equal((await request('member', { action: 'create-group', name: 'Forbidden', revision: listed.revision })).status, 403)
   assert.equal((await request('member', { action: 'consolidate-cloudflare', scope: 'project', name: 'api', disable: [], revision: listed.revision })).status, 403)

@@ -349,12 +349,85 @@ for (const revokeOnExchange of [false, true]) test(revokeOnExchange ? 'real SDK 
 test('real SDK probes a local JSON-RPC fixture and records readiness only after initialize', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-mcp-connect-stdio-'))
   t.after(async () => { fs.rmSync(directory, { recursive: true, force: true }) })
-  const script = `import readline from 'node:readline';const input=readline.createInterface({input:process.stdin});input.on('line',line=>{const message=JSON.parse(line);if(message.method==='initialize')process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:message.id,result:{protocolVersion:message.params.protocolVersion,capabilities:{},serverInfo:{name:'fixture',version:'1'}}})+'\\n')});`
+  const script = `import readline from 'node:readline';const input=readline.createInterface({input:process.stdin});input.on('line',line=>{const message=JSON.parse(line);if(message.method==='initialize')process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:message.id,result:{protocolVersion:message.params.protocolVersion,capabilities:{tools:{}},serverInfo:{name:'fixture',version:'1'}}})+'\\n');else if(message.method==='tools/list')process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:message.id,result:{tools:[{name:'ping',description:'ping tool',inputSchema:{type:'object'}},{name:'lookup',description:'lookup tool',inputSchema:{type:'object'}}]}})+'\\n')});`
   fs.writeFileSync(path.join(directory, 'servers.json'), JSON.stringify({ mcpServers: { fixture: { command: process.execPath, args: ['--input-type=module', '-e', script] } } }))
   const store = new SharedMcpConnections({ directory: () => directory, closeBrowser: async () => {}, timeout: 5000 })
   t.after(async () => { await store.close() })
   assert.equal((await store.status('alice', 'fixture')).status, 'disconnected')
   store.start('alice', 'fixture', () => true)
   await until(async () => (await store.status('alice', 'fixture')).status === 'connected')
+  const state = await store.status('alice', 'fixture')
+  assert.equal(state.toolCount, 2)
+  assert.deepEqual(state.toolNames, ['ping', 'lookup'])
   assert.equal(sharedMcpAuthStatus(directory, 'fixture').status, 'connected')
+  assert.equal(sharedMcpAuthStatus(directory, 'fixture').toolCount, 2)
 })
+
+test('browser OAuth mode works without native desktop browser, isolates authorize URLs to the owner, and validates callback state', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mew-mcp-connect-browser-'))
+  t.after(async () => { fs.rmSync(directory, { recursive: true, force: true }) })
+  fs.writeFileSync(path.join(directory, 'servers.json'), JSON.stringify({ mcpServers: { fixture: { type: 'http', url: 'https://remote.example.test/mcp', oauth: { client_id: 'fixture-client' } } } }))
+  const seed = createSharedMcpConnection(directory, 'fixture')
+  await seed.provider.saveDiscoveryState?.({
+    authorizationServerUrl: 'https://auth.example.test',
+    authorizationServerMetadata: { issuer: 'https://auth.example.test', authorization_endpoint: 'https://auth.example.test/authorize', token_endpoint: 'https://auth.example.test/token', response_types_supported: ['code'], code_challenge_methods_supported: ['S256'], token_endpoint_auth_methods_supported: ['none'] },
+    resourceMetadata: { resource: 'https://remote.example.test/mcp', authorization_servers: ['https://auth.example.test'], scopes_supported: ['mcp'] },
+  })
+  await seed.close()
+  let browserOpened = 0
+  const mockFetch: typeof fetch = async (input, init) => {
+    const url = new URL(String(input))
+    if (url.hostname === 'auth.example.test') {
+      return Response.json({ access_token: 'browser-mode-token', refresh_token: 'browser-mode-refresh', token_type: 'Bearer', expires_in: 3600 })
+    }
+    if (new Headers(init?.headers).get('authorization') !== 'Bearer browser-mode-token') return new Response('', { status: 401 })
+    if (init?.method === 'GET') return new Response('', { status: 405 })
+    const message = JSON.parse(String(init?.body))
+    if (message.method === 'notifications/initialized') return new Response(null, { status: 202 })
+    if (message.method === 'tools/list') return Response.json({ jsonrpc: '2.0', id: message.id, result: { tools: [{ name: 'remote_echo', inputSchema: { type: 'object' } }] } })
+    return Response.json({ jsonrpc: '2.0', id: message.id, result: { protocolVersion: message.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'fixture', version: '1' } } })
+  }
+  const store = new SharedMcpConnections({
+    directory: () => directory,
+    remote: (_directory, name, options) => createSharedMcpConnection(directory, name, { ...options, fetch: mockFetch }),
+    openBrowser: async () => { browserOpened++; throw new Error('desktop browser should not open in browser mode') },
+    closeBrowser: async () => {},
+    timeout: 5000,
+  })
+  t.after(async () => { await store.close() })
+  store.start('alice', 'fixture', () => true, { mode: 'browser' })
+  await until(async () => (await store.status('alice', 'fixture')).status === 'needs_auth')
+  const ownerStatus = await store.status('alice', 'fixture')
+  assert.equal(ownerStatus.authMode, 'browser')
+  assert.equal(ownerStatus.ownsJob, true)
+  assert.equal(ownerStatus.streamUrl, undefined)
+  assert.equal(JSON.stringify(ownerStatus).includes('authorize'), false, 'status never exposes the authorization URL')
+  assert.equal(browserOpened, 0)
+
+  const otherStatus = await store.status('bob', 'fixture')
+  assert.equal(otherStatus.authMode, undefined)
+  assert.equal(otherStatus.ownsJob, false)
+  assert.throws(() => store.authorizationUrl('bob', 'fixture'), /소유자/)
+
+  const authUrl = new URL(store.authorizationUrl('alice', 'fixture'))
+  assert.equal(authUrl.origin, 'https://auth.example.test')
+  const redirect = new URL(authUrl.searchParams.get('redirect_uri')!)
+  const state = authUrl.searchParams.get('state')!
+
+  const wrongCallback = new URL(redirect.toString())
+  wrongCallback.searchParams.set('code', 'browser-code')
+  wrongCallback.searchParams.set('state', 'mismatched-state')
+  assert.throws(() => store.submitCallback('alice', 'fixture', wrongCallback.toString()), /일치/)
+
+  const validCallback = new URL(redirect.toString())
+  validCallback.searchParams.set('code', 'browser-code')
+  validCallback.searchParams.set('state', state)
+  store.submitCallback('alice', 'fixture', validCallback.toString())
+
+  await until(async () => (await store.status('alice', 'fixture')).status === 'connected')
+  const connected = await store.status('alice', 'fixture')
+  assert.equal(connected.toolCount, 1)
+  assert.deepEqual(connected.toolNames, ['remote_echo'])
+  assert.equal(JSON.stringify(connected).includes('browser-mode-token'), false)
+})
+
