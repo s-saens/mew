@@ -4,7 +4,7 @@ import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, BookStack, PlugTypeA, Xmark, RefreshDouble, Plus, NavArrowRight } from 'iconoir-react'
+import { ArrowLeft, BookStack, PlugTypeA, Trash, Xmark, RefreshDouble, Plus, NavArrowRight } from 'iconoir-react'
 import { SelectField, useOverlayDismiss } from '@mew/ui'
 
 import { SharedMcpConnection } from './shared-mcp-connection'
@@ -19,26 +19,90 @@ function mcpDraft(agent?: string) {
   return JSON.stringify(agent === 'opencode' ? { type: 'local', command: [''] } : agent === 'prime' || agent === 'mew' ? { type: 'http', url: '' } : { command: '', args: [] }, null, 2)
 }
 
-export function AgentHarnessButtons({ cwd }: { cwd: string }) {
+export interface AgentHarnessSessionProps {
+  sessionMcpServers?: string[]
+  canReloadSession?: boolean
+  canApplyMcpChanges?: boolean
+  onApplyMcpChanges?: () => void
+}
+
+export function AgentHarnessButtons({
+  cwd,
+  sessionMcpServers,
+  canReloadSession,
+  canApplyMcpChanges,
+  onApplyMcpChanges,
+}: { cwd: string } & AgentHarnessSessionProps) {
   useUiLocale()
   const [open, setOpen] = useState<HarnessKind | null>(null)
+  const loadedCount = sessionMcpServers?.length ?? 0
+  const mcpTip = loadedCount > 0 ? `${uiText("MCP 관리")} · ${loadedCount} (${sessionMcpServers!.join(', ')})` : uiText("MCP 관리")
   return <>
     <button type="button" aria-label={uiText("Skills 관리")} title={uiText("Skills 관리")} data-tip={uiText("Skills 관리")} onClick={() => setOpen('skills')} className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"><BookStack width={14} height={14} aria-hidden /></button>
-    <button type="button" aria-label={uiText("MCP 관리")} title={uiText("MCP 관리")} data-tip={uiText("MCP 관리")} onClick={() => setOpen('mcp')} className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"><PlugTypeA width={14} height={14} aria-hidden /></button>
-    {open && <AgentHarnessModal key={cwd} cwd={cwd} initialKind={open} onClose={() => setOpen(null)} />}
+    <button type="button" aria-label={uiText("MCP 관리")} title={mcpTip} data-tip={mcpTip} onClick={() => setOpen('mcp')} className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded text-ink-secondary hover:bg-surface-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-accent">
+      <PlugTypeA width={14} height={14} aria-hidden />
+      {loadedCount > 0 && <span aria-hidden className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-accent" />}
+    </button>
+    {open && <AgentHarnessModal
+      key={cwd}
+      cwd={cwd}
+      initialKind={open}
+      sessionMcpServers={sessionMcpServers}
+      canReloadSession={canReloadSession}
+      canApplyMcpChanges={canApplyMcpChanges}
+      onApplyMcpChanges={onApplyMcpChanges}
+      onClose={() => setOpen(null)}
+    />}
   </>
 }
 
-export function AgentHarnessModal({ cwd, initialKind, onClose }: { cwd: string; initialKind: HarnessKind; onClose: () => void }) {
+export function AgentHarnessModal({
+  cwd,
+  initialKind,
+  sessionMcpServers,
+  canReloadSession,
+  canApplyMcpChanges,
+  onApplyMcpChanges,
+  onClose,
+}: { cwd: string; initialKind: HarnessKind; onClose: () => void } & AgentHarnessSessionProps) {
   const [kind, setKind] = useState(initialKind)
   const [native, setNative] = useState(false)
+  const [initialServer, setInitialServer] = useState<string | undefined>(undefined)
   return kind === 'skills'
     ? <SkillLibraryManager cwd={cwd} onClose={onClose} onSwitchMcp={() => setKind('mcp')} />
-    : native ? <NativeHarnessModal cwd={cwd} onClose={onClose} onSwitchSkills={() => setKind('skills')} onBackToManaged={() => setNative(false)} />
-      : <McpManager cwd={cwd} onClose={onClose} onSwitchSkills={() => setKind('skills')} onOpenSources={() => setNative(true)} />
+    : native ? <NativeHarnessModal
+      cwd={cwd}
+      onClose={onClose}
+      onSwitchSkills={() => { setInitialServer(undefined); setKind('skills') }}
+      onBackToManaged={() => { setInitialServer(undefined); setNative(false) }}
+      onOpenManagedServer={(serverName) => { setInitialServer(serverName); setNative(false) }}
+    />
+      : <McpManager
+        cwd={cwd}
+        initialServer={initialServer}
+        sessionMcpServers={sessionMcpServers}
+        canReloadSession={canReloadSession}
+        canApplyMcpChanges={canApplyMcpChanges}
+        onApplyMcpChanges={onApplyMcpChanges}
+        onClose={onClose}
+        onSwitchSkills={() => { setInitialServer(undefined); setKind('skills') }}
+        onOpenSources={() => { setInitialServer(undefined); setNative(true) }}
+      />
 }
 
-export function NativeHarnessModal({ cwd, onClose, onSwitchSkills, onBackToManaged }: { cwd: string; onClose: () => void; onSwitchSkills: () => void; onBackToManaged?: () => void }) {
+export function NativeHarnessModal({
+  cwd,
+  onClose,
+  onSwitchSkills,
+  onBackToManaged,
+  onOpenManagedServer,
+}: {
+  cwd: string
+  onClose: () => void
+  onSwitchSkills: () => void
+  onBackToManaged?: () => void
+  onOpenManagedServer?: (serverName: string) => void
+}) {
   const { fetchHarness, fetchHarnessDetail, mutateHarness } = useWorkspaceApi()
   const copy = mcpManagerCopy[useUiLocale()]
   const kind = 'mcp' as const
@@ -54,6 +118,7 @@ export function NativeHarnessModal({ cwd, onClose, onSwitchSkills, onBackToManag
   const [advancedMcp, setAdvancedMcp] = useState(false)
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [reload, setReload] = useState(0)
   const [error, setError] = useState(''), [notice, setNotice] = useState('')
+  const [lastImported, setLastImported] = useState<{ name: string; originalId: string; originalWritable: boolean; originalRevision?: string } | null>(null)
   const [confirmation, setConfirmation] = useState<{ text: string; label: string; action: () => void } | null>(null)
   const dialog = useRef<HTMLDivElement>(null), searchRef = useRef<HTMLInputElement>(null), confirmRef = useRef<HTMLButtonElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null), hadDetail = useRef(false)
@@ -121,23 +186,46 @@ export function NativeHarnessModal({ cwd, onClose, onSwitchSkills, onBackToManag
 
   async function mutate(action: HarnessMutation['action']) {
     if (busy) return
-    setBusy(true); setError(''); setNotice('')
+    const importSnapshot = action === 'import' && selected
+      ? { name: selected.name, originalId: selected.id, originalWritable: detail?.item.writable === true && !detail.item.managed, originalRevision: detail?.revision }
+      : null
+    setBusy(true); setError(''); setNotice(''); setLastImported(null)
     try {
       await mutateHarness(action === 'import'
         ? { cwd, kind, action, id: selected?.id, revision: detail?.revision, target: mewLocation?.id }
         : { cwd, kind, action, id: selected?.id, revision: detail?.revision, target, name, content })
       reset(); setReload(value => value + 1)
+      if (importSnapshot) setLastImported(importSnapshot)
       setNotice(action === 'import' ? uiText('Mew 공통으로 가져왔습니다. 연결 후 새 세션에서 사용할 수 있습니다.') : action === 'delete' ? uiText("삭제했습니다.") : action === 'move' ? uiText("이동했습니다. 적용 시점은 에이전트에 따라 다릅니다.") : uiText("저장했습니다. 적용 시점은 에이전트에 따라 다릅니다."))
       window.dispatchEvent(new Event('mew:harness-changed'))
     } catch (error) { setError(error instanceof Error ? error.message : uiText("변경하지 못했습니다")) }
     finally { setBusy(false) }
   }
   function create() {
-    reset(); setCreating(true)
+    reset(); setLastImported(null); setCreating(true)
     const location = availableLocations.find(location => location.agent === 'mew' && writableLocation(location)) ?? availableLocations.find(writableLocation)
     setTarget(location?.id ?? destinations[0]?.id ?? '')
     setName('')
     setContent(mcpDraft(location?.agent ?? destinations[0]?.agent))
+  }
+  const removeImportedOriginal = () => {
+    if (!lastImported) return
+    const targetInfo = lastImported
+    setConfirmation({
+      text: copy.deleteDuplicateConfirm,
+      label: uiText("삭제"),
+      action: async () => {
+        if (busy) return
+        setBusy(true); setError(''); setNotice(''); setLastImported(null)
+        try {
+          await mutateHarness({ cwd, kind, action: 'delete', id: targetInfo.originalId, revision: targetInfo.originalRevision })
+          reset(); setReload(value => value + 1)
+          setNotice(uiText("삭제했습니다."))
+          window.dispatchEvent(new Event('mew:harness-changed'))
+        } catch (error) { setError(error instanceof Error ? error.message : uiText("변경하지 못했습니다")) }
+        finally { setBusy(false) }
+      },
+    })
   }
   const showingDetail = !!selected || creating
   useEffect(() => {
@@ -169,7 +257,13 @@ export function NativeHarnessModal({ cwd, onClose, onSwitchSkills, onBackToManag
       </div>}
       {error && <div role="alert" className="shrink-0 border-b border-edge px-4 py-2 text-xs text-danger-strong">{error} <button type="button" className={button} disabled={busy} onClick={() => guarded(() => { reset(); setReload(value => value + 1) })}>{uiText("다시 불러오기")}</button></div>}
       {onBackToManaged && <p className="shrink-0 border-b border-edge px-3 py-2 text-xs leading-relaxed text-ink-secondary">{copy.externalHint}</p>}
-      {notice && <p role="status" className="shrink-0 border-b border-edge px-4 py-2 text-xs text-ink-secondary">{notice}</p>}
+      {notice && <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-edge px-4 py-2 text-xs text-ink-secondary">
+        <p role="status" className="min-w-0 flex-1">{notice}</p>
+        {lastImported && kind === 'mcp' && <div className="flex flex-wrap items-center gap-1">
+          {onOpenManagedServer && <button type="button" className={`${button} bg-accent text-ink-on-accent hover:bg-accent/90`} disabled={busy} onClick={() => guarded(() => onOpenManagedServer(lastImported.name))}><PlugTypeA width={14} height={14} aria-hidden />{copy.openInMew}</button>}
+          {lastImported.originalWritable && <button type="button" className={`${button} text-danger-strong`} disabled={busy} onClick={removeImportedOriginal}><Trash width={14} height={14} aria-hidden />{copy.deleteDuplicate}</button>}
+        </div>}
+      </div>}
       <div className="flex min-h-0 flex-1" inert={confirmation ? true : undefined}>
         <aside className={`${showingDetail ? 'hidden md:flex' : 'flex'} min-h-0 w-full flex-col border-r border-edge md:w-80 md:shrink-0`}>
           <div className="space-y-2 border-b border-edge p-3">

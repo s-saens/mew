@@ -237,3 +237,237 @@ createRoot(document.getElementById('root')).render(<AgentHarnessButtons cwd="/pr
     await page.close()
   }
 })
+
+test('presets, stdio onboarding, save-and-connect, direct browser OAuth, session sync, and post-import flows work cleanly', { timeout: 90000 }, async t => {
+  const source = `import React from '${root}/node_modules/react/index.js';
+import {createRoot} from '${root}/node_modules/react-dom/client.js';
+import {AgentHarnessButtons} from '${root}/src/components/agent-harness-modal.tsx';
+window.__applied = 0;
+createRoot(document.getElementById('root')).render(
+  <AgentHarnessButtons
+    cwd="/project"
+    sessionMcpServers={['search']}
+    canReloadSession={true}
+    canApplyMcpChanges={true}
+    onApplyMcpChanges={() => { window.__applied += 1 }}
+  />
+);`
+  const bundle = await build({
+    input: 'virtual:mcp-manager-v2.tsx',
+    write: false,
+    platform: 'browser',
+    onLog(level, log, handler) { if (log.code !== 'MODULE_LEVEL_DIRECTIVE') handler(level, log) },
+    output: { format: 'iife' },
+    transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': JSON.stringify('test') } },
+    plugins: [{
+      name: 'mcp-manager-v2-fixture',
+      resolveId(id) { if (id === 'virtual:mcp-manager-v2.tsx') return id; if (id.endsWith('LoginDesktopViewer')) return 'virtual:login.tsx'; if (id.endsWith('.css')) return 'virtual:style' },
+      load(id) {
+        if (id === 'virtual:mcp-manager-v2.tsx') return source
+        if (id === 'virtual:style') return ''
+        if (id === 'virtual:login.tsx') return `import React from '${root}/node_modules/react/index.js'; export function LoginDesktopViewer() { return <div role="region" aria-label="MCP 로그인 화면">Login</div> }`
+      },
+    }],
+  })
+  const chunk = bundle.output.find(item => item.type === 'chunk')!
+  const content = (await Promise.all([
+    'src/components/mcp-manager.tsx',
+    'src/components/mcp-manager-fields.tsx',
+    'src/components/agent-harness-modal.tsx',
+    'src/components/shared-mcp-connection.tsx',
+    'packages/ui/src/select-field.tsx',
+  ].map(file => fs.readFile(path.join(root, file), 'utf8')))).join('\n')
+  const compiler = await compile(await fs.readFile(`${root}/src/index.css`, 'utf8'), { base: `${root}/src`, onDependency() {} })
+  const css = compiler.build([...new Set((source + content).match(/[A-Za-z0-9_@!:/.[\]()%,-]+/g))])
+  const browser = await connectTestBrowser()
+  t.after(() => browser.close())
+  const page = await browser.newPage({ viewport: { width: 1200, height: 844 }, locale: 'ko-KR', reducedMotion: 'reduce' })
+  page.setDefaultTimeout(5000)
+
+  const errors: string[] = []
+  const mutations: McpManagementMutation[] = []
+  const connectPayloads: Array<{ path: string; body: Record<string, unknown> }> = []
+  page.on('pageerror', error => errors.push(error.message))
+
+  const usage = (enabled = true) => ({ common: enabled, project: null, enabled })
+  const inventory: McpManagementInventory = {
+    canManage: true,
+    revision: { registry: 'r1', common: 'c1', project: 'p1' },
+    projectRoot: '/project',
+    groups: [{ id: 'cloudflare', name: 'Cloudflare', suggested: true, usage: usage(), members: ['bindings'], enabledCount: 1, readyCount: 0 }],
+    servers: [
+      { name: 'bindings', endpoint: 'https://bindings.mcp.cloudflare.com/mcp', transport: 'http', groupId: 'cloudflare', inferredGroup: true, usage: usage(), effectiveEnabled: true, connection: { status: 'needs_auth' } },
+      { name: 'search', endpoint: 'https://search.example.test/mcp', transport: 'http', groupId: null, inferredGroup: false, usage: usage(), effectiveEnabled: true, connection: { status: 'connected', toolCount: 3 } },
+      { name: 'docs', endpoint: 'https://docs.example.test/mcp', transport: 'http', groupId: null, inferredGroup: false, usage: usage(), effectiveEnabled: true, connection: { status: 'connected', toolCount: 2 } },
+    ],
+    cloudflare: { url: 'https://mcp.cloudflare.com/mcp', existingUnified: null, suggestedName: 'cloudflare-api', candidates: [] },
+  }
+  const harness: HarnessInventory = {
+    canManageSharedMcp: true,
+    scopes: [{ id: 'mew', label: 'Mew', path: 'Mew installation', global: true }, { id: 'global', label: '전역', path: '/home/test', global: true }],
+    agents: [{ id: 'mew', label: 'Mew' }, { id: 'claude', label: 'Claude' }],
+    locations: [{ id: 'mew-mcp', kind: 'mcp', agent: 'mew', scope: 'mew', label: 'Mew', path: 'Mew account MCP', writable: true }, { id: 'native', kind: 'mcp', agent: 'claude', scope: 'global', label: 'Claude', path: '/home/test/.claude.json', writable: true }],
+    items: [{ id: 'external-cloud', location: 'native', name: 'native-helper', description: 'Native Helper MCP', path: '/home/test/.claude.json', writable: true }],
+    warnings: [],
+  }
+  const liveStatuses = new Map<string, Record<string, unknown>>([
+    ['bindings', { name: 'bindings', status: 'needs_auth' }],
+    ['search', { name: 'search', status: 'connected', toolCount: 3, toolNames: ['web_search', 'page_fetch', 'cite'] }],
+    ['docs', { name: 'docs', status: 'connected', toolCount: 2, toolNames: ['read_doc', 'list_docs'] }],
+  ])
+
+  await page.route('http://mew-mcp-manager-v2.test/**', async route => {
+    const url = new URL(route.request().url())
+    if (url.pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: chunk.code })
+    if (url.pathname === '/api/agent/mcp-management') {
+      if (route.request().method() === 'POST') {
+        const value = route.request().postDataJSON() as McpManagementMutation
+        mutations.push(value)
+        if (value.action === 'create-server') {
+          inventory.servers.push({
+            name: value.name,
+            endpoint: 'stdio',
+            transport: 'stdio',
+            groupId: null,
+            inferredGroup: false,
+            usage: usage(),
+            effectiveEnabled: true,
+            connection: { status: 'disconnected' },
+          })
+          liveStatuses.set(value.name, { name: value.name, status: 'disconnected' })
+        }
+        return route.fulfill({ json: { ok: true } })
+      }
+      return route.fulfill({ json: inventory })
+    }
+    if (url.pathname === '/api/agent/harness/detail') {
+      return route.fulfill({ json: { item: harness.items[0], revision: 'rev-native', content: '{"type":"http","url":"https://helper.example.test/mcp"}', files: [] } })
+    }
+    if (url.pathname === '/api/agent/harness') {
+      if (route.request().method() === 'POST') {
+        const body = route.request().postDataJSON() as HarnessMutation
+        if (body.action === 'import') {
+          const importedName = body.name ?? 'native-helper'
+          inventory.servers.push({
+            name: importedName,
+            endpoint: 'https://helper.example.test/mcp',
+            transport: 'http',
+            groupId: null,
+            inferredGroup: false,
+            usage: usage(),
+            effectiveEnabled: true,
+            connection: { status: 'disconnected' },
+          })
+          liveStatuses.set(importedName, { name: importedName, status: 'disconnected' })
+        }
+        return route.fulfill({ json: { ok: true } })
+      }
+      return route.fulfill({ json: harness })
+    }
+    if (url.pathname === '/api/agent/mcp/status') {
+      const name = url.searchParams.get('name') ?? ''
+      return route.fulfill({ json: liveStatuses.get(name) ?? { name, status: 'disconnected' } })
+    }
+    if (url.pathname === '/api/agent/mcp/connect') {
+      const body = route.request().postDataJSON() as Record<string, unknown>
+      connectPayloads.push({ path: url.pathname, body })
+      const name = String(body.name)
+      if (body.mode === 'browser') {
+        const next = { name, status: 'needs_auth', authMode: 'browser', ownsJob: true }
+        liveStatuses.set(name, next)
+        return route.fulfill({ status: 202, json: next })
+      }
+      const next = { name, status: 'connected', toolCount: 1, toolNames: ['local_ping'] }
+      liveStatuses.set(name, next)
+      const server = inventory.servers.find(item => item.name === name)
+      if (server) server.connection = { status: 'connected', toolCount: 1 }
+      return route.fulfill({ status: 202, json: next })
+    }
+    if (url.pathname === '/api/agent/mcp/authorize-url') {
+      const body = route.request().postDataJSON() as Record<string, unknown>
+      connectPayloads.push({ path: url.pathname, body })
+      return route.fulfill({ json: { url: 'https://auth.example.test/authorize?state=test-state' } })
+    }
+    if (url.pathname === '/api/agent/mcp/callback') {
+      const body = route.request().postDataJSON() as Record<string, unknown>
+      connectPayloads.push({ path: url.pathname, body })
+      const name = String(body.name)
+      const next = { name, status: 'connected', toolCount: 2, toolNames: ['cf_list', 'cf_deploy'] }
+      liveStatuses.set(name, next)
+      const server = inventory.servers.find(item => item.name === name)
+      if (server) server.connection = { status: 'connected', toolCount: 2 }
+      inventory.groups[0].readyCount = 1
+      return route.fulfill({ json: next })
+    }
+    return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="dark" lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}html,body{margin:0}</style><div id="root"></div><script src="/app.js"></script></html>` })
+  })
+
+  await page.goto('http://mew-mcp-manager-v2.test/')
+  const opener = page.getByRole('button', { name: 'MCP 관리', exact: true })
+  assert.match((await opener.getAttribute('data-tip')) ?? '', /1/)
+  await opener.click()
+
+  // 1. Tool counts, group readyCount, and session sync banner + one-click apply
+  await page.getByRole('button', { name: 'Cloudflare 펼치기', exact: true }).waitFor()
+  assert.match(await page.getByRole('region', { name: 'Cloudflare', exact: true }).innerText(), /1\/1 사용 · 0 준비됨/)
+  assert.match(await page.getByRole('button', { name: 'search', exact: true }).innerText(), /도구 3/)
+  const applyButton = page.getByRole('button', { name: '현재 대화에 적용', exact: true })
+  await applyButton.waitFor()
+  await applyButton.click()
+  assert.equal(await page.evaluate(() => (globalThis as unknown as { __applied: number }).__applied), 1)
+  await opener.click()
+
+  // 2. Direct browser OAuth + manual callback paste flow
+  await page.getByRole('button', { name: 'Cloudflare 펼치기', exact: true }).click()
+  await page.getByRole('button', { name: 'bindings', exact: true }).click()
+  await page.getByRole('button', { name: '내 브라우저로 로그인', exact: true }).click()
+  await page.getByRole('button', { name: '로그인 페이지 열기', exact: true }).waitFor()
+  assert.deepEqual(connectPayloads.at(-1), { path: '/api/agent/mcp/connect', body: { name: 'bindings', mode: 'browser' } })
+  const callbackInput = page.getByRole('textbox', { name: '로컬 리다이렉트가 자동 완료되지 않았다면 이동된 URL을 붙여넣으세요', exact: true })
+  await callbackInput.fill('http://127.0.0.1:43210/mcp/callback/id?code=ok&state=test-state')
+  await page.getByRole('button', { name: '로그인 완료', exact: true }).click()
+  await page.getByText('확인된 도구 (2)', { exact: true }).click()
+  await page.getByText('cf_list', { exact: true }).waitFor()
+  assert.equal(connectPayloads.at(-1)?.path, '/api/agent/mcp/callback')
+
+  // 3. Preset selection + stdio mode (0 native <select>) + Save & Connect
+  await page.getByRole('button', { name: '연결 추가', exact: true }).click()
+  await page.getByRole('button', { name: 'GitHub', exact: true }).click()
+  assert.equal(await page.getByRole('textbox', { name: '연결 이름', exact: true }).inputValue(), 'github')
+  assert.match(await page.getByRole('textbox', { name: '서버 URL', exact: true }).inputValue(), /githubcopilot/)
+  await page.getByRole('combobox', { name: '연결 방식', exact: true }).click()
+  await page.getByRole('listbox', { name: '연결 방식', exact: true }).getByRole('option', { name: '로컬 명령 (stdio)', exact: true }).click()
+  assert.equal(await page.locator('select, datalist').count(), 0)
+  await page.getByRole('textbox', { name: '연결 이름', exact: true }).fill('local-stdio')
+  await page.getByRole('textbox', { name: '실행 명령', exact: true }).fill('npx')
+  await page.getByRole('textbox', { name: '인수 (한 줄에 하나)', exact: true }).fill('-y\n@example/mcp-server')
+  await page.getByRole('textbox', { name: '환경 변수 (한 줄에 KEY=VALUE, 선택)', exact: true }).fill('API_TOKEN=${MY_TOKEN}')
+  await page.getByRole('button', { name: '저장 후 연결', exact: true }).click()
+  await page.getByRole('heading', { name: 'local-stdio', exact: true }).waitFor()
+  const created = mutations.findLast(item => item.action === 'create-server') as { content: string }
+  assert.deepEqual(JSON.parse(created.content), { type: 'stdio', command: 'npx', args: ['-y', '@example/mcp-server'], env: { API_TOKEN: '${MY_TOKEN}' } })
+  assert.deepEqual(connectPayloads.at(-1), { path: '/api/agent/mcp/connect', body: { name: 'local-stdio' } })
+
+  // 4. Native import follow-up actions (never auto-deletes original; jumps to Mew MCP to connect)
+  await page.getByRole('button', { name: '외부 연결·고급 설정', exact: true }).click()
+  await page.getByRole('button', { name: 'native-helper Claude', exact: true }).click()
+  await page.getByRole('button', { name: 'Mew에 가져오기', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: 'Mew 공통으로 가져왔습니다' }).waitFor()
+  assert.equal(harness.items.length, 1, 'native original is preserved after import')
+  await page.getByRole('button', { name: '원본 중복 삭제', exact: true }).waitFor()
+  await page.getByRole('button', { name: 'Mew MCP에서 연결', exact: true }).click()
+  await page.getByRole('heading', { name: 'native-helper', exact: true }).waitFor()
+
+  // 5. Non-owner guidance on a needs_auth server
+  inventory.canManage = false
+  liveStatuses.set('native-helper', { name: 'native-helper', status: 'needs_auth' })
+  await page.getByRole('button', { name: '닫기', exact: true }).click()
+  await opener.click()
+  await page.getByRole('button', { name: 'native-helper', exact: true }).click()
+  await page.getByText(/소유자/).first().waitFor()
+  assert.equal(await page.getByRole('button', { name: '내 브라우저로 로그인', exact: true }).count(), 0)
+  await page.getByRole('button', { name: '닫기', exact: true }).click()
+  assert.deepEqual(errors, [])
+  await page.close()
+})
+

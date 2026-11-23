@@ -4130,7 +4130,22 @@ function AgentSessionView({
           >
             <InfoGlyph />
           </button>
-          <AgentHarnessButtons cwd={cwd} />
+          <AgentHarnessButtons
+            cwd={cwd}
+            sessionMcpServers={meta?.mcpServers}
+            canReloadSession={meta?.canLoad === true && !!meta?.sessionId}
+            canApplyMcpChanges={connected && !busy && (meta?.queued.length ?? 0) === 0}
+            onApplyMcpChanges={() => {
+              if (meta?.canLoad && meta.sessionId) {
+                previewTargetRef.current = meta.sessionId
+                setHistoryPreview(null)
+                setLoadingSession(meta.sessionId)
+                send({ type: 'load_session', sessionId: meta.sessionId })
+              } else {
+                clearSession()
+              }
+            }}
+          />
           {onOpenGuidanceFile && <AgentGuidanceButton workspacePath={notificationWorkspace} onOpenFile={onOpenGuidanceFile} />}
           <AgentQuotaBattery runtime={runtime} account={cacheAccount} enabled={visible && connected && !auth} />
         </div>
@@ -4149,6 +4164,7 @@ function AgentSessionView({
             value={modes ? (MODE_LABEL[modes.currentModeId] ?? modes.currentModeId) : '—'}
           />
           <InfoRow label={uiText("추론 정도")} value={thinking?.options.find((option) => option.id === thinking.currentValue)?.name ?? thinking?.currentValue ?? '—'} />
+          <InfoRow label="MCP" value={meta?.mcpServers?.length ? meta.mcpServers.join(', ') : '—'} title={meta?.mcpServers?.join(', ')} />
           <InfoRow label={uiText("대화 턴")} value={meta ? uiText("{p0}턴", { p0: nf.format(meta.turns) }) : '—'} />
           {usage ? (
             <>

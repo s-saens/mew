@@ -1,14 +1,14 @@
 import { useWorkspaceApi } from '../api/workspace-api-context.tsx'
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, Cloud, EditPencil, Folder, NavArrowRight, Plus, PlugTypeA, RefreshDouble, Settings, Trash, Xmark } from 'iconoir-react'
+import { ArrowLeft, Cloud, EditPencil, Folder, NavArrowRight, Plus, PlugTypeA, RefreshDouble, Settings, Trash, WarningTriangle, Xmark } from 'iconoir-react'
 import { canAutoFocusInput, SelectField, useOverlayDismiss } from '@mew/ui'
 import { uiText } from '@mew/ui/i18n-core'
 import { useUiLocale } from '@mew/ui/i18n'
 
 import { SharedMcpConnection } from './shared-mcp-connection'
 import { mcpManagerCopy } from './mcp-manager-copy'
-import { McpCloudflareFields, McpConnectionFields, McpGroupFields } from './mcp-manager-fields'
+import { buildMcpConnectionConfig, McpCloudflareFields, McpConnectionFields, McpGroupFields, type McpConnectionMode } from './mcp-manager-fields'
 import type { McpManagedGroup, McpManagedServer, McpManagementInventory, McpManagementMutation, McpUsageScope, McpUsageState } from '../../shared/mcp-management'
 import type { SharedMcpConnectionStatus } from '../../shared/shared-mcp'
 
@@ -18,21 +18,53 @@ const primary = `${button} bg-accent text-ink-on-accent hover:bg-accent/90`
 type Selection = { kind: 'server'; id: string } | { kind: 'group'; id: string } | null
 type Draft = 'connection' | 'group' | 'rename' | 'cloudflare' | null
 type MutationInput = McpManagementMutation extends infer M ? M extends McpManagementMutation ? Omit<M, 'cwd' | 'revision'> : never : never
+type CachedStatus = Pick<SharedMcpConnectionStatus, 'status' | 'error' | 'toolCount' | 'checkedAt'>
 
 function enabledIn(usage: McpUsageState, scope: McpUsageScope) { return scope === 'common' ? usage.common : usage.project ?? usage.common }
 
-export function McpManager({ cwd, onClose, onSwitchSkills, onOpenSources }: { cwd: string; onClose: () => void; onSwitchSkills: () => void; onOpenSources: () => void }) {
+function sameNameList(a: string[], b: string[]) {
+  if (a.length !== b.length) return false
+  const sortedA = [...a].sort(), sortedB = [...b].sort()
+  return sortedA.every((value, index) => value === sortedB[index])
+}
+
+export function McpManager({
+  cwd,
+  initialServer,
+  sessionMcpServers,
+  canReloadSession,
+  canApplyMcpChanges,
+  onApplyMcpChanges,
+  onClose,
+  onSwitchSkills,
+  onOpenSources,
+}: {
+  cwd: string
+  initialServer?: string
+  sessionMcpServers?: string[]
+  canReloadSession?: boolean
+  canApplyMcpChanges?: boolean
+  onApplyMcpChanges?: () => void
+  onClose: () => void
+  onSwitchSkills: () => void
+  onOpenSources: () => void
+}) {
   const { fetchMcpManagement, mutateMcpManagement } = useWorkspaceApi()
   const copy = mcpManagerCopy[useUiLocale()]
   const [inventory, setInventory] = useState<McpManagementInventory | null>(null)
   const [scope, setScope] = useState<McpUsageScope>('project'), [search, setSearch] = useState('')
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set()), [selection, setSelection] = useState<Selection>(null)
-  const [draft, setDraft] = useState<Draft>(null), [name, setName] = useState(''), [url, setUrl] = useState(''), [json, setJson] = useState(''), [advanced, setAdvanced] = useState(false)
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const [selection, setSelection] = useState<Selection>(() => initialServer ? { kind: 'server', id: initialServer } : null)
+  const [draft, setDraft] = useState<Draft>(null), [name, setName] = useState('')
+  const [connectionMode, setConnectionMode] = useState<McpConnectionMode>('url')
+  const [url, setUrl] = useState(''), [json, setJson] = useState('')
+  const [command, setCommand] = useState(''), [argsText, setArgsText] = useState(''), [cwdText, setCwdText] = useState(''), [envText, setEnvText] = useState('')
+  const [autoConnectTarget, setAutoConnectTarget] = useState<string | null>(null)
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(() => new Set())
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [reload, setReload] = useState(0)
   const [error, setError] = useState(''), [notice, setNotice] = useState('')
   const [confirmation, setConfirmation] = useState<{ text: string; label: string; action: () => void } | null>(null)
-  const [statuses, setStatuses] = useState<Record<string, Pick<SharedMcpConnectionStatus, 'status' | 'error'>>>({})
+  const [statuses, setStatuses] = useState<Record<string, CachedStatus>>({})
   const dialog = useRef<HTMLDivElement>(null), searchRef = useRef<HTMLInputElement>(null), headingRef = useRef<HTMLHeadingElement>(null), confirmRef = useRef<HTMLButtonElement>(null)
   const listId = useId(), confirmationId = useId()
   const canManage = inventory?.canManage === true
@@ -42,7 +74,11 @@ export function McpManager({ cwd, onClose, onSwitchSkills, onOpenSources }: { cw
   const group = selection?.kind === 'group' ? inventory?.groups.find(item => item.id === selection.id) : undefined
   const selectedGroup = server?.groupId ? inventory?.groups.find(group => group.id === server.groupId) : undefined
   const groupGate = selectedGroup ? enabledIn(selectedGroup.usage, scope) : true
-  const reset = () => { setSelection(null); setDraft(null); setName(''); setUrl(''); setJson(''); setAdvanced(false); setSelectedMembers(new Set()); setError('') }
+  const reset = () => {
+    setSelection(null); setDraft(null); setName(''); setConnectionMode('url')
+    setUrl(''); setJson(''); setCommand(''); setArgsText(''); setCwdText(''); setEnvText('')
+    setSelectedMembers(new Set()); setError(''); setAutoConnectTarget(null)
+  }
   const guarded = (action: () => void) => {
     if (busy) return
     if (draft) setConfirmation({ text: copy.dirty, label: copy.discard, action })
@@ -102,15 +138,37 @@ export function McpManager({ cwd, onClose, onSwitchSkills, onOpenSources }: { cw
       if (value === 'cloudflare') setName(inventory?.cloudflare.existingUnified ?? inventory?.cloudflare.suggestedName ?? 'cloudflare')
     })
   }
-  function openServer(item: McpManagedServer) { guarded(() => { reset(); setSelection({ kind: 'server', id: item.name }) }) }
+  function openServer(item: McpManagedServer, autoConnect = false) {
+    guarded(() => {
+      reset()
+      setSelection({ kind: 'server', id: item.name })
+      if (autoConnect && canManage) setAutoConnectTarget(item.name)
+    })
+  }
   function openGroup(item: McpManagedGroup) { guarded(() => { reset(); setSelection({ kind: 'group', id: item.id }) }) }
   function toggleMember(value: string) { setSelectedMembers(previous => { const next = new Set(previous); if (next.has(value)) next.delete(value); else next.add(value); return next }) }
+  function changeConnectionMode(nextMode: McpConnectionMode) {
+    if (nextMode === 'json' && connectionMode !== 'json') {
+      setJson(buildMcpConnectionConfig({ mode: connectionMode, url, json, command, argsText, cwdText, envText }))
+    }
+    setConnectionMode(nextMode)
+  }
+  function saveConnection(connectImmediately: boolean) {
+    const trimmedName = name.trim()
+    const content = buildMcpConnectionConfig({ mode: connectionMode, url, json, command, argsText, cwdText, envText })
+    mutate({ action: 'create-server', scope, name: trimmedName, content }, () => {
+      reset()
+      setSelection({ kind: 'server', id: trimmedName })
+      if (connectImmediately && canManage) setAutoConnectTarget(trimmedName)
+    })
+  }
   function saveDraft() {
     if (draft === 'group') mutate({ action: 'create-group', name, members: [...selectedMembers] }, reset)
     if (draft === 'rename' && group) mutate({ action: 'rename-group', id: group.id, name })
     if (draft === 'cloudflare') mutate({ action: 'consolidate-cloudflare', name, disable: cloudflareReady ? [...selectedMembers] : [], scope }, () => { reset(); if (!cloudflareReady) setSelection({ kind: 'server', id: name }) })
-    if (draft === 'connection') mutate({ action: 'create-server', scope, name, content: advanced ? json : JSON.stringify({ type: 'http', url }) }, () => { reset(); setSelection({ kind: 'server', id: name }) })
+    if (draft === 'connection') saveConnection(false)
   }
+  const connectionFormReady = connectionMode === 'json' ? !!json.trim() : connectionMode === 'stdio' ? !!command.trim() : !!url.trim()
   const matches = (item: McpManagedServer) => `${item.name} ${item.endpoint}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())
   const grouped = inventory?.groups.filter(group => !search || group.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()) || inventory.servers.some(server => server.groupId === group.id && matches(server))) ?? []
   const ungrouped = inventory?.servers.filter(server => !server.groupId && matches(server)) ?? []
@@ -118,6 +176,12 @@ export function McpManager({ cwd, onClose, onSwitchSkills, onOpenSources }: { cw
   const unifiedServer = inventory?.servers.find(server => server.name === unifiedName)
   const cloudflareReady = (unifiedName ? statuses[unifiedName] ?? unifiedServer?.connection : undefined)?.status === 'connected'
   const scopeOptions = [{ value: 'common', label: copy.common }, { value: 'project', label: copy.project }]
+  const expectedNextSession = inventory
+    ? inventory.servers.filter(item => item.effectiveEnabled && (statuses[item.name]?.status ?? item.connection?.status) === 'connected').map(item => item.name).sort()
+    : null
+  const sessionSyncVisible = sessionMcpServers !== undefined && expectedNextSession !== null
+  const hasSessionDiff = sessionSyncVisible && !sameNameList(sessionMcpServers, expectedNextSession)
+
   function readiness(item: McpManagedServer) {
     const connection = statuses[item.name] ?? item.connection
     return !connection ? copy.unknown : connection.status === 'connected' ? copy.ready : connection.status === 'needs_auth' ? copy.login : connection.status === 'error' ? copy.error : connection.status === 'connecting' ? copy.connecting : copy.disconnected
@@ -130,11 +194,23 @@ export function McpManager({ cwd, onClose, onSwitchSkills, onOpenSources }: { cw
   }
   function serverRow(item: McpManagedServer, gate = true, indent = false) {
     const status = statuses[item.name] ?? item.connection
+    const enabledHere = gate && enabledIn(item.usage, scope)
+    const needsConnect = !!status && status.status !== 'connected' && status.status !== 'connecting'
+    const quickActionLabel = status?.status === 'needs_auth' ? copy.loginNow : status?.status === 'error' ? copy.reconnectNow : copy.connectNow
     return <div key={item.name} className={`flex min-h-11 items-center gap-1 px-2 ${indent ? 'pl-6' : ''} ${selection?.kind === 'server' && selection.id === item.name ? 'bg-surface-hover' : ''}`}>
       <button type="button" aria-label={item.name} aria-pressed={selection?.kind === 'server' && selection.id === item.name} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded px-1 text-left hover:text-accent focus-visible:outline-2 focus-visible:outline-accent" onClick={() => openServer(item)}>
         {!indent && <PlugTypeA width={16} height={16} aria-hidden className="shrink-0 text-ink-secondary" />}
-        <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{item.name}</span><span className={`block truncate text-[11px] ${status?.status === 'error' ? 'text-danger-ink' : status?.status === 'connected' ? 'text-success-ink' : 'text-ink-secondary'}`}>{!gate ? copy.groupOff : readiness(item)}</span></span>
-      </button>{switchControl('server', item.name, item.usage)}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-xs font-medium">{item.name}</span>
+          <span className="flex items-center gap-1.5 truncate text-[11px]">
+            <span className={status?.status === 'error' ? 'text-danger-ink' : status?.status === 'connected' ? 'text-success-ink' : 'text-ink-secondary'}>{!gate ? copy.groupOff : readiness(item)}</span>
+            {gate && status?.status === 'connected' && typeof status.toolCount === 'number' && <span className="text-ink-secondary tabular-nums">· {copy.toolsUnit} {status.toolCount}</span>}
+            {enabledHere && needsConnect && <WarningTriangle width={12} height={12} aria-hidden className="shrink-0 text-ink-secondary" />}
+          </span>
+        </span>
+      </button>
+      {canManage && needsConnect && <button type="button" className={`${button} px-1.5`} aria-label={`${item.name} ${quickActionLabel}`} data-tip={quickActionLabel} disabled={busy} onClick={() => openServer(item, true)}>{status?.status === 'error' ? <RefreshDouble width={14} height={14} aria-hidden /> : <PlugTypeA width={14} height={14} aria-hidden />}</button>}
+      {switchControl('server', item.name, item.usage)}
     </div>
   }
   const title = draft === 'connection' ? copy.add : draft === 'group' ? copy.createGroup : draft === 'rename' ? copy.rename : draft === 'cloudflare' ? copy.cloudflareTitle : server?.name ?? group?.name ?? ''
@@ -157,6 +233,15 @@ export function McpManager({ cwd, onClose, onSwitchSkills, onOpenSources }: { cw
       {confirmation && <div role="alertdialog" aria-label={uiText('변경 확인')} aria-describedby={confirmationId} className="flex flex-wrap items-center gap-2 border-b border-edge bg-surface-raised px-3 py-2"><p id={confirmationId} className="min-w-0 flex-1 text-sm">{confirmation.text}</p><button type="button" className={button} onClick={() => setConfirmation(null)}>{copy.confirmCancel}</button><button ref={confirmRef} type="button" className={`${button} text-danger-ink`} onClick={() => { const action = confirmation.action; setConfirmation(null); action() }}>{confirmation.label}</button></div>}
       {error && <div role="alert" className="shrink-0 border-b border-edge px-3 py-2 text-xs text-danger-ink">{error}<button type="button" className={`${button} ml-1`} disabled={busy} onClick={() => guarded(() => setReload(value => value + 1))}>{uiText('다시 불러오기')}</button></div>}
       {notice && <p role="status" className="shrink-0 border-b border-edge px-3 py-2 text-xs text-ink-secondary">{notice}</p>}
+      {sessionSyncVisible && <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-edge bg-surface-raised px-3 py-1.5 text-xs">
+        <span className="min-w-0 flex-1 truncate text-ink-secondary">
+          {sessionMcpServers.length ? `${copy.sessionLoaded}: ${sessionMcpServers.join(', ')}` : copy.sessionNone}
+          {hasSessionDiff ? ` · ${copy.sessionPending}` : ''}
+        </span>
+        {hasSessionDiff && onApplyMcpChanges && <button type="button" className={primary} disabled={!canApplyMcpChanges || busy} data-tip={!canApplyMcpChanges ? copy.applyBusyHint : undefined} onClick={() => guarded(() => { onApplyMcpChanges(); onClose() })}>
+          <RefreshDouble width={14} height={14} aria-hidden />{canReloadSession ? copy.applyReload : copy.applyNew}
+        </button>}
+      </div>}
       <div className="flex min-h-0 flex-1" inert={confirmation ? true : undefined}>
         <aside className={`${showingDetail ? 'hidden md:flex' : 'flex'} min-h-0 w-full flex-col border-r border-edge md:w-96 md:shrink-0`}>
           <div className="flex gap-1 border-b border-edge p-2"><input ref={searchRef} className={`${input} w-full`} value={search} aria-label={copy.search} placeholder={copy.search} onChange={event => setSearch(event.target.value)} /><button type="button" className={button} aria-label={uiText('새로고침')} data-tip={uiText('새로고침')} disabled={busy || loading} onClick={() => guarded(() => setReload(value => value + 1))}><RefreshDouble width={16} height={16} aria-hidden /></button><button type="button" className={button} aria-label={copy.add} data-tip={copy.add} disabled={busy || loading || !canManage} onClick={() => startDraft('connection')}><Plus width={16} height={16} aria-hidden /></button></div>
@@ -170,11 +255,12 @@ export function McpManager({ cwd, onClose, onSwitchSkills, onOpenSources }: { cw
                 const isExpanded = expanded.has(item.id) || !!search
                 const gate = enabledIn(item.usage, scope)
                 const enabledCount = gate ? allMembers.filter(server => enabledIn(server.usage, scope)).length : 0
+                const readyCount = gate ? allMembers.filter(server => enabledIn(server.usage, scope) && (statuses[server.name]?.status ?? server.connection?.status) === 'connected').length : 0
                 const Icon = item.id === 'cloudflare' ? Cloud : Folder
                 return <section key={item.id} aria-label={item.name} className="border-b border-edge last:border-b-0">
                   <div className="flex min-h-12 items-center gap-0.5 px-2">
                     <button type="button" aria-label={`${item.name} ${isExpanded ? uiText('접기') : uiText('펼치기')}`} aria-expanded={isExpanded} aria-controls={`${listId}-${index}`} className="flex min-h-12 min-w-0 flex-1 items-center gap-2 rounded px-1 text-left hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-accent" onClick={() => setExpanded(previous => { const next = new Set(previous); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next })}>
-                      <NavArrowRight width={12} height={12} aria-hidden className={`shrink-0 transition-transform duration-150 motion-reduce:transition-none ${isExpanded ? 'rotate-90' : ''}`} /><Icon width={18} height={18} aria-hidden className="shrink-0 text-ink-secondary" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.name}</span><span className="block text-[11px] text-ink-secondary tabular-nums">{enabledCount}/{allMembers.length} {copy.used}</span></span>
+                      <NavArrowRight width={12} height={12} aria-hidden className={`shrink-0 transition-transform duration-150 motion-reduce:transition-none ${isExpanded ? 'rotate-90' : ''}`} /><Icon width={18} height={18} aria-hidden className="shrink-0 text-ink-secondary" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.name}</span><span className="block text-[11px] text-ink-secondary tabular-nums">{enabledCount}/{allMembers.length} {copy.used}{enabledCount > 0 ? ` · ${readyCount} ${copy.readyCount}` : ''}</span></span>
                     </button><button type="button" className={`${button} px-1.5`} aria-label={`${item.name} ${copy.manage}`} data-tip={copy.manage} disabled={busy} onClick={() => openGroup(item)}><Settings width={15} height={15} aria-hidden /></button>{switchControl('group', item.id, item.usage, item.name)}
                   </div>
                   <div id={`${listId}-${index}`} hidden={!isExpanded}>{members.length ? members.map(member => serverRow(member, gate, true)) : <p className="px-8 pb-3 text-xs text-ink-secondary">{copy.emptyGroup}</p>}</div>
@@ -201,17 +287,30 @@ export function McpManager({ cwd, onClose, onSwitchSkills, onOpenSources }: { cw
               {!canManage && <p className="text-xs text-ink-secondary">{copy.readonly}</p>}
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-              {draft === 'connection' ? <McpConnectionFields copy={copy} name={name} url={url} json={json} advanced={advanced} scope={scope} busy={busy} onName={setName} onUrl={setUrl} onJson={setJson} onToggleAdvanced={() => { setJson(JSON.stringify({ type: 'http', url }, null, 2)); setAdvanced(true) }} />
+              {draft === 'connection' ? <McpConnectionFields copy={copy} mode={connectionMode} name={name} url={url} json={json} command={command} argsText={argsText} cwdText={cwdText} envText={envText} scope={scope} busy={busy} onMode={changeConnectionMode} onName={setName} onUrl={setUrl} onJson={setJson} onCommand={setCommand} onArgsText={setArgsText} onCwdText={setCwdText} onEnvText={setEnvText} />
                 : draft === 'group' || draft === 'rename' ? <McpGroupFields copy={copy} name={name} busy={busy} onName={setName} servers={draft === 'group' ? inventory?.servers : undefined} selectedMembers={selectedMembers} onToggleMember={toggleMember} />
                 : draft === 'cloudflare' && inventory ? <McpCloudflareFields copy={copy} preview={inventory.cloudflare} name={name} scope={scope} busy={busy} ready={cloudflareReady} selectedMembers={selectedMembers} onName={setName} onToggleMember={toggleMember} />
                   : server ? <>
-                    <SharedMcpConnection key={`${server.name}:${reload}`} name={server.name} canManage={canManage} logoutLabel={copy.logout} onStatusChange={value => setStatuses(previous => ({ ...previous, [server.name]: { status: value.status, error: value.error } }))} />
+                    <SharedMcpConnection
+                      key={`${server.name}:${reload}`}
+                      name={server.name}
+                      canManage={canManage}
+                      logoutLabel={copy.logout}
+                      effectiveEnabled={server.effectiveEnabled}
+                      autoConnect={autoConnectTarget === server.name}
+                      onAutoConnectConsumed={() => setAutoConnectTarget(current => current === server.name ? null : current)}
+                      onStatusChange={value => setStatuses(previous => ({ ...previous, [server.name]: { status: value.status, error: value.error, toolCount: value.toolCount, checkedAt: value.checkedAt } }))}
+                    />
                     <div className="space-y-3 p-3"><SelectField label={copy.group} value={server.groupId ?? ''} disabled={busy || !canManage} onChange={value => mutate({ action: 'assign', names: [server.name], groupId: value || null })} options={[{ value: '', label: copy.ungrouped }, ...(inventory?.groups.map(group => ({ value: group.id, label: group.name })) ?? [])]} />
                       <dl className="space-y-1 text-xs"><dt className="text-ink-secondary">{copy.endpoint}</dt><dd className="select-text break-all leading-relaxed">{server.endpoint}</dd></dl><p className="text-[11px] leading-relaxed text-ink-secondary">{copy.sharedHint}</p><button type="button" className={`${button} -ml-2`} disabled={busy} onClick={() => guarded(onOpenSources)}><Settings width={14} height={14} aria-hidden />{copy.sources}</button><p className="text-[11px] leading-relaxed text-ink-secondary">{copy.externalHint}</p>
                     </div>
                   </> : group ? <div className="space-y-1 py-2"><h4 className="px-3 py-1 text-xs font-medium text-ink-secondary">{copy.members}</h4>{!group.members.length && <p className="px-3 py-2 text-xs leading-relaxed text-ink-secondary">{copy.membersEmpty}</p>}{inventory?.servers.filter(server => server.groupId === group.id).map(item => serverRow(item, enabledIn(group.usage, scope)))}{group.id === 'cloudflare' && canManage && <div className="border-t border-edge px-3 pt-2"><button type="button" className={button} disabled={busy} onClick={() => startDraft('cloudflare')}><Cloud width={16} height={16} aria-hidden />{copy.cloudflare}</button></div>}</div> : null}
             </div>
-            {draft && <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-edge p-2"><button type="button" className={button} disabled={busy} onClick={() => guarded(() => { setDraft(null); if (draft !== 'rename') reset() })}>{uiText('취소')}</button><button type="button" className={primary} disabled={busy || !name.trim() || !canManage || draft === 'connection' && !(advanced ? json.trim() : url.trim())} onClick={saveDraft}>{busy ? uiText('저장 중…') : draft === 'cloudflare' ? cloudflareReady ? copy.cloudflareApply : unifiedName ? copy.cloudflareConnect : copy.cloudflareStart : uiText('저장')}</button></footer>}
+            {draft && <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-edge p-2">
+              <button type="button" className={button} disabled={busy} onClick={() => guarded(() => { setDraft(null); if (draft !== 'rename') reset() })}>{uiText('취소')}</button>
+              {draft === 'connection' && <button type="button" className={button} disabled={busy || !name.trim() || !canManage || !connectionFormReady} onClick={() => saveConnection(true)}><PlugTypeA width={14} height={14} aria-hidden />{copy.saveAndConnect}</button>}
+              <button type="button" className={primary} disabled={busy || !name.trim() || !canManage || draft === 'connection' && !connectionFormReady} onClick={saveDraft}>{busy ? uiText('저장 중…') : draft === 'cloudflare' ? cloudflareReady ? copy.cloudflareApply : unifiedName ? copy.cloudflareConnect : copy.cloudflareStart : uiText('저장')}</button>
+            </footer>}
           </>}
         </main>
       </div>

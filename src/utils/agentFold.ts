@@ -53,6 +53,7 @@ export type SessionMeta = {
   usage: Usage | null
   canLoad: boolean
   canList: boolean
+  mcpServers?: string[]
 }
 
 export type SessionInfo = import('../../shared/agent-session-search').SessionSearchResult
