@@ -2,7 +2,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parseOptions } from '../src/options.mjs'
+import { detectInstallChannel, parseOptions } from '../src/options.mjs'
 import { runtimeTarget, prepareRuntime } from '../src/runtime.mjs'
 import { launch, runHost, openBrowser, runtimeEnvironment } from '../src/launcher.mjs'
 import { prepareBrowserDependencies } from '../src/browser-dependencies.mjs'
@@ -85,7 +85,10 @@ try {
   const options = parseOptions(process.argv.slice(2))
   if (options.help) console.log(help)
   else if (options.version) console.log(version)
-  else process.exitCode = await execute(options)
+  else {
+    options.installChannel ??= detectInstallChannel(packageRoot, options.installer)
+    process.exitCode = await execute(options)
+  }
 } catch (error) {
   console.error(`[mew] ${error.message}`)
   process.exitCode = 1

@@ -213,6 +213,11 @@ export interface MewUpdateStatus {
   branch: string | null
   localHash: string | null
   remoteHash: string | null
+  installChannel?: 'git' | 'curl' | 'npm' | 'windows' | 'termux' | 'unknown'
+  currentVersion?: string | null
+  latestVersion?: string | null
+  updateInstruction?: string | null
+  updateUrl?: string | null
   ahead: number
   behind: number
   available: boolean

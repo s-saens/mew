@@ -3,6 +3,16 @@ import path from 'node:path'
 import { parseEnv } from 'node:util'
 import { hostPaths } from './platform/index.mjs'
 
+export function detectInstallChannel(packageRoot, installer) {
+  if (installer) {
+    const marker = path.join(packageRoot, '.mew-install-channel')
+    if (!fs.existsSync(marker)) return undefined
+    const channel = fs.readFileSync(marker, 'utf8').trim()
+    return channel === 'npm' || channel === 'windows' ? channel : undefined
+  }
+  return fs.existsSync(path.join(packageRoot, '.mew-archive-sha256')) ? 'curl' : 'npm'
+}
+
 export function parseOptions(args, { env = process.env, cwd = process.cwd() } = {}) {
   const locations = hostPaths(env)
   const settingsIndex = args.indexOf('--settings')
@@ -30,6 +40,11 @@ export function parseOptions(args, { env = process.env, cwd = process.cwd() } = 
     else if (arg === '--no-open') options.open = false
     else if (arg === '--installer') { options.installer = true; options.open = false; options.foreground = true; options.autostart = false }
     else if (arg === '--service') { options.service = true; options.open = false; options.foreground = true; options.autostart = false }
+    else if (arg === '--install-channel') {
+      const channel = args[++i]
+      if (channel !== 'curl' && channel !== 'npm') throw new Error('Invalid Mew service installation channel.')
+      options.installChannel = channel
+    }
     else if (arg === '--foreground') options.foreground = true
     else if (arg === '--no-autostart') options.autostart = false
     else if (arg === '--setup-in-browser') { /* Browser setup is the default. */ }

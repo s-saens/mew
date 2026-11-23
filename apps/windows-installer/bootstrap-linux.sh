@@ -34,6 +34,9 @@ mkdir -p "$stage/node" "$stage/cli" "$stage/runtimes/$version-linux-x64-node24"
 tar --no-same-owner -xJf "$node_archive" --strip-components=1 -C "$stage/node"
 tar --no-same-owner -xzf "$runtime_archive" -C "$stage/runtimes/$version-linux-x64-node24"
 cp -R "$payload/cli/." "$stage/cli/"
+channel=windows
+if [ -f "$payload/npm-setup.ps1" ]; then channel=npm; fi
+printf '%s\n' "$channel" > "$stage/cli/.mew-install-channel"
 cp "$payload/launch-linux.sh" "$stage/launch.sh"
 chmod 755 "$stage/launch.sh"
 export PATH="$stage/node/bin:$PATH"

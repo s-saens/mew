@@ -21,13 +21,14 @@ test('Termux bootstrap installs verified source, runs setup and exposes the mew 
   const source = path.join(directory, 'source')
   const archive = path.join(directory, 'source.tar.gz')
   const installer = path.join(directory, 'install.sh')
-  const destination = path.join(home, '.local/opt/mew-termux-0.1.7')
+  const destination = path.join(home, '.local/opt/mew-termux-0.1.8')
+  const legacyDestination = path.join(home, '.local/opt/mew-termux-0.1.7')
   for (const folder of [home, bin, source]) await fs.mkdir(folder, { recursive: true })
   await fs.symlink('/bin/bash', path.join(bin, 'bash'))
   await fs.writeFile(path.join(source, 'package-lock.json'), '{}')
   await fs.writeFile(path.join(source, 'mew'), `set -e
 case "$1" in
-  setup) test ! -t 0; test "$*" = "setup --termux-defaults"; test -z "${'$'}{TEST_FAIL_SETUP:-}"; printf 'setup\\n' >> setup.log ;;
+  setup) test ! -t 0; test "$*" = "setup --termux-defaults"; test -s .mew-install-version; test -z "${'$'}{TEST_FAIL_SETUP:-}"; printf 'setup\\n' >> setup.log ;;
   *) printf '<%s>\\n' "$0" "$@" ;;
 esac
 `)
@@ -67,9 +68,25 @@ esac
   await assert.rejects(fs.stat(launcher), { code: 'ENOENT' })
 
   await run()
+  assert.equal(await fs.readFile(path.join(destination, '.mew-install-version'), 'utf8'), '0.1.8\n')
+  await fs.rename(destination, legacyDestination)
+  await fs.unlink(path.join(legacyDestination, '.mew-install-version'))
   await run({ TEST_ARCHIVE: '/missing' })
-  assert.equal(await fs.readFile(path.join(destination, 'setup.log'), 'utf8'), 'setup\nsetup\n')
+  assert.equal(await fs.readFile(path.join(legacyDestination, '.mew-install-version'), 'utf8'), '0.1.8\n')
+  assert.equal(await fs.readFile(path.join(legacyDestination, 'setup.log'), 'utf8'), 'setup\nsetup\n')
   const { stdout } = await exec('mew', ['users', 'a b', ''], { cwd: directory, env })
-  assert.equal(stdout, '<' + path.join(destination, 'mew') + '>\n<users>\n<a b>\n<>\n')
-  await assert.rejects(fs.stat(destination + '.lock'), { code: 'ENOENT' })
+  assert.equal(stdout, '<' + path.join(legacyDestination, 'mew') + '>\n<users>\n<a b>\n<>\n')
+  await assert.rejects(fs.stat(legacyDestination + '.lock'), { code: 'ENOENT' })
+
+  const updated = path.join(home, '.local/opt/mew-termux-0.1.9')
+  await fs.writeFile(installer, (await fs.readFile(installer, 'utf8'))
+    .replace(/^version=.+$/m, 'version=0.1.9')
+    .replace(/^revision=.+$/m, 'revision=' + 'e'.repeat(40)))
+  await fs.mkdir(legacyDestination + '.lock')
+  await assert.rejects(run(), error => /Installation is locked/.test(error.stdout))
+  await fs.rmdir(legacyDestination + '.lock')
+  await run()
+  assert.equal(await fs.readFile(path.join(updated, '.mew-install-version'), 'utf8'), '0.1.9\n')
+  assert.equal((await exec('mew', ['status'], { cwd: directory, env })).stdout, '<' + path.join(updated, 'mew') + '>\n<status>\n')
+  assert.equal(await fs.readFile(path.join(legacyDestination, 'setup.log'), 'utf8'), 'setup\nsetup\n')
 })

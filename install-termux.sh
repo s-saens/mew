@@ -5,8 +5,8 @@ revision=c9030bb988d99b86a2085e7b82d8886188eced88
 checksum=ebd51f44e4a6b5144477d1b5889d76003f55c4e5119e5ed0d455c5c5af265410
 version=0.1.8
 release_url="https://github.com/s-saens/mew/releases/download/mew-termux-v$version"
-install_dir="$HOME/.local/opt/mew-termux-0.1.7"
-marker="$install_dir/.mew-termux-source"
+install_dir="$HOME/.local/opt/mew-termux-$version"
+legacy_dir="$HOME/.local/opt/mew-termux-0.1.7"
 
 fail() { printf '[mew] %s\n' "$*" >&2; exit 1; }
 
@@ -30,7 +30,8 @@ check_launcher
 [ -x "$bin/bash" ] && [ -w "$bin" ] || fail "Termux needs a writable command directory and Bash in $bin."
 
 mkdir -p -- "$(dirname -- "$install_dir")"
-lock="$install_dir.lock"
+# Serialize setup across versions because settings and the public launcher are shared.
+lock="$legacy_dir.lock"
 mkdir -- "$lock" 2>/dev/null || fail "Installation is locked. If the installer has stopped, remove: $lock"
 cleanup() {
   if [ -n "${launcher_temp:-}" ]; then rm -rf -- "$launcher_temp"; fi
@@ -39,6 +40,12 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+
+if [ ! -e "$install_dir" ] && [ ! -L "$install_dir" ] && [ ! -L "$legacy_dir" ] &&
+  [ -f "$legacy_dir/.mew-termux-source" ] && [ "$(cat "$legacy_dir/.mew-termux-source")" = "$revision" ]; then
+  install_dir="$legacy_dir"
+fi
+marker="$install_dir/.mew-termux-source"
 
 if [ -e "$install_dir" ] || [ -L "$install_dir" ]; then
   [ ! -L "$install_dir" ] && [ -f "$marker" ] && [ "$(cat "$marker")" = "$revision" ] &&
@@ -60,6 +67,8 @@ else
 fi
 
 printf '[mew] Running setup in %s\n' "$install_dir" >&2
+printf '%s\n' "$version" > "$lock/version"
+mv -fT -- "$lock/version" "$install_dir/.mew-install-version"
 cd -- "$install_dir"
 bash ./mew setup --termux-defaults </dev/null
 

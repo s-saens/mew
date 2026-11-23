@@ -106,7 +106,7 @@ import { createLoginDesktopAuthSession, createLoginDesktopRoutes, closeLoginDesk
 import { createTodo, deleteTodo, listTodos, TodoError, updateTodo, type TodoChange } from './todos.ts'
 import { currentWorkspace, switchDocsRoot, switchWorkspace, switchWorktree, WorkspaceError } from './workspace.ts'
 import { collectSystemStats } from './sysStats.ts'
-import { MEW_APP_ROOT, MEW_UPDATE_SESSION, mewUpdateStatus, mewUpdateRunning, readMewUpdateJob, needsMewUpdate, writeMewUpdateJob, isReleaseDistribution, RELEASE_UPDATE_MESSAGE } from './mewUpdate.ts'
+import { MEW_APP_ROOT, MEW_UPDATE_SESSION, mewUpdateStatus, mewUpdateRunning, readMewUpdateJob, needsMewUpdate, writeMewUpdateJob, isPackagedMew, isReleaseDistribution, RELEASE_UPDATE_MESSAGE } from './mewUpdate.ts'
 import { listSkills } from './skills.ts'
 import { createAgentHarnessRouter } from './agent-harness-routes.ts'
 import { createSkillLibraryRouter } from './skill-library-routes.ts'
@@ -202,7 +202,7 @@ const MEW_ACTIONS = {
 let mewActionStarting = false
 function mewActionRunning(sessions: { name: string }[]): boolean {
   return mewActionStarting || sessions.some(session => Object.entries(MEW_ACTIONS).some(([id, action]) => id !== 'update' && action.session === session.name))
-    || !isReleaseDistribution() && mewUpdateRunning(readMewUpdateJob(), sessions.some(session => session.name === MEW_UPDATE_SESSION))
+    || !isPackagedMew() && mewUpdateRunning(readMewUpdateJob(), sessions.some(session => session.name === MEW_UPDATE_SESSION))
 }
 
 const UPLOAD_TEMP_DIR = path.join(DATA_DIR, 'uploads')
@@ -623,7 +623,7 @@ export function createApiApp() {
 
   app.get('/mew-update/status', requireFeature('system'), async (req, res) => {
     try {
-      const running = !isReleaseDistribution() && (await tmuxManager.list()).some((session) => session.name === MEW_UPDATE_SESSION)
+      const running = !isPackagedMew() && (await tmuxManager.list()).some((session) => session.name === MEW_UPDATE_SESSION)
       res.json(await mewUpdateStatus(req.query.refresh === '1', running))
     } catch (err) {
       handleError(res, err)
@@ -641,6 +641,10 @@ export function createApiApp() {
         return
       }
       if (isReleaseDistribution()) { res.status(409).json({ error: RELEASE_UPDATE_MESSAGE }); return }
+      if (id === 'update' && isPackagedMew()) {
+        res.status(409).json({ error: 'Mew를 중지한 뒤 새 Termux 설치 스크립트로 업데이트하세요.' })
+        return
+      }
       if (updatesRunning()) { res.status(409).json({ error: '의존성 업데이트가 끝난 뒤 실행해 주세요' }); return }
       const sessions = await tmuxManager.list()
       if (updatesRunning()) { res.status(409).json({ error: '의존성 업데이트가 끝난 뒤 실행해 주세요' }); return }

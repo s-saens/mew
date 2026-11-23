@@ -53,6 +53,32 @@ function Fixture(){const [open,setOpen]=React.useState(true);const [mew,setMew]=
       await page.getByText('Codex CLI', { exact: true }).waitFor()
       assert.equal(await page.getByRole('columnheader', { name: '현재 버전' }).count(), 1)
       assert.equal(await page.getByRole('columnheader', { name: '최신 버전' }).count(), 1)
+      const mewRow = page.getByRole('row').filter({ has: page.getByRole('cell', { name: 'Mew', exact: true }) })
+      assert.equal(await mewRow.getByRole('cell', { name: 'abc123', exact: true }).count(), 1)
+      assert.equal(await mewRow.getByRole('cell', { name: 'def456', exact: true }).count(), 1)
+      const release = {
+        ...mew, canUpdate: false, installChannel: 'curl', localHash: null, remoteHash: null,
+        currentVersion: '1.2.3', latestVersion: '1.3.0', error: null,
+        updateInstruction: 'Mew를 중지한 뒤 새 설치 스크립트를 실행하세요.',
+        updateUrl: 'https://github.com/s-saens/mew/releases/tag/mew-cli-v1.3.0',
+      }
+      await page.evaluate(value => (globalThis as any).setMew(value), release)
+      await mewRow.getByRole('cell', { name: '1.2.3', exact: true }).waitFor()
+      assert.equal(await mewRow.getByRole('cell', { name: '1.3.0', exact: true }).count(), 1)
+      assert.equal(await mewRow.getByText('Mew 수동 업데이트 필요', { exact: true }).count(), 1)
+      assert.equal(await mewRow.getByRole('button', { name: '업데이트', exact: true }).count(), 0)
+      assert.equal(await page.getByText(release.updateInstruction).count(), 1)
+      const download = page.getByRole('link', { name: '다운로드', exact: true })
+      assert.equal(await download.getAttribute('href'), release.updateUrl)
+      await page.evaluate(value => (globalThis as any).setMew(value), { ...release, updateUrl: 'https://github.com@suspicious.test/s-saens/mew/releases/tag/v1.3.0' })
+      await download.waitFor({ state: 'hidden' })
+      assert.equal(await page.getByRole('alert').count(), 0)
+      assert.equal(await page.getByRole('dialog').evaluate(el => el.scrollWidth <= el.clientWidth), true)
+      await page.evaluate(value => (globalThis as any).setMew(value), { ...release, currentVersion: '1.3.0', available: false })
+      await mewRow.getByRole('button', { name: '최신', exact: true }).waitFor()
+      assert.equal(await page.getByText(release.updateInstruction).count(), 0)
+      await page.evaluate(value => (globalThis as any).setMew(value), mew)
+      await mewRow.getByRole('button', { name: '업데이트', exact: true }).waitFor()
       assert.equal(await page.getByRole('row').filter({ hasText: 'Node.js' }).getByRole('button', { name: '업데이트', exact: true }).isDisabled(), true)
       assert.equal(await page.getByRole('row').filter({ hasText: 'react' }).getByRole('button', { name: '업데이트', exact: true }).isDisabled(), true)
       assert.equal(await page.getByRole('button', { name: 'Codex CLI 터미널 세션', exact: true }).isDisabled(), true)

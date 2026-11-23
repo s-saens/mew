@@ -1,6 +1,6 @@
 ---
 title: "Getting started with mew"
-updated: "2026-11-17"
+updated: "2026-11-23"
 description: "Covers npm, the WSL/Linux/macOS curl bootstrap, source setup, and the Termux source installer. Includes platform prerequisites, data preservation, initial setup, remote access, and Mewlink two-factor sign-in."
 ---
 
@@ -36,7 +36,7 @@ The installer uses defaults without asking for a workspace, port, or database co
 
 On Windows x64, run the command in **CMD or PowerShell**. Mew prepares its dedicated WSL environment and opens the Windows browser; you do not enter Ubuntu commands or install Linux Node.js yourself. Windows may require administrator approval and a restart. Login startup launches the owned environment after sign-in. Existing unrelated WSL distributions are preserved.
 
-On Linux/macOS, Mew registers login startup. Run `npx mew-ide` again to reopen it, `npx mew-ide status` to check it, or `npx mew-ide stop` to stop it while preserving data. Use `--foreground` for terminal-owned execution or `--no-autostart` to omit login registration. To update, stop the running instance and run `npx mew-ide@latest`.
+On Linux/macOS, Mew registers login startup. Run `npx mew-ide` again to reopen it, `npx mew-ide status` to check it, or `npx mew-ide stop` to stop it while preserving data. Use `--foreground` for terminal-owned execution or `--no-autostart` to omit login registration. See [Running and updating](#running-and-updating) for updates.
 
 After creating the administrator, configure agents in **Agent Set**, then choose **Mewlink**, **Tailscale**, or **Cloudflare Tunnel** in the remote-access popup. Reopen agent setup from **Menu → Agent Set**. **Menu → Mewlink** opens the same popup later. Provider sign-in is separate from local installation.
 
@@ -66,7 +66,7 @@ The convenience command is installed at `~/.local/bin/mew-ide`. The script print
 ~/.local/bin/mew-ide stop
 ```
 
-Running the command again reopens Mew. `stop` preserves account and database data; `disable-autostart` removes Mew's login registration. To update a curl installation, stop it and rerun the curl command after a newer installer is published.
+Running the command again reopens Mew. `stop` preserves account and database data. `disable-autostart` removes Mew's login registration. See [Running and updating](#running-and-updating) for updates.
 
 ### Install from source
 
@@ -171,13 +171,13 @@ From a native Termux terminal, download the pinned Mew source and run setup in o
 pkg install -y curl && curl -fsSL https://github.com/s-saens/mew/releases/download/mew-termux-v0.1.8/install-termux.sh | bash
 ```
 
-Setup installs source in `~/.local/opt/mew-termux-0.1.7` and uses defaults without prompting. A fresh setup uses `~/mew-workspace` and picks a port starting at 5000. It preserves existing configuration and prepares a local PostgreSQL database when no external `DATABASE_URL` is configured. After the local authentication endpoint responds, setup prints the first-owner link and opens it in the phone browser when `termux-open-url` is available. Keep the link private.
+The installer uses defaults without prompting. New installers place the source in `~/.local/opt/mew-termux-<version>` and reuse existing settings and data. A fresh setup uses `~/mew-workspace` and picks a port starting at 5000. It prepares a local PostgreSQL database when no external `DATABASE_URL` is configured. After the local authentication endpoint responds, setup prints the first-owner link and opens it in the phone browser when `termux-open-url` is available. Keep the link private.
 
 Termux is experimental and full setup has not been verified. When running the source setup directly in Termux, it offers to install a missing Node LTS and npm, compiler, make, Python, and tmux using `pkg` without sudo. If Node fails to start because of mismatched Termux libraries, update the installed Termux packages with `pkg update` and `pkg upgrade`, then check `node --version` before retrying.
 
 After setup, run `mew help`, `mew status`, `mew start`, `mew stop`, or `mew logs` from any folder. The installer puts the command in Termux's `$PREFIX/bin`. To replace an expired or exposed link on a running instance, run `mew setup-link`.
 
-If setup reports an HTTP startup failure, check the server log at the path in its error. The downloaded source has no Git history, so install a newer version using its installer. Server-side Chrome and Playwright features are unavailable on native Termux.
+If setup reports an HTTP startup failure, check the server log at the path in its error. For a newer version, follow [Running and updating](#running-and-updating). Server-side Chrome and Playwright features are unavailable on native Termux.
 
 ### Finish setup
 
@@ -336,7 +336,21 @@ Open panels from the dock and drag tabs to arrange them. On phones, switch panel
 
 ## Running and updating
 
-Run these from the mew repository. On Windows, use the Ubuntu terminal. Setup and update install missing browser dependencies. Start and restart check them without installing; restart checks before stopping the running server. If this check fails, repair dependencies interactively, then retry your normal start or restart command:
+Open **Menu → Updates → Check Again** to compare your running version with the latest one available through your installation method. If Mew finds a newer version, follow the instructions under **Mew** in the update list.
+
+| How you installed Mew | How to update |
+| --- | --- |
+| Cloned the Git repository and ran `./mew setup` | Use **Update** in Mew when the built-in launcher manages it, or run `./mew update` from the clone. For systemd or another supervisor, use the [deployment procedure](../deployment/native.md#4-updates-backups-and-failure-checks). |
+| Ran the curl installer | Stop Mew with `mew-ide stop`, then run the release installer shown in **Updates** from the same terminal environment you used to install Mew. |
+| Ran `npx mew-ide` | Stop Mew with `npx mew-ide stop`, then run `npx mew-ide@latest`. On Windows, use CMD or PowerShell. |
+| Ran the Windows setup wizard | Download and run the newer setup EXE from the release shown in **Updates**. If Mew was already running, sign out of Windows, sign back in, and reopen Mew to start the new version. |
+| Ran the Termux installer | Run `mew stop`, then run the newer Termux installer shown in **Updates**. |
+
+If the check is unavailable, use the same installation method you used before. Reuse any custom data or workspace settings so the installer can find your existing files.
+
+### Source launcher commands
+
+Run these from the Mew repository. On Windows, use the Ubuntu terminal. Setup and update install missing browser dependencies. Start and restart check them before launching. If this check fails, repair dependencies interactively, then retry your normal start or restart command.
 
 ```bash
 npm run browsers:install
@@ -356,7 +370,7 @@ An existing ordinary Chrome is reused. Chromium follows Mew's pinned Playwright 
 ./mew users add you@example.com owner
 ```
 
-`./mew update` uses a fast-forward pull. For installations started with `./mew start`, you can also check for updates and install them from the app menu. Servers managed by systemd or another supervisor follow the separate [deployment and update procedure](../deployment/native.md).
+`./mew update` uses a fast-forward pull.
 
 Settings and runtime data live outside the clone by default:
 

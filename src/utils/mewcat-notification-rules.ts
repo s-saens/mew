@@ -1,4 +1,5 @@
 import type { AgentEvent } from './agentFold.ts'
+import type { MewUpdateStatus } from '../api/client.ts'
 
 export type NoticeKind = 'complete' | 'stopped' | 'error' | 'permission' | 'cpu' | 'memory' | 'gpu' | 'temperature' | 'test' | 'updates' | 'chat'
 export type NoticeLevel = 'success' | 'warning' | 'danger'
@@ -10,6 +11,16 @@ export interface NoticeInput {
   updateVersions?: string[]
   chatConversation?: string
   target?: { tabId: string; cwd: string; workspacePath?: string } | 'system' | 'updates' | 'chat'
+}
+
+export function mewUpdateNoticeVersion(
+  status: Pick<MewUpdateStatus, 'available' | 'installChannel' | 'latestVersion' | 'remoteHash'>,
+): string | null {
+  if (!status.available) return null
+  if (status.installChannel && status.installChannel !== 'git' && status.latestVersion) {
+    return `mew:${status.installChannel}:${status.latestVersion}`
+  }
+  return status.remoteHash ? `mew:${status.remoteHash}` : null
 }
 
 /** Consume live events only. Replays restore the conversation, never announce old work. */

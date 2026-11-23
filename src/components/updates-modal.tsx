@@ -65,6 +65,12 @@ export function UpdatesModal({ open, mew, mewUpdating, onMewUpdate, onRefreshMew
   const button = 'whitespace-nowrap rounded border border-edge px-1.5 py-1.5 text-xs hover:bg-surface-hover disabled:opacity-40'
   const mewFailed = mew?.job?.state === 'failed'
   const mewReady = !!mew?.canUpdate && (!!mew.available || mewFailed)
+  const currentVersion = mew?.currentVersion ?? mew?.localHash
+  const latestVersion = mew?.latestVersion ?? mew?.remoteHash
+  const showManualUpdate = !!mew?.available && !mew.canUpdate && !!mew.updateInstruction
+  const instruction = showManualUpdate || mew?.error ? mew?.updateInstruction : null
+  const updateUrl = mew?.updateUrl?.match(/^https:\/\/github\.com\/s-saens\/mew\/releases(?:\/tag\/[a-zA-Z0-9][a-zA-Z0-9.-]*)?$/)?.[0]
+  const mewNote = mew?.error ?? ((mew?.available || mewFailed) && !mew?.canUpdate && !instruction ? uiText('터미널에서 업데이트해 주세요.') : null)
   const popupState = popup?.id === 'mew' ? mew?.job?.state : status?.job.items.find(item => item.id === popup?.id && item.session === popup?.session)?.state
   const showSession = (id: string, label: string, session: string) => setPopup({ id, label, session })
   if (!open) return null
@@ -101,13 +107,19 @@ export function UpdatesModal({ open, mew, mewUpdating, onMewUpdate, onRefreshMew
         <thead className="sticky top-0 bg-surface text-ink-secondary"><tr><th className="w-[32%] py-2 font-medium">{uiText('항목')}</th><th className="w-[18%] font-medium">{uiText('현재 버전')}</th><th className="w-[18%] font-medium">{uiText('최신 버전')}</th><th className="w-[32%] text-right font-medium">{uiText('업데이트')}</th></tr></thead>
         <tbody>
           <tr className="border-t border-edge align-top">
-            <td className="py-2 pr-2">Mew{(mew?.error || (mew?.available || mewFailed) && !mew?.canUpdate) && <p className="mt-1 text-ink-secondary break-words">{mew?.error ?? uiText('터미널에서 업데이트해 주세요.')}</p>}{mew?.job && <UpdateProgress state={mew.job.state} />}</td>
-            <td className="py-2 break-all pr-2 tabular-nums">{mew?.localHash ?? '—'}</td><td className="py-2 break-all pr-2 tabular-nums">{mew?.remoteHash ?? '—'}</td>
+            <td className="py-2 pr-2">Mew{mewNote && <p className="mt-1 text-ink-secondary break-words">{mewNote}</p>}{mew?.job && <UpdateProgress state={mew.job.state} />}</td>
+            <td className="py-2 break-all pr-2 tabular-nums">{currentVersion ?? '—'}</td><td className="py-2 break-all pr-2 tabular-nums">{latestVersion ?? '—'}</td>
             <td className="py-2"><div className="flex flex-wrap items-center justify-end gap-0.5">
-              <button className={button} disabled={busy || !mewReady} onClick={() => void update([], true)}>{uiText(mewUpdating || mew?.running ? '업데이트 중…' : mewFailed ? '다시 시도' : mew?.available ? '업데이트' : mew?.localHash && mew.remoteHash && !mew.error ? '최신' : '확인 불가')}</button>
+              {showManualUpdate
+                ? <span className="py-1.5 text-right text-ink-secondary">{uiText('Mew 수동 업데이트 필요')}</span>
+                : <button className={button} disabled={busy || !mewReady} onClick={() => void update([], true)}>{uiText(mewUpdating || mew?.running ? '업데이트 중…' : mewFailed ? '다시 시도' : mew?.available ? '업데이트' : currentVersion && latestVersion && !mew?.error ? '최신' : '확인 불가')}</button>}
               {canViewSessions && <SessionButton label="Mew" session={mew?.session} onOpen={session => showSession('mew', 'Mew', session)} />}
             </div></td>
           </tr>
+          {instruction && <tr><td colSpan={4} className="pb-2 break-words whitespace-pre-line text-ink-secondary">
+            {instruction}
+            {updateUrl && <a href={updateUrl} target="_blank" rel="noopener noreferrer" className="ml-1.5 inline-block text-accent underline">{uiText('다운로드')}</a>}
+          </td></tr>}
           {(['agent', 'system', 'dependency'] as const).map(category => <CategoryRows key={category} category={category} status={status} busy={busy} button={button} update={ids => void update(ids)} showSession={canViewSessions ? showSession : undefined} />)}
         </tbody>
       </table>

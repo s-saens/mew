@@ -1,7 +1,7 @@
 ---
 title: "CLI Releases and npm Publishing"
-description: "Release procedure for the mew-ide npm package, curl installer, and platform runtime archives. Covers the public 0.1.5 GitHub assets, separate native Windows CI, and installation acceptance."
-updated: "2026-11-18"
+description: "Release procedure for the mew-ide npm package, curl installer, and platform runtime archives. Covers the public 0.1.5 GitHub assets, update-channel checks, separate native Windows CI, and installation acceptance."
+updated: "2026-11-23"
 상위파일:
   - "../../../docs/deployment/native.md"
   - "../development/cli-distribution.md"
@@ -69,7 +69,7 @@ Before publishing, verify that the full texts of the root `LICENSE` and `apps/cl
 `.github/workflows/cli-release.yml` runs in the following order.
 
 1. Match the version in `apps/cli/package.json` to the `mew-cli-v<version>` tag.
-2. Build four Node.js 24 runtimes on Ubuntu 22.04 and macOS 15, each on x64 and arm64. Each job installs the locked dependencies, runs the runtime and CLI tests, builds the app, and packages its archive and checksum. A fifth job tests and packages the standalone CLI and shell installer.
+2. Build four Node.js 24 runtimes on Ubuntu 22.04 and macOS 15, each on x64 and arm64. Each job installs locked dependencies, tests the runtime, CLI, and [release update checks](../features/appearance-accounts-operations/application-updates-and-operations.md#mew-version-checks-by-installation-method), builds the app, and packages its archive and checksum. A fifth job tests and packages the standalone CLI and shell installer.
 3. After all five jobs succeed, a tag run can publish through the protected `cli-release` environment. The release contains four runtime archives, `mew-cli-standalone.tar.gz`, `install.sh`, and the `SHA256SUMS` manifest covering those six files. Repeated runs verify existing files against the manifest. Publish a new version if the bytes change. Update the public `main/install.sh` entry after accepting its matching runtime release.
 4. For subsequent npm publications, dispatch the workflow on the same tag with `publish_npm=true`. The job downloads the published files, checks all six entries, and publishes through the protected `npm-publish` environment.
 

@@ -33,6 +33,8 @@ export function runtimeEnvironment(runtime, options, env = process.env) {
   const environment = {
     ...env,
     MEW_DISTRIBUTION: 'release',
+    MEW_INSTALL_CHANNEL: options.installChannel || '',
+    MEW_INSTALL_VERSION: options.installVersion || '',
     MEW_OWNER_EMAIL: options.ownerEmail || '',
     MEW_WORKSPACE: options.workspace,
     MEW_DATA_DIR: options.dataDir,
@@ -192,7 +194,7 @@ export async function launch({ prepare, options, version, target, prepareBrowser
     const runtime = await prepare({ cacheDir: options.cacheDir, version, target, log: options.installer ? console.error : console.log })
     await prepareBrowsers(runtime, { env: runtimeEnvironment(runtime, options), installer: options.installer, checkOnly: options.service })
     database = await prepareDatabase(runtime, { dataDir: options.dataDir, databaseUrl: options.databaseUrl, env: runtimeEnvironment(runtime, options) })
-    return await host(runtime, { ...options, databaseUrl: database.databaseUrl, databaseFailure: database.failure })
+    return await host(runtime, { ...options, installVersion: version, databaseUrl: database.databaseUrl, databaseFailure: database.failure })
   } finally {
     try { await database?.stop() } finally { try { await control?.close() } finally { await unlock() } }
   }

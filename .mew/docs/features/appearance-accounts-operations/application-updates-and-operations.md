@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "App updates and operations access"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-18"
+updated: "2026-11-23"
 status_hash: "24b9ec9b4721cf44a384c60d727d8f59e62a1ffb0c0e48aad1304d2d19c99816"
-files: ["server/mewUpdate.ts", "server/runMewUpdate.ts", "server/updates.ts", "server/updateSessions.ts", "server/runUpdates.ts", "server/updateProcess.ts", "src/components/updates-modal.tsx", "shared/updates.ts"]
+files: ["server/mewUpdate.ts", "server/mewReleaseUpdate.ts", "server/runMewUpdate.ts", "server/updates.ts", "server/updateSessions.ts", "server/runUpdates.ts", "server/updateProcess.ts", "src/components/updates-modal.tsx", "shared/updates.ts"]
 commits: []
-description: "Feature contract for the update screen, source update jobs, standalone agent and system-tool updates, and preserved command output. Covers Codex standalone release discovery and prebuilt Mew updates through the original installer."
+description: "Defines the update screen, Mew version checks by Git, curl, npm, Windows wizard, and Termux installation channel, and preserved source update jobs. Covers standalone agent and system-tool updates, notifications, and manual installer guidance."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -29,7 +29,7 @@ description: "Feature contract for the update screen, source update jobs, standa
 - Run the Mew update last, after all dependency tasks succeed.
 
 - Run Mew, agent, and tool updates in dedicated tmux sessions, and retain output and results in those sessions. Tasks continue when the update screen is closed; reopen a session using the item's terminal icon.
-- Mew updates run pull, dependency installation, build, and restart in order. If the build fails, do not restart the server; provide failure status, logs, and a retry option.
+- Git-based Mew updates run pull, dependency installation, build, and restart in order. On build failure, keep the running server and provide failure status, logs, and a retry option.
 - Even if an update fails after pull, retries are not blocked merely because the Git commit is up to date. Reopening the page restores the job state and access to the session.
 
 ### Boundaries and limitations
@@ -37,12 +37,26 @@ description: "Feature contract for the update screen, source update jobs, standa
 - App npm dependencies and bundled ACP adapters are excluded from latest-version checks, notifications, and individual and batch updates. Mew updates install the lockfile combination from the commit, and legacy `npm:*` API requests are also rejected.
 
 - The deployment documentation is the detailed canonical source for execution, configuration, HTTPS, and backups.
-- This feature documentation cleanup does not run updates, builds, or restarts.
 
 ### Detailed contracts
 
-- [Updates, Deployment, and Backups](../../../../docs/deployment/native.md) · [Account and Appearance Settings](../../../../docs/configuration/appearance.md) · [Execution and Validation Invariants](../../development/getting-started.md)
+- [Running and updating](../../../../docs/guides/getting-started-en.md#running-and-updating) · [Deployment and backups](../../../../docs/deployment/native.md) · [Execution and verification](../../development/getting-started.md)
 - [Update Terminal Session Decision](../../decisions/0022-update-terminal-sessions.md)
+
+### Mew version checks by installation method
+
+The Mew row checks the channel that supplied the running app. Git installations compare `HEAD` with the clone's configured `origin/main`. The source update button remains available on `main` when the built-in launcher manages the running server.
+
+| Installation method | Version source |
+| --- | --- |
+| curl, including curl inside WSL | Published stable `mew-cli-vX.Y.Z` releases with the installer, standalone launcher, checksum manifest, and the runtime archive for the host |
+| npm, including npm on Windows | The npm registry's `mew-ide@latest` |
+| Windows setup wizard | Published stable `mew-windows-vX.Y.Z` releases with the installer EXE and its checksum |
+| Termux installer | Published `mew-termux-vX.Y.Z` releases with the installer script and source archive, including releases marked as prerelease |
+
+The app compares release version numbers within each channel. When it finds a newer version, it shows both versions in **Updates**, notifies the user through Mewcat, and gives instructions for the original installer. For curl, the instructions point to the exact release installer. Users start the packaged update themselves. The browser excludes these updates from **Update All**. The server blocks the Git update job for packaged installations and also blocks build and restart jobs for prebuilt runtimes.
+
+If installation metadata is missing or a lookup fails, the screen shows that the check is unavailable. An unrecognized packaged installation keeps the original-installer guidance. The check stays outside the Git repository and its source update state. [Installation channel decision](../../decisions/0212-installation-channel-updates.md)
 
 ### Execution and Session Viewing
 
@@ -83,9 +97,13 @@ description: "Feature contract for the update screen, source update jobs, standa
 
 - 2026-10-03: Isolated tests with actual commands replaced verified the update order and that subsequent steps stop when pull, installation, build, or restart fails. Passed 16 update-related server tests, 1 desktop and mobile UI tests, type checking, oxlint on changed update files, the UI detector, and shell syntax checks. Verified retries with Git up to date after a build failure and mobile display of long logs. No actual installation, build, or restart was run. Documentation link checks passed, while documentation boundary checks failed due to an existing missing `todo/docs` registration.
 
+- 2026-10-14: Isolated API tests verified that prebuilt installs do not run source management commands. The tests did not perform a source update, application restart, or deployment.
+
 - 2026-10-19: Passed 22 update-related server tests. In isolated tmux sessions using harmless commands, verified independent worker execution after the launching process exited, success of the next batch item after the first item failed, session log retention, restoration of disk state by a new process, `0600` permissions on the state file, and dead-worker detection.
 
 - 2026-10-19: Passed 1 isolated Chromium tests using mock update state and terminals at 1100px and 390px. Verified per-item session access and output, reopening after closing, hidden session buttons for users without `terminal` permission, absence of a Force Quit button, explicit refresh and session retention after Mew succeeds, failure retries, and horizontal overflow. Type checking, global lint, the targeted UI detector, 3 translation dictionary tests, and `npm run check:docs` also passed. Global lint has existing warnings, and the global UI text check failed due to 361 existing missing translations; this update screen had 0 new missing translations. No actual update installation, build, or server restart was run.
+
+- 2026-11-23: The project build and lint passed. Thirty-five focused tests covered release selection, Git update behavior, API guards, runtime packaging, and desktop and mobile update views. The CLI suite passed 80 tests and skipped the optional live PostgreSQL test. Five portable Windows installer tests passed. The five PowerShell tests could not complete because WSL interop timed out. Live read-only queries found downloadable curl and Termux releases. The documentation checker reported no description errors and 39 existing link errors. No installers were published and no running Mew instance was restarted.
 
 <!-- mew:validation:end -->
 
@@ -93,10 +111,10 @@ description: "Feature contract for the update screen, source update jobs, standa
 
 Update jobs use the server's `process.execPath` and run scripts with Bash. The same runtime is also prepended to PATH for installation and builds and passed through `MEW_NODE` for restarts, avoiding effects from a different Node version in tmux or script execution permissions. The user runs the actual update.
 
-The X, Clear All, and Open Updates actions in Mewcat update notifications store the displayed app remote hash and latest tool versions in the browser. The same versions do not trigger notifications on reconnect, while newly discovered versions that have not been dismissed trigger notifications again. A shorter list resulting from updating some items is not treated as a new update. The update screen remains accessible from the menu.
+The X, Clear All, and Open Updates actions in Mewcat update notifications store the displayed app remote hash or channel and release version, along with the latest tool versions. The browser suppresses dismissed versions on reconnect and reports newly discovered versions. A shorter list after an update does not trigger a notification. The update screen remains accessible from the menu.
 
 Validation (2026-10-06): Ran related server and isolated Chromium tests, TypeScript, and targeted lint. No actual update installation, build, or server restart was performed.
 
-### Operational Boundaries for the Prebuilt CLI (2026-10-14)
+### Prebuilt CLI operations
 
-Under `MEW_DISTRIBUTION=release`, Mew status queries do not read or modify Git or source update job files. The server rejects app build, restart, and pull jobs and individual updates of bundled tmux, and instructs users to stop Mew and rerun their original installer: `npx mew-ide@latest` or the newer published curl script. External standalone agents retain the existing individual-update rules and blocking rules while running. Follows the [CLI Distribution Contract](../../development/cli-distribution.md). Isolated API and update validation confirmed that source commands are not called; no actual source update, application restart, or deployment was run by those fixtures.
+The prebuilt CLI also blocks individual updates of bundled tmux. External standalone agents keep their individual-update rules and running-process checks. See the [CLI distribution contract](../../development/cli-distribution.md).

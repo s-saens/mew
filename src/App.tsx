@@ -50,6 +50,7 @@ import { useMobileKeyboard } from './hooks/use-mobile-keyboard'
 import { adjacentDockPanel, visibleDockPanels, type MobileDockPanel } from './utils/mobile-dock'
 import { handleDockShortcut } from './utils/dock-shortcuts'
 import { OPEN_NOTICE_EVENT, publishMewcatNotice, type MewcatNotice } from './utils/mewcat-notifications'
+import { mewUpdateNoticeVersion } from './utils/mewcat-notification-rules'
 import { SidebarCreateButtons } from './components/sidebar-create-buttons'
 import { ScopeToggle } from './components/scope-toggle'
 import { ExplorerDatabaseButton } from './components/explorer-database-button'
@@ -580,7 +581,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       setMewUpdate(status)
       if (!announce) return
       if (status.error) showToast(uiText("업데이트를 확인하지 못했습니다: {p0}", { p0: status.error }))
-      else if (status.available && !status.canUpdate) showToast(uiText("새 버전이 있습니다. 터미널에서 업데이트해 주세요."))
+      else if (status.available && !status.canUpdate) {
+        showToast(uiText(status.updateInstruction ? "Mew 수동 업데이트 필요" : "새 버전이 있습니다. 터미널에서 업데이트해 주세요."))
+      }
       else if (status.available) showToast(uiText("origin/main에 새 커밋 {p0}개가 있습니다", { p0: status.behind }))
       else showToast(uiText("Mew가 최신 버전입니다"))
     } catch (err) {
@@ -597,7 +600,8 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         setMewUpdate(mew)
         if (mew.running || mew.job?.state === 'queued' || mew.job?.state === 'running') setMewUpdating(true)
         const labels = [...(mew.available ? ['Mew'] : []), ...dependencies.items.filter(item => item.available).map(item => item.label)]
-        if (labels.length) publishMewcatNotice({ updateVersions: [...(mew.available && mew.remoteHash ? [`mew:${mew.remoteHash}`] : []), ...dependencies.items.filter(item => item.available && item.latest).map(item => `${item.id}:${item.latest}`)], key: 'updates:available', kind: 'updates', level: 'warning', source: uiText('{p0}개 업데이트: {p1}', { p0: labels.length, p1: labels.slice(0, 3).join(', ') + (labels.length > 3 ? '…' : '') }), target: 'updates' })
+        const appVersion = mewUpdateNoticeVersion(mew)
+        if (labels.length) publishMewcatNotice({ updateVersions: [...(appVersion ? [appVersion] : []), ...dependencies.items.filter(item => item.available && item.latest).map(item => `${item.id}:${item.latest}`)], key: 'updates:available', kind: 'updates', level: 'warning', source: uiText('{p0}개 업데이트: {p1}', { p0: labels.length, p1: labels.slice(0, 3).join(', ') + (labels.length > 3 ? '…' : '') }), target: 'updates' })
       }).catch(() => { /* Each failed check remains visible in the update screen. */ })
     })
     return () => { alive = false; cancel() }
@@ -609,7 +613,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       return
     }
     if (!mewUpdate.canUpdate) {
-      showToast(mewUpdate.error ?? uiText("터미널에서 업데이트해 주세요."))
+      showToast(mewUpdate.error ?? mewUpdate.updateInstruction ?? uiText("터미널에서 업데이트해 주세요."))
       return
     }
     setMewUpdating(true)

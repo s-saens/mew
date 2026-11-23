@@ -1,7 +1,7 @@
 ---
 title: "Single-Command Execution and Prebuilt Distribution"
-description: "Defines unattended mew-ide execution shared by npm and curl installation, managed Postgres, private control sockets, background/login startup, dedicated and existing Windows WSL paths, browser-first administrator setup, and Linux/macOS runtime distribution. Publication and clean-platform acceptance remain separate."
-updated: "2026-11-18"
+description: "Defines unattended mew-ide execution for npm and curl installations, managed Postgres, private control sockets, background/login startup, Windows WSL, browser-first administrator setup, and runtime distribution. Covers installation identity for update checks, publication, and clean-platform acceptance."
+updated: "2026-11-23"
 상위파일:
   - "architecture.md"
   - "../operations/cli-release.md"
@@ -60,7 +60,7 @@ The POSIX daemon exposes only a private local socket in a mode-0700 control dire
 
 The runtime then starts `server/cli-host.js` as a separate process. IPC in `cli-host.ts` carries listener addresses, the private first-owner setup URL and refresh requests, public remote status, and explicit legacy owner-creation responses. It does not send registration keys or login-session tokens. The raw setup capability travels only to the trusted launcher and browser, not ordinary logs. The [first-administrator contract](first-owner-setup.md) defines the installer stdin/stdout protocol. Parent termination, IPC disconnection, and SIGINT/SIGTERM cause the host to shut down.
 
-The launcher sets `MEW_DISTRIBUTION=release`. App update status checks in this distribution do not call Git. It rejects source builds, restarts, pull operations, and individual updates to bundled tmux, and directs users to stop Mew and rerun their installation entry: `npx mew-ide@latest` or the newer published curl script. Existing update boundaries for external agents remain in place. Automatic replacement of the running app is not provided, and npx also handles checking the latest npm version.
+The launcher sets `MEW_DISTRIBUTION=release` and passes its installation channel and version to the host. Installation identity travels with the launcher through background and login startup. A curl installation stays on the GitHub release channel, while an npm installation follows the npm registry, including npm on Windows. The Windows setup wizard follows its own releases. The [app update contract](../features/appearance-accounts-operations/application-updates-and-operations.md#mew-version-checks-by-installation-method) defines version checks, installer guidance, and which actions the server permits.
 
 ## Verification and application
 

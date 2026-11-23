@@ -117,6 +117,7 @@ export function daemonControl(options, { notify = message => { if (process.conne
 
 export function serviceArguments(options) {
   return ['--service', '--workspace', options.workspace, '--data-dir', options.dataDir, '--cache-dir', options.cacheDir,
+    ...(options.installChannel ? ['--install-channel', options.installChannel] : []),
     ...(!options.explicitPort && options.port === 5000 ? [] : ['--port', String(options.port)]),
     ...(options.settingsFile ? ['--settings', options.settingsFile] : []),
     ...(options.ownerEmail ? ['--owner-email', options.ownerEmail] : [])]

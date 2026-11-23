@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import { ORIGINAL_INSTALLER_MESSAGE, packagedMewInstall, packagedMewUpdate, type MewInstallChannel } from './mewReleaseUpdate.ts'
 import { stateDir } from './config.ts'
 import { updateWorkerAlive } from './updateSessions.ts'
 
@@ -11,9 +12,14 @@ export const MEW_UPDATE_SESSION = 'mewcmd-mew-update'
 const UPDATE_JOB_FILE = path.join(stateDir(), 'update-job.json')
 const PID_FILE = path.join(stateDir(), 'mew.pid')
 
-export const RELEASE_UPDATE_MESSAGE = '실행 중인 Mew를 중지한 뒤 원래 설치 명령을 다시 실행하세요(npm: npx mew-ide@latest, curl: 설치 스크립트 재실행). 계정과 작업 데이터는 유지됩니다.'
+export const RELEASE_UPDATE_MESSAGE = ORIGINAL_INSTALLER_MESSAGE
 export function isReleaseDistribution(): boolean {
-  return process.env.MEW_DISTRIBUTION === 'release'
+  const install = packagedMewInstall(MEW_APP_ROOT)
+  return install !== null && install.channel !== 'termux'
+}
+
+export function isPackagedMew(): boolean {
+  return packagedMewInstall(MEW_APP_ROOT) !== null
 }
 
 export type MewUpdateJob = {
@@ -25,6 +31,11 @@ export type MewUpdateJob = {
 }
 
 export type MewUpdateStatus = {
+  installChannel?: MewInstallChannel
+  currentVersion?: string | null
+  latestVersion?: string | null
+  updateInstruction?: string | null
+  updateUrl?: string | null
   supported: boolean
   canUpdate: boolean
   branch: string | null
@@ -100,11 +111,13 @@ export function mewUpdateRunning(job: MewUpdateJob | null, sessionExists: boolea
 }
 
 export async function mewUpdateStatus(refreshRemote: boolean, sessionExists: boolean): Promise<MewUpdateStatus> {
-  if (isReleaseDistribution()) {
+  const install = packagedMewInstall(MEW_APP_ROOT)
+  if (install) {
     return {
-      supported: false, canUpdate: false, branch: null, localHash: null, remoteHash: null,
-      ahead: 0, behind: 0, available: false, dirty: false, running: false,
-      managedByMew: false, error: RELEASE_UPDATE_MESSAGE, job: null, session: null,
+      ...await packagedMewUpdate(install, refreshRemote),
+      canUpdate: false, branch: null, localHash: null, remoteHash: null,
+      ahead: 0, behind: 0, dirty: false, running: false,
+      managedByMew: false, job: null, session: null,
     }
   }
   let job = readMewUpdateJob()
@@ -116,6 +129,7 @@ export async function mewUpdateStatus(refreshRemote: boolean, sessionExists: boo
     writeMewUpdateJob(job)
   }
   const base = {
+    installChannel: 'git' as const,
     supported: false,
     canUpdate: false,
     branch: null,
@@ -131,6 +145,10 @@ export async function mewUpdateStatus(refreshRemote: boolean, sessionExists: boo
     job,
     session: sessionExists ? MEW_UPDATE_SESSION : null,
   } satisfies MewUpdateStatus
+
+  if (!fs.existsSync(path.join(MEW_APP_ROOT, '.git'))) {
+    return { ...base, installChannel: 'unknown', error: 'Git으로 설치한 Mew를 찾지 못했습니다.' }
+  }
 
   try {
     const branch = await git(['branch', '--show-current'])

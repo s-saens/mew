@@ -47,6 +47,7 @@ test('packager stages pinned payload and LF shell sources, runs only isolated np
         assert.equal(command, 'mock-iscc')
         assert.ok(args.includes(`/DPayload=${staged}`))
         assert.deepEqual(JSON.parse(readFileSync(path.join(staged, 'install-manifest.json'), 'utf8')), manifest)
+        assert.equal(existsSync(path.join(staged, 'npm-setup.ps1')), false, 'the wizard payload must remain distinct from the npm installer')
         for (const file of ['bootstrap-linux.sh', 'launch-linux.sh', 'verify-linux.sh']) assert.equal(readFileSync(path.join(staged, file)).includes(13), false, `emitted ${file} must use LF`)
         execFileSync(process.execPath, ['-e', 'require("fs").writeFileSync(process.argv[1], "unsigned mock installer")', path.join(output, 'mew-windows-setup-x64.exe')])
       }

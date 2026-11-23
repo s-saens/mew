@@ -21,3 +21,25 @@ export function primeReleaseVersion(value: string): string {
   if (!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(version)) throw new Error('Prime 최신 버전을 읽지 못했습니다')
   return version
 }
+
+export function newer(current: string | null, latest: string | null): boolean {
+  if (!current || !latest || current === latest) return false
+  const parse = (value: string) => value.match(/(?:^|\s|v)(\d+)\.(\d+)(?:\.(\d+))?(?:-([\w.-]+))?/)
+  const a = parse(current), b = parse(latest)
+  if (!a || !b) return false
+  for (let i = 1; i <= 3; i++) { const diff = Number(b[i] ?? 0) - Number(a[i] ?? 0); if (diff) return diff > 0 }
+  if (a[4] && !b[4]) return true
+  if (!a[4] && b[4]) return false
+  if (a[4] && b[4]) {
+    const left = a[4].split('.'), right = b[4].split('.')
+    for (let i = 0; i < Math.max(left.length, right.length); i++) {
+      if (left[i] === right[i]) continue
+      if (left[i] === undefined) return true
+      if (right[i] === undefined) return false
+      const l = /^\d+$/.test(left[i]), r = /^\d+$/.test(right[i])
+      if (l !== r) return l
+      return l ? Number(right[i]) > Number(left[i]) : right[i] > left[i]
+    }
+  }
+  return false
+}

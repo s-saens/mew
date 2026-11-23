@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { mewUpdateNoticeVersion } from './mewcat-notification-rules.ts'
 
 test('dismissed update versions survive reload and only new versions notify again', async () => {
   const storage = new Map<string, string>([['mew:dismissed-update-versions', '["mew:old"]']])
@@ -18,4 +19,13 @@ test('dismissed update versions survive reload and only new versions notify agai
   assert.equal(delivered.length, 1)
   notices.publishMewcatNotice({ ...input, key: 'newer', updateVersions: ['tool:2'] })
   assert.equal(delivered.length, 2)
+})
+
+test('release notices distinguish installers and preserve existing Git dismissal keys', () => {
+  const release = { available: true, latestVersion: '1.2.3', remoteHash: null }
+  assert.equal(mewUpdateNoticeVersion({ ...release, installChannel: 'curl' }), 'mew:curl:1.2.3')
+  assert.equal(mewUpdateNoticeVersion({ ...release, installChannel: 'npm' }), 'mew:npm:1.2.3')
+  assert.equal(mewUpdateNoticeVersion({ ...release, installChannel: 'curl', available: false }), null)
+  assert.equal(mewUpdateNoticeVersion({ available: true, remoteHash: 'abc123' }), 'mew:abc123')
+  assert.equal(mewUpdateNoticeVersion({ available: true, remoteHash: 'abc123', installChannel: 'git' }), 'mew:abc123')
 })

@@ -5,7 +5,7 @@ import path from 'node:path'
 import os from 'node:os'
 import { EventEmitter } from 'node:events'
 import { controlPath, daemonControl, requestDaemon, startBackground, serviceArguments, saveLaunchSettings } from '../src/daemon.mjs'
-import { parseOptions } from '../src/options.mjs'
+import { detectInstallChannel, parseOptions } from '../src/options.mjs'
 import { runHost } from '../src/launcher.mjs'
 
 async function fixture(t) {
@@ -67,12 +67,26 @@ test('a failed background start surfaces its log location', async t => {
 test('login settings preserve an external database privately without putting its credentials in argv', async t => {
   const options = await fixture(t)
   options.databaseUrl = 'postgres://user:private-password@localhost/mew'
+  options.installChannel = 'curl'
   const settings = await saveLaunchSettings(options)
   const args = serviceArguments(settings)
   assert.equal(args.some(arg => arg.includes('private-password')), false)
   const restored = parseOptions(args, { cwd: options.workspace, env: {} })
   assert.equal(restored.databaseUrl, options.databaseUrl)
+  assert.equal(restored.installChannel, 'curl')
   if (process.platform !== 'win32') assert.equal((await fs.stat(settings.settingsFile)).mode & 0o777, 0o600)
+})
+
+test('installation identity uses curl and Windows payload markers', async t => {
+  const { workspace } = await fixture(t)
+  assert.equal(detectInstallChannel(workspace, false), 'npm')
+  assert.equal(detectInstallChannel(workspace, true), undefined)
+  await fs.writeFile(path.join(workspace, '.mew-archive-sha256'), 'a'.repeat(64) + '\n')
+  assert.equal(detectInstallChannel(workspace, false), 'curl')
+  for (const channel of ['npm', 'windows', 'unknown']) {
+    await fs.writeFile(path.join(workspace, '.mew-install-channel'), channel + '\n')
+    assert.equal(detectInstallChannel(workspace, true), channel === 'unknown' ? undefined : channel)
+  }
 })
 
 test('daemon reopen consumes only requested readiness and recovers after a missing reply', async () => {
