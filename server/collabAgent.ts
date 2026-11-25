@@ -39,6 +39,7 @@ interface AgentState {
   awareness: Awareness
   connection: RoomConnection
   absPath: string
+  diskBody: string | undefined
   watcher: fs.FSWatcher
   timer: NodeJS.Timeout | null
 }
@@ -208,13 +209,15 @@ function reconcile(roomKey: string): void {
     return
   }
 
-  // 앱(자동저장·커밋)이 방금 쓴 메아리면 무시 — 외부(AI) 변경만 주입한다
-  if (consumeAppWrite(state.absPath, content)) return
-
   const { body } = splitFrontmatter(content)
+  const sameDiskBody = body === state.diskBody
+  state.diskBody = body
+  // Duplicate watcher events and frontmatter-only edits can arrive while the room is ahead of disk.
+  // Advance the disk baseline even when this event acknowledges an app save.
+  if (consumeAppWrite(state.absPath, content) || sameDiskBody) return
+
   const storage = state.editor.storage as { markdown?: { getMarkdown(): string } }
   const current = storage.markdown?.getMarkdown() ?? ''
-  // 본문이 그대로면(예: frontmatter만 바뀐 외부 편집) 방을 건드리지 않는다
   if (body === current) return
 
   // setContent(문자열)은 tiptap-markdown이 마크다운으로 파싱한다. emitUpdate:false여도 ySyncPlugin이
@@ -282,7 +285,13 @@ async function onOpen(roomKey: string, room: CollabRoom): Promise<void> {
     abandon()
     return
   }
-  agents.set(roomKey, { editor, ydoc, awareness, connection, absPath, watcher, timer: null })
+  let diskBody: string | undefined
+  try {
+    diskBody = splitFrontmatter(fs.readFileSync(absPath, 'utf-8')).body
+  } catch {
+    // A missing or unreadable file can become available on the next watcher event.
+  }
+  agents.set(roomKey, { editor, ydoc, awareness, connection, absPath, diskBody, watcher, timer: null })
 }
 
 function onClose(roomKey: string): void {

@@ -80,7 +80,7 @@ function connectClient(port: number, roomKey: string) {
   return { doc, awareness, ws, opened, agentSeen }
 }
 
-test('외부 디스크 편집은 agent로 방에 주입되고, 앱 메아리는 무시된다', async () => {
+test('the disk bridge relays external body edits and preserves newer room text on repeated autosave events', async () => {
   const project = `ztest${process.pid}${Math.random().toString(36).slice(2, 6)}`
   const projectDir = path.join(WORKSPACE_ROOT, project)
   const absPath = path.join(projectDir, 'doc.md')
@@ -106,12 +106,40 @@ test('외부 디스크 편집은 agent로 방에 주입되고, 앱 메아리는 
     await waitFor('외부 편집이 클라이언트 doc까지 도달한다', () => fragText(client.doc).includes('AI가 고친 한 줄'))
 
     // ── 앱 자동저장(메아리) → 무시 ──
-    const echo = withFm('앱이 저장한 다른 줄\n')
+    const echo = withFm('A newer autosave\n')
+    const paragraph = client.doc.getXmlFragment('default').get(0) as Y.XmlElement
+    const text = paragraph.get(0) as Y.XmlText
+    client.doc.transact(() => {
+      text.delete(0, text.length)
+      text.insert(0, 'A newer autosave')
+      const fragment = client.doc.getXmlFragment('default')
+      for (const line of ['Unsaved first line', 'Unsaved second line']) {
+        const nextParagraph = new Y.XmlElement('paragraph')
+        const nextText = new Y.XmlText()
+        nextText.insert(0, line)
+        nextParagraph.insert(0, [nextText])
+        fragment.push([nextParagraph])
+      }
+    })
+    const unsaved = fragText(client.doc)
     noteAppWrite(absPath, echo) // 앱이 쓴 것으로 먼저 기록
     fs.writeFileSync(absPath, echo, 'utf-8')
     await new Promise((r) => setTimeout(r, 600)) // 주입될 시간을 충분히 준 뒤에 없음을 확인
-    assert.ok(!fragText(client.doc).includes('앱이 저장한 다른 줄'), '앱 메아리는 방에 주입되면 안 된다')
-    assert.ok(fragText(client.doc).includes('AI가 고친 한 줄'), '메아리 무시 후에도 이전 내용이 유지되어야 한다')
+    assert.equal(fragText(client.doc), unsaved)
+
+    // A later watcher event can report the same autosave after the ledger entry was consumed.
+    const now = new Date()
+    fs.utimesSync(absPath, now, now)
+    await new Promise((r) => setTimeout(r, 600))
+    assert.equal(fragText(client.doc), unsaved)
+
+    // An external edit to properties keeps the same disk body while the room is ahead.
+    fs.writeFileSync(absPath, echo.replace('title: "T"', 'title: "Updated"'), 'utf-8')
+    await new Promise((r) => setTimeout(r, 600))
+    assert.equal(fragText(client.doc), unsaved)
+
+    fs.writeFileSync(absPath, withFm('A new external body\n'), 'utf-8')
+    await waitFor('a new external body reaches the room', () => fragText(client.doc).includes('A new external body'))
   } finally {
     client.ws.close()
     client.awareness.destroy()
