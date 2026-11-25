@@ -296,7 +296,7 @@ Open **Git** from the dock to see changed files and commit history. Open a file 
 
 ### Collaboration and sharing
 
-Edit documents together and use comments, mentions, and chat. Roles, features, and file permissions control access for other accounts and guests.
+Edit documents together and use comments and mentions. Roles, features, and file permissions control access for other accounts and guests.
 
 [Collaboration and sharing](collaboration.md) · [Security](../operations/security.md).
 

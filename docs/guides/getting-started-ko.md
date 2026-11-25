@@ -236,9 +236,9 @@ View changed files and commit history in **Git** in the dock. Open files to revi
 
 ### Collaboration and sharing
 
-Edit documents together and use comments, mentions, and chat. Guest sharing and access by other accounts depend on roles, feature permissions, and file permissions.
+Edit documents together and use comments and mentions. Guest sharing and access by other accounts depend on roles, feature permissions, and file permissions.
 
-[Collaboration, comments, chat, and sharing](collaboration.md) · [Security](../operations/security.md).
+[Collaboration, comments, and sharing](collaboration.md) · [Security](../operations/security.md).
 
 <a id="terminals-agents-and-automation"></a>
 

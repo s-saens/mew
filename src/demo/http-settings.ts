@@ -1,7 +1,7 @@
 import { DEMO_USER, DEMO_CODE_PATH } from './fixtures.ts'
 import { demoJson, requireMethod, stringArray, stringField, type DemoHttpHandler } from './http.ts'
 import { DemoError } from './workspace-store.ts'
-import type { AgentRuntimeStatus, AgentSet, AgentTabsState, ChatMessage, CommentThread, IgnoreListState, MemberProfile, RootProjectTabState, WorkspaceUiState } from '../api/client.ts'
+import type { AgentRuntimeStatus, AgentSet, AgentTabsState, CommentThread, IgnoreListState, MemberProfile, RootProjectTabState, WorkspaceUiState } from '../api/client.ts'
 import type { TmuxSession } from '../../packages/tmux-term/src/types.ts'
 import type { StoredTabs } from '../hooks/useTabs.ts'
 import { demoHostSession } from './http-host.ts'
@@ -213,15 +213,6 @@ export const handleDemoSettings: DemoHttpHandler = ({ store, request, url, body,
   if (route === '/api/todos') { requireMethod(request, 'GET'); return demoJson({ items: [] }) }
   if (route === '/api/members') { requireMethod(request, 'GET'); return demoJson({ members: [DEMO_USER.email] }) }
   if (route === '/api/member-profiles') { requireMethod(request, 'GET'); const auth = store.authStatus(); return demoJson({ members: [{ email: auth.email, displayName: auth.displayName, avatarDataUrl: auth.avatarDataUrl }] }) }
-  if (route === '/api/chat') {
-    requireMethod(request, 'GET', 'POST', 'DELETE')
-    const messages = store.getState<ChatMessage[]>('chat', [])
-    if (method === 'GET') return demoJson({ messages, unread: {}, canDeleteHistory: true })
-    if (method === 'DELETE') { store.setState('chat', []); return demoJson({ ok: true, deleted: messages.length }) }
-    const message: ChatMessage = { id: crypto.randomUUID(), author: DEMO_USER.email, time: Date.now(), text: stringField(body, 'text'), unread: 0, ...(Array.isArray(body.to) ? { to: stringArray(body, 'to') } : {}) }
-    messages.push(message); store.setState('chat', messages); return demoJson({ ok: true, message })
-  }
-  if (route === '/api/chat/read') { requireMethod(request, 'POST'); return demoJson({ ok: true }) }
   if (route === '/api/comments') {
     requireMethod(request, 'GET', 'POST', 'PUT', 'DELETE')
     const target = method === 'GET' || method === 'DELETE' ? url.searchParams.get('path') ?? '' : stringField(body, 'path'), key = `comments:${store.canonicalFilePath(target, project)}`

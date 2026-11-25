@@ -1,11 +1,11 @@
 ---
 title: "Member chat presentation and recipient notifications"
-description: "Records the 2026-11-03 member chat bubble alignment and recipient notification work. Covers grouped headers, wrapping, closed-panel collection, conversation navigation, and local verification limits."
+description: "Records the 2026-11-03 member chat bubble alignment and recipient notification work. Covers grouped headers, wrapping, closed-panel collection, conversation navigation, and the 2026-11-25 removal and verification of member chat."
 created: "2026-11-03"
-updated: "2026-11-03"
+updated: "2026-11-25"
 ---
 
-The member chat previously rendered every message as left-aligned text. The change uses the existing agent conversation surfaces and rounded bubbles to make authorship clear in group rooms and DMs. The [chat feature contract](../features/collaboration-comments-chat/group-chat-direct-messages-and-read-status.md#message-presentation) owns the resulting behavior.
+The member chat previously rendered every message as left-aligned text. The change uses the existing agent conversation surfaces and rounded bubbles to make authorship clear in group rooms and DMs. The [chat feature contract](../features/collaboration-comments-chat/group-chat-direct-messages-and-read-status.md#message-presentation) records the behavior at that time.
 
 `src/components/ChatPanel.tsx` aligns the signed-in account's messages right and all other authors left, including consecutive messages. Names and times follow the same side; unread counts sit outside the bubble toward the center. Bubble width is bounded, long words wrap, and file-reference buttons remain interactive.
 
@@ -21,7 +21,7 @@ No deployment or application server lifecycle operations were performed. Real mu
 
 ## Recipient notifications
 
-The follow-up adds incoming member-chat messages to the existing notification center even when chat is closed. Initial history is silent; a monotonic cursor excludes old and duplicate messages, the current sender, and other people's DMs. Notification actions open the corresponding group room or DM. Desktop titles omit the sender and message body, and channel settings remain shared with existing notifications. The [recipient notification contract](../features/collaboration-comments-chat/group-chat-direct-messages-and-read-status.md#recipient-notifications) owns current behavior.
+The follow-up adds incoming member-chat messages to the existing notification center even when chat is closed. Initial history is silent; a monotonic cursor excludes old and duplicate messages, the current sender, and other people's DMs. Notification actions open the corresponding group room or DM. Desktop titles omit the sender and message body, and channel settings remain shared with existing notifications. The [recipient notification contract](../features/collaboration-comments-chat/group-chat-direct-messages-and-read-status.md#recipient-notifications) records the behavior before removal.
 
 Follow-up verification:
 
@@ -31,3 +31,14 @@ Follow-up verification:
 - The full documentation check still reports the unrelated pending task asset URL listed above. Changed document descriptions and local links passed scoped inspection.
 
 Only chat-related hunks in the already modified `src/App.tsx` belong to this change. Other project-navigation edits remain outside its commit. No deployment or application server lifecycle operation was performed.
+
+## Removal on 2026-11-25
+
+[ADR 0215](../decisions/0215-remove-member-chat.md) records the removal of the rarely used group room, direct messages, read receipts, and chat notices. The application and demo omit chat controls and the server no longer registers chat routes. Existing chat history stays on disk. Comments still support member mentions within the document thread.
+
+- The focused runs passed all 71 tests. Coverage includes 44 unit tests for Dock, layout, shortcuts, and related behavior, 14 notification and workspace Chromium tests including legacy chat state at 390 px and 1440 px, one demo retirement test, and 12 isolated access policy, remote account access, comments, and database catalog tests. Additional suites reported existing failures for demo sprite fixture width, Dock task ordering, and maximized panel corner radius.
+- `npm run build` passed TypeScript and the Vite production build with a bundle-size warning. `npm run lint` exited successfully with warnings.
+- `npm run check:docs` validated 790 descriptions. Link validation reported 38 existing links from tracked documents and one asset URL in an unrelated untracked task. No reported link error came from the chat removal.
+- `git diff --check` passed.
+
+No deployment or server lifecycle operations were performed.

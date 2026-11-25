@@ -1,8 +1,8 @@
 ---
 title: "Browser demo using the shared UI"
-description: "Defines the browser demo using Mew's shared UI, pinned public file catalog, lazy body loading, size budgets, virtual projects, host fixtures, and in-memory memo tabs. Covers transport/CSP boundaries, removed Android fixtures, automated checks, and request-authorized build/deployment and separate server lifecycle procedures."
+description: "Defines the browser demo using Mew's shared UI, pinned public file catalog, lazy body loading, size budgets, virtual projects, host fixtures, and in-memory memo tabs. Covers transport/CSP boundaries, removed Android and member-chat fixtures, automated checks, and request-authorized build/deployment and separate server lifecycle procedures."
 created: "2026-10-19"
-updated: "2026-11-11"
+updated: "2026-11-25"
 ---
 
 # Browser demo using the shared UI
@@ -34,7 +34,7 @@ The demo is a separate entry point for trying Mew without logging in or running 
 | Agent | Uses the existing send, wait, and cancel UI and event display, and generates responses that modify example documents |
 | Terminal | Creating, renaming, deleting, and reconnecting sessions; preserving working directories and history; interpreting file and Git commands locally. Package installation, development, and test commands provide example output |
 | Git | Computes changes, diffs, selective commits, history, and reverts from the same files. Does not modify actual Git repositories |
-| Document DB, comments, and chat | Uses example data in per-visitor memory and the existing UI |
+| Document DB and comments | Uses example data in per-visitor memory and the existing UI |
 | System resources | Dummy CPU, memory, GPU, temperature, and process values, with graphs that change over time |
 | Scheduled tasks | Editing, adding, and deleting example schedules and prompts, execution history, and in-memory state changes from the virtual terminal and scheduled prompts |
 | Updates and commands | Dummy versions, completion status, and execution logs; simulates command buttons and agent runtime installation, removal, and logout |

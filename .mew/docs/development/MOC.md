@@ -1,8 +1,8 @@
 ---
 title: "Development contracts"
 created: "2026-09-11"
-updated: "2026-10-14"
-description: "Links development setup, architecture, shared UI, and implementation contracts for documents, storage, agents, permissions, collaboration, and remote access by area."
+updated: "2026-11-25"
+description: "Links development setup, architecture, shared UI, and implementation contracts for documents, storage, agents, permissions, collaboration and presence, and remote access by area."
 상위파일: "../MOC.md"
 ---
 # Development contracts
@@ -33,7 +33,7 @@ Before changing code, read [Development environment, execution restrictions, and
 - [Skills and MCP management and APIs](../../../docs/configuration/agent-harness.md)
 - [Per-account feature and file permissions](access-control.md)
 - [Per-account Git connections, OAuth, and commit authors](git-connections.md)
-- [Collaboration rooms and member chat](collaboration.md)
+- [Collaboration rooms and presence](collaboration.md)
 
 ## Remote access
 

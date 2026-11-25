@@ -1,7 +1,6 @@
 /** 모바일에서 작업 영역을 덮는 App 소유 보조창. DOM 순서와 초기 쌓임 순서도 이 목록을 따른다. */
 export const WORKSPACE_PANEL_IDS = [
   'sidebar',
-  'chat',
   'agent',
   'terminal',
   'git',

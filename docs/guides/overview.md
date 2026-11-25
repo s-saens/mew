@@ -66,7 +66,7 @@ These screens use **Midnight**, the default theme, and the built-in capybara **M
 
 | Task | Guide |
 | --- | --- |
-| Coedit documents, comment, chat, and share with guests | [Collaboration and sharing](collaboration.md) |
+| Coedit documents, comment, and share with guests | [Collaboration and sharing](collaboration.md) |
 | Read and annotate a PDF | [PDF annotation](editor.md#reading-and-annotating-pdfs) |
 | Use the host browser and login screens | [Browser](browser.md) |
 | Add database tables to documents | [Postgres tables](database.md), which require a separate database connection |

@@ -1,6 +1,6 @@
 ---
-title: "Collaboration rooms and member chat"
-description: "Defines per-root Yjs rooms, permission-checked preparation and recovery, and Markdown disk reconciliation that protects newer edits from autosave echoes. Covers headless DOM restrictions, shared and private memo persistence, theme signals, presence history, chat notices, and subscriptions."
+title: "Collaboration rooms and presence"
+description: "Defines per-root Yjs rooms, permission-checked preparation and recovery, and Markdown disk reconciliation that protects newer edits from autosave echoes. Covers headless DOM restrictions, shared and private memo persistence, theme signals, presence history, and subscriptions."
 updated: "2026-11-25"
 상위파일:
   - "../MOC.md"
@@ -90,28 +90,6 @@ On account theme save, `broadcastAccount` sends `{type:'theme'}` only to that ac
 - A single query or Excel export supports at most 50,000 state intervals. Exceeding this returns 400 and requires a narrower time/person range rather than silently omitting records. Excel exports are actual OOXML `.xlsx` files generated on the server with the same filters, containing UTC times, observed duration in minutes, locations, and states. They provide frozen headers, filters, and bold headers, and user text is written as inline strings rather than formulas. `server/session-history-xlsx.ts` generates the ZIP package and XML ([Microsoft structure documentation](https://learn.microsoft.com/en-us/office/open-xml/spreadsheet/structure-of-a-spreadsheetml-document)).
 - `server/presence-history.test.ts` checks persistent storage, state separation, deduplication of identical reports, midnight/time/person filters, reload/interruption recovery, preservation of corrupted data, authentication/permission redaction, daylight saving time, and actual XLSX round trips. `server/active-sessions-ui.test.ts` checks mobile/desktop, themes, filters, time graphs, dropdown Esc behavior, matching download scope, empty history, error retries, and focus restoration.
 - For backups, treat this as a permanent ledger rather than a cache. Shut down the server and back up the server data directory, including the `presence/` directory, or use SQLite online backup. Copying only `history.sqlite` while the server is running may omit the latest records in the WAL. Do not attempt recovery by deleting the directory.
-
-## Member chat (`DATA_DIR/chat.json`)
-
-Each person has one group chat and 1:1 DMs. Delivery uses **presence signals + REST re-fetching**, without a dedicated socket. `{type:'chat'}` carries no content because presence also reaches guests. See [ADR 0050](../history/decisions/0050-mew-chat-dm-and-read-receipts.md).
-
-**There is no room identifier:** `to` (recipient array) means DM; absence means group chat. `conversationsOf` in `server/chat.ts` and UI `inConversation` compute viewer-relative conversations and **must change together**.
-
-| Request | Action |
-| --- | --- |
-| `GET /api/chat` | **Only what that person can see** — `{messages, unread, canDeleteHistory}`. Other people's DMs are not included in the response. Each message has `unread` (number of recipients who have not read it yet), and the `unread` map contains the unread count for **me** per conversation. `canDeleteHistory` is true only for the owner |
-| `POST /api/chat` `{text, to?}` | Providing `to` makes it a DM. Only existing accounts are accepted as recipients |
-| `DELETE /api/chat` `{conversation}` | Both owner status and chat permission are required. Permanently deletes from the ledger messages that appear to the current user as belonging to that conversation and returns `{ok, deleted}`. The group chat is `group`; a DM uses the other person's email. Other conversations and other people's DMs are retained; multi-recipient messages are deleted in full. When a change occurs, a chat signal with no content is broadcast |
-| `POST /api/chat/read` `{conversation}` | Records that the conversation has been read. The conversation key is `group` or the other person's email |
-
-- **Read pointers use the conversation's last-message timestamp at read time, not the current time.** Otherwise, a new message in the same millisecond could appear read. Ledger timestamps must be **strictly increasing** (`max(now, 마지막+1)`); these paired rules must change together.
-- Deletion preserves read pointers. New timestamps exceed both the ledger's last message and every stored read pointer, including when deletion/resending happen within one millisecond.
-- Broadcast read state **only when it changes**; repeatedly writing it while the window is open causes an infinite broadcast loop.
-- The 500-line limit is shared by the group chat and DMs
-
-`useChatNotifications` collects incoming notices outside the chat panel while a signed-in account has chat permission. It establishes a silent REST baseline, serializes subsequent reads on chat signals, and reconciles on permission/reconnection and foreground events. Pending signals cause one follow-up read rather than concurrent requests. Cleanup prevents a response from an old identity or permission subscription from publishing notices.
-
-`createChatNoticeTracker` uses the server's strictly increasing message timestamps as a high-water mark that never decreases after deletion or truncation. It excludes the current author and nonrecipient DMs, deduplicates message IDs, and publishes the shared `chat` notice with `target: 'chat'` and a viewer-relative `chatConversation`. The notification stores the sender, never the body. `App` opens that conversation through the existing workspace panel controls, and `ChatPanel.conversationRequest` handles initial and repeated navigation requests. Requirements and limits follow [recipient notifications](../features/collaboration-comments-chat/group-chat-direct-messages-and-read-status.md#recipient-notifications).
 
 ## Panel state subscriptions
 

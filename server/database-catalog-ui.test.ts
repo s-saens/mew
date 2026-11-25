@@ -79,9 +79,11 @@ createRoot(document.getElementById('root')).render(<I18nProvider><Fixture/></I18
     await region.getByRole('heading', { name: 'Database reference (4)', exact: true }).waitFor()
     await page.getByRole('button', { name: 'Close', exact: true }).click()
     await page.locator('[data-dock-settings]').waitFor()
-    assert.equal(await page.locator('[data-dock-setting="database"]').count(), 0)
-    assert.equal(await page.locator('[data-dock-preview="database"]').count(), 0)
-    assert.deepEqual((await page.locator('[data-dock-setting]').evaluateAll(elements => elements.map(el => el.getAttribute('data-dock-setting')))).filter(id => ['chat', 'editor', 'sidebar'].includes(id!)), ['chat', 'editor', 'sidebar'], 'other customized Dock order is retained')
+    for (const retired of ['database', 'chat']) {
+      assert.equal(await page.locator(`[data-dock-setting="${retired}"]`).count(), 0)
+      assert.equal(await page.locator(`[data-dock-preview="${retired}"]`).count(), 0)
+    }
+    assert.deepEqual((await page.locator('[data-dock-setting]').evaluateAll(elements => elements.map(el => el.getAttribute('data-dock-setting')))).filter(id => ['editor', 'sidebar'].includes(id!)), ['editor', 'sidebar'], 'other customized Dock order is retained')
     assert.deepEqual(errors, [])
     await page.close()
   }

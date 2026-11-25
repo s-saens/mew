@@ -4,11 +4,11 @@ parent: "mew-collaboration"
 title: "Comments, replies, and member mentions"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-01"
+updated: "2026-11-25"
 status_hash: "7979e03691cf55ffafcd76ec7ddbc05edc3fd3d2bc53100f0b07b948ce9abe63"
 files: ["src/components/Comments.tsx", "server/comments.ts", "packages/editor/src/editor/commentHighlight.ts"]
 commits: []
-description: "A feature contract for adding comments with Ctrl+Shift+C or by right-clicking the body, and replying, mentioning, editing, and deleting through a small quote/input popup and threads showing authors and timestamps. It explains automatic paragraph/line selection on right-click, the list, draft retention on failure, project-owned storage shared by Documents and Files, legacy migration, and management permissions."
+description: "A feature contract for adding comments with Ctrl+Shift+C or by right-clicking the body, and replying, mentioning, editing, and deleting through a small quote/input popup and threads showing authors and timestamps. It explains automatic paragraph/line selection on right-click, the list, draft retention on failure, comment-local mentions, project-owned storage shared by Documents and Files, legacy migration, and management permissions."
 상위파일:
   - "MOC.md"
   - "_collaboration-comments-chat.md"
@@ -45,7 +45,7 @@ When the comment shortcut reaches the app and an actual text editor has focus or
 
 ### Composer, thread, and list views
 
-The composer popup consists of a small title row, a quote of the selected passage, an input field supporting member mentions, and Close and Submit icon buttons. Do not submit empty content. Enter submits and Shift+Enter inserts a line break; when mention suggestions are open, Enter selects a suggestion first.
+The composer popup consists of a small title row, a quote of the selected passage, an input field supporting member mentions, and Close and Submit icon buttons. Do not submit empty content. Enter submits and Shift+Enter inserts a line break; when mention suggestions are open, Enter selects a suggestion first. A mention stays in the comment or reply text.
 
 Threads group the author's avatar, creation time, and body, with a reply field below. In editable files, show edit and delete tools only to the author and owner, and support keyboard and touch operation. Distinguish Save and Cancel while editing. If a create, reply, or edit request fails, preserve the error and draft without clearing the content or closing the input. Do not send duplicate content while a request is in progress.
 

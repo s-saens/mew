@@ -231,7 +231,7 @@ Open **Git** from the dock to view changed files and commit history. Open a file
 
 ### Collaboration and sharing
 
-Supports collaborative editing, comments, mentions, and chat. Access for other accounts and guests is controlled by roles, features, and file permissions.
+Supports collaborative editing, comments and mentions. Access for other accounts and guests is controlled by roles, features, and file permissions.
 
 [Collaboration and sharing](collaboration.md) · [Security](../operations/security.md).
 

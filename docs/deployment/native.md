@@ -135,7 +135,7 @@ Always record the current commit and data backup location before deployment. The
 | Target | Default location | Reason for backup |
 | --- | --- | --- |
 | Configuration and external service credentials | `~/.config/mew/config.env` | Restore workspace, port, DB connections, and other settings |
-| mew app data | `~/.local/share/mew/` or `MEW_DATA_DIR` | Accounts, sessions, guest rules, and chat |
+| mew app data | `~/.local/share/mew/` or `MEW_DATA_DIR` | Accounts, sessions, guest rules, and other server data |
 | Work files | `MEW_WORKSPACE` | Actual files edited by mew — assess separately whether Git alone is sufficient |
 | `/db` data | Postgres referenced by `DATABASE_URL` | Not included in the app data folder |
 

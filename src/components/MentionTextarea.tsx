@@ -11,7 +11,7 @@ import { useOverlayDismiss } from '@mew/ui'
 
 const AgentComposerInput = deferredComponent(async () => ({ default: (await import('./agent-composer-input')).AgentComposerInput }), undefined, { suspend: false })
 
-// '@' 멘션이 되는 textarea — 채팅 입력(파일 멘션)과 댓글 작성(사용자 멘션)이 같이 쓴다.
+// '@' 멘션이 되는 textarea — 에이전트 입력(파일 멘션)과 댓글 작성(사용자 멘션)이 같이 쓴다.
 // '@' 뒤에 이어 친 글자를 검색어로 목록을 띄우고, 고르면 '@검색어'가 insert 문자열로 바뀐다.
 // 에이전트에서는 모바일 이미지 입력을 위해 CodeMirror 편집 호스트를 사용한다.
 
@@ -35,7 +35,7 @@ export interface TriggerOptionSet {
   options: MentionOption[]
 }
 
-/** 멤버 이메일 → 멘션 옵션 — 넣는 문자열이 `@이메일` 그대로여야 서버가 멘션으로 알아본다(server/chat.ts) */
+/** 멤버 이메일을 댓글의 `@이메일` 멘션 옵션으로 바꾼다. */
 export function memberMentionOptions(members: string[]): MentionOption[] {
   return members.map((email) => ({ id: email, label: email.split('@')[0] || email, hint: email, insert: `@${email}` }))
 }
@@ -85,7 +85,7 @@ export function MentionTextarea({
   maxResults?: number
   /** Let callers load additional candidates only while a trigger is open. */
   onTriggerChange?: (trigger: string | null) => void
-  /** 메뉴가 닫혀 있을 때 Enter(Shift 없이) — 채팅 전송·댓글 등록 */
+  /** 메뉴가 닫혀 있을 때 Enter(Shift 없이) — 메시지 전송·댓글 등록 */
   onSubmit?: () => void
   placeholder?: string
   autoFocus?: boolean
@@ -220,7 +220,7 @@ export function MentionTextarea({
   }
 
   // 인라인 검색 메뉴도 모달·패널과 같은 Esc 스택에 올라간다. 기본 capture 단계가 툴팁을
-  // 먼저 닫고 이벤트를 소비하므로, 아래의 에이전트·채팅 같은 bubble 패널까지 닫히지 않는다.
+  // 먼저 닫고 이벤트를 소비하므로, 아래의 에이전트 같은 bubble 패널까지 닫히지 않는다.
   useOverlayDismiss(mention && (shown.length > 0 || onTriggerChange) ? closeMention : false)
 
   const pick = (option: MentionOption) => {

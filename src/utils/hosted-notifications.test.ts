@@ -58,7 +58,7 @@ test('hosted notifications use opaque actions and close prevents stale click nav
   const clicked: string[] = []
   const delivery = createNotificationDelivery(id => clicked.push(id))
   t.after(() => delivery.dispose())
-  const shown = delivery.show('mew · New chat message', 'opaque-id')
+  const shown = delivery.show('mew · All queued agent work is complete', 'opaque-id')
   const message = f.sent.at(-1)!
   assert.deepEqual(Object.keys(message).sort(), ['id', 'requestId', 'title', 'type'])
   assert.equal(message.type, 'mew-notification-show')
@@ -78,7 +78,7 @@ test('disconnect resolves pending requests and drops notices and clicks from a p
   const f = fixture(t)
   const clicked: string[] = []
   const delivery = createNotificationDelivery(id => clicked.push(id))
-  const shown = delivery.show('mew · New chat message', 'old-id')
+  const shown = delivery.show('mew · All queued agent work is complete', 'old-id')
   const message = f.sent.at(-1)!
   const permission = requestBrowserNotificationPermissionForApp()
   const failure = assert.rejects(permission, /timed out/)

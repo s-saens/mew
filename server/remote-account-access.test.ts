@@ -145,7 +145,7 @@ test('remote account access updates preserve their response and revoke previous 
     assert.equal((await member.request('/api/file?project=docs&path=note.md')).status, 403)
 
     const stale = await owner.start('/api/admin/access/feature', 'PUT', { subject: memberId, feature: 'terminal', enabled: true })
-    policy.setFeature(memberId, 'chat', false)
+    policy.setFeature(memberId, 'collaboration', false)
     owner.assertRevoked(stale)
     const before = fs.readFileSync(policyFile, 'utf8')
     await owner.dispatcher.receive(JSON.stringify({ type: 'end', id: stale }))

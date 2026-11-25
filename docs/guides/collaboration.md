@@ -1,14 +1,14 @@
 ---
-title: "Collaborative Editing, Comments, Chat, and Guest Sharing"
-description: "Covers collaborative editing, permanent shared and private memo tabs, sessions, comments, mentions, Dock chat and recipient notifications. Links browser notification setup and covers permissions, drafts, public links, and guest sharing boundaries."
+title: "Collaborative Editing, Comments, and Guest Sharing"
+description: "Covers collaborative editing, shared and private memo tabs, active sessions, comments, mentions, public links, and guest sharing."
 updated: "2026-11-07"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
 ---
-This guide explains user actions for collaborative editing, comments, chat, and sharing. Review [Security and Roles](../operations/security.md) before inviting others.
+This guide explains user actions for collaborative editing, comments, and sharing. Review [Security and Roles](../operations/security.md) before inviting others.
 
-[Collaborative Editing](#collaborative-editing-and-participants) · [Shared Notes](#shared-memo) · [Active Sessions](#active-mew-sessions) · [Comments](#comments-and-replies) · [Chat](#group-chat-and-dms) · [Public Links](#public-file-and-folder-links) · [Guest Sharing](#guest-sharing)
+[Collaborative Editing](#collaborative-editing-and-participants) · [Shared Notes](#shared-memo) · [Active Sessions](#active-mew-sessions) · [Comments](#comments-and-replies) · [Public Links](#public-file-and-folder-links) · [Guest Sharing](#guest-sharing)
 
 ## Before Working Together
 
@@ -16,7 +16,7 @@ This guide explains user actions for collaborative editing, comments, chat, and 
 2. The owner checks the account's **Feature Permissions** and **File and Folder Permissions**. Editing requires file modification permission; collaborative editing and comments also require their respective feature permissions.
 3. Open the same file in the same project and check participant color dots and cursors to confirm the connection. For access from outside the server, first set up [external access](getting-started-ko.md#connect-remotely).
 
-To let others only view files, you can use [Guest Sharing](#guest-sharing) below. Collaborative editing and chat require a logged-in account.
+To let others only view files, you can use [Guest Sharing](#guest-sharing) below. Collaborative editing requires a logged-in account.
 
 ## Collaborative Editing and Participants
 
@@ -57,7 +57,7 @@ The top shows connection count, people count, and total observed time, with a pe
 ## Comments and Replies
 
 1. Select the passage you want to comment on in the document and press `Ctrl+Shift+C` (`Cmd+Shift+C` on macOS). On mobile, select the passage and tap the comment icon in the keyboard auxiliary bar. This shortcut does not open the composer if no text is selected.
-2. Write in the input below the quoted passage and send with the submit icon or Enter. Shift+Enter inserts a line break, and `@` lets you select a member. If mention suggestions are open, Enter selects a suggestion first.
+2. Write in the input below the quoted passage and send with the submit icon or Enter. Shift+Enter inserts a line break, and `@` lets you select a member. If mention suggestions are open, Enter selects a suggestion first. Mentions appear in the comment or reply.
 3. Click a highlight in the body or select a thread from the editor's **Comment List**. Send replies using the input below the thread. The list also includes comments whose highlights can no longer be found because the source text changed.
 4. You can edit and delete your own comments, and the owner can also manage other people's comments.
 
@@ -66,16 +66,6 @@ If you choose **Add Comment** from the body context menu without a selection, th
 If sending a new comment, reply, or edit fails, the error and entered content remain so you can send it again. The number above the comment list is the thread count for the current file. Close the popup with the close icon, Esc, or Back.
 
 Comments are managed separately rather than inserted as text in the body. They are available for Markdown in Hotview and Plain, and for code and text, and require login and collaboration feature permission. Viewing the list requires file viewing permission; adding, editing, and deleting also require file modification permission. Comments on read-only or archived files can only be viewed. Comments cannot be started by guests, on media, diffs, files outside projects, or anchor previews, or while a file is being revalidated. You can change the default comment shortcut in [Settings](../configuration/appearance.md).
-
-## Group Chat and DMs
-
-Open **Chat** from the Dock or press `Alt+C`. The Dock button appears when you are logged in and have chat permission; its order and visibility are configurable under **Settings → Dock**. On desktop, selecting Chat brings the panel forward, and selecting it again while focused closes it. On mobile, it brings chat to the front while preserving your other open panels. In the conversation list, select the group room to talk with all members, or select a person for a 1:1 conversation. The unread conversation count and the number of recipients who have not read each message are displayed.
-
-While mew is open, new messages from other people appear in the header menu’s notification section even when chat is closed. An unread count appears on the menu button. Select a notification to open its group room or DM. **Settings → Notifications** controls in-app display, Mewpet/toasts, sound, and browser notifications; follow [desktop and mobile notification setup](../configuration/appearance.md#notification-settings) for permission and iPhone/iPad installation requirements. Reloading does not turn old chat history into new notifications, and closing or suspending the browser can stop delivery.
-
-If you insert a file reference in the input and send it, recipients can click the reference to open it in the mew editor. After opening chat, press `Ctrl+L` in the editor to insert a file mention into the input according to the [reference forwarding rules](editor.md#ctrll-references-경로줄). If you opened another auxiliary panel most recently, that panel may receive the reference.
-
-Chat is only available to logged-in users with chat permission. The app delivers DMs only to the participants, but they are stored in server files, so they are not secret conversations hidden from the server administrator. Storage and read-status handling follow the [chat contract](../../.mew/docs/development/collaboration.md); permission policies follow [Security](../operations/security.md).
 
 ## Public file and folder links
 

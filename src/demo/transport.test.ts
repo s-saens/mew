@@ -191,6 +191,17 @@ test('unsupported and cross-origin requests never call a native network function
   } finally { globalThis.fetch = nativeFetch }
 })
 
+test('the demo rejects retired member chat endpoints but still provides member profiles', async () => {
+  const store = new DemoWorkspaceStore()
+  try {
+    assert.equal(Object.hasOwn(store.capabilities, 'chat'), false)
+    assert.equal((await demoFetch(store, '/api/chat')).status, 501)
+    assert.equal((await demoFetch(store, '/api/chat', write('POST', { text: 'hello' }))).status, 501)
+    assert.equal((await demoFetch(store, '/api/chat/read', write('POST', { conversation: 'group' }))).status, 501)
+    assert.ok((await data(store, '/api/member-profiles')).members.length > 0)
+  } finally { store.close() }
+})
+
 test('request cancellation and transport shutdown cleanly reject work', async () => {
   const store = new DemoWorkspaceStore(), controller = new AbortController()
   controller.abort()

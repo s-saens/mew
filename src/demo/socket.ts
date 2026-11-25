@@ -280,7 +280,7 @@ export function createDemoSocketFactory(store: DemoWorkspaceStore): DemoSocketFa
   const unsubscribe = store.subscribe(event => {
     if (event.type === 'state' && event.key === 'theme') for (const socket of presence) socket.emit({ type: 'theme' })
     if (event.type === 'files' || event.type === 'reset') for (const socket of presence) socket.emit({ type: 'tree', project: '.workspace', version: store.revision })
-    if (event.type === 'state' && (event.key?.includes('chat') || event.key?.includes('comment'))) for (const socket of presence) socket.emit({ type: event.key.includes('chat') ? 'chat' : 'comments' })
+    if (event.type === 'state' && event.key?.includes('comment')) for (const socket of presence) socket.emit({ type: 'comments' })
     if (event.type === 'state' && event.key?.startsWith('db-event:')) {
       const update = store.getState<{ project: string; dbId: string; event: unknown } | null>(event.key, null)
       if (update) for (const [socket, subscriptions] of databases) if (subscriptions.has(JSON.stringify([update.project, update.dbId]))) socket.emit({ type: 'db.event', ...update })

@@ -1,7 +1,7 @@
 import type { AgentEvent } from './agentFold.ts'
 import type { MewUpdateStatus } from '../api/client.ts'
 
-export type NoticeKind = 'complete' | 'stopped' | 'error' | 'permission' | 'cpu' | 'memory' | 'gpu' | 'temperature' | 'test' | 'updates' | 'chat'
+export type NoticeKind = 'complete' | 'stopped' | 'error' | 'permission' | 'cpu' | 'memory' | 'gpu' | 'temperature' | 'test' | 'updates'
 export type NoticeLevel = 'success' | 'warning' | 'danger'
 export interface NoticeInput {
   key: string
@@ -9,8 +9,7 @@ export interface NoticeInput {
   level: NoticeLevel
   source: string
   updateVersions?: string[]
-  chatConversation?: string
-  target?: { tabId: string; cwd: string; workspacePath?: string } | 'system' | 'updates' | 'chat'
+  target?: { tabId: string; cwd: string; workspacePath?: string } | 'system' | 'updates'
 }
 
 export function mewUpdateNoticeVersion(

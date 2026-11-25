@@ -111,9 +111,9 @@ export function usePresence(
             window.dispatchEvent(new Event('mew:permissions-changed'))
             onTreeChangeRef.current()
           } else if (msg.type === 'tree') onTreeChangeRef.current({ project: msg.project, version: msg.version, parents: msg.parents })
-          // 채팅·댓글이 바뀌었다는 **내용 없는 신호** — 받은 쪽이 REST로 다시 읽는다(신호는 게스트에게도
+          // 댓글이 바뀌었다는 **내용 없는 신호** — 받은 쪽이 REST로 다시 읽는다(신호는 게스트에게도
           // 가므로 경로·본문을 싣지 않는다). 창은 소켓을 따로 열지 않고 window 이벤트로 받는다
-          else if (msg.type === 'chat' || msg.type === 'comments') {
+          else if (msg.type === 'comments') {
             window.dispatchEvent(new CustomEvent('mew:signal', { detail: { type: msg.type } }))
           }
           // 루트 프로젝트가 바뀌었다. App이 루트별 탭·본문 캐시를 갈아끼우고 트리만 다시 읽는다.

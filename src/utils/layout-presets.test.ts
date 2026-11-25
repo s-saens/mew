@@ -4,11 +4,12 @@ import { spawnSync } from 'node:child_process'
 import { changeLayoutPreset, factoryLayout, initialLayoutPresets, layoutFingerprint, layoutIconRects, layoutIconSvg, normalizeLayoutSnapshot, readLayoutPresets, layoutPresetsKey, legacyLayoutPresetsKey } from './layout-presets.ts'
 
 const current = () => factoryLayout(normalizeLayoutSnapshot({ version: 1, dock: { version: 1, groups: [{ id: 'editor:main', kind: 'editor' }], tree: { id: 'editor:main' } } }))
-test('legacy Android panel state is ignored by restored layouts and thumbnails', () => {
+test('legacy Android and member chat panel state is ignored by restored layouts and thumbnails', () => {
   const base = current()
-  const legacy = { ...base, androidWidth: 960, open: { ...base.open, android: true } }
+  const legacy = { ...base, androidWidth: 960, open: { ...base.open, android: true, chat: true } }
   const restored = normalizeLayoutSnapshot(legacy)
   assert.equal(Object.hasOwn(restored.open, 'android'), false)
+  assert.equal(Object.hasOwn(restored.open, 'chat'), false)
   assert.equal(Object.hasOwn(restored, 'androidWidth'), false)
   assert.equal(layoutFingerprint(restored), layoutFingerprint(base))
   assert.equal(layoutIconSvg(restored), layoutIconSvg(base))

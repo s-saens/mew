@@ -1,9 +1,9 @@
 ---
 title: "Multi-project mode"
-description: "Optional desktop multi-project mode with independent compact workspaces, movement, resizing, shared controls, project selection, and lifecycle and error recovery. Covers linked page body saves and the single-project requirement for database tools and properties."
+description: "Optional desktop multi-project mode with independent compact workspaces, movement, resizing, shared controls, project selection, and lifecycle and error recovery. Covers shared notes, linked page body saves and the single-project requirement for database tools and properties."
 status: implemented
 created: "2026-11-06"
-updated: "2026-11-23"
+updated: "2026-11-25"
 ---
 
 # Multi-project mode
@@ -75,7 +75,7 @@ These choices fill gaps in the visual references and keep geometry independent o
 | Duplicate project | In the first version, selecting an already-open logical project focuses its panel. Avoid two local writers for the existing account/project tab ledger. Independent views of the same logical project require a later view-state decision. |
 | Worktrees | One logical project's panel can switch its working root using the existing worktree action. Its tab identity stays with the logical project. Simultaneous independent worktrees of the same logical project are outside the first version. |
 | Empty board | Closing the last panel leaves the background and a compact add-project-panel action. It does not recreate a closed panel or replace the account's personal project list. |
-| Shared tools | Notes and chat retain their existing shared data ownership. Remote browser uses one independent board panel in multi-project mode. Native Browser and login retain one account session under the [browser contract](../../development/browser-desktop.md#permissions-profiles-and-lifecycle). Mew Port app tabs have been removed. |
+| Shared tools | Notes retain their existing shared data ownership. Remote browser uses one independent board panel in multi-project mode. Native Browser and login retain one account session under the [browser contract](../../development/browser-desktop.md#permissions-profiles-and-lifecycle). Mew Port app tabs have been removed. |
 | Initial scope | Arrange project panels; reuse the current compact tools inside them. Cross-project document-tab dragging, floating project windows, and arbitrary nested project docking are outside this first version. |
 
 ## Current limitation

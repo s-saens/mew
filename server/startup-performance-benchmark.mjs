@@ -41,7 +41,7 @@ const productionAssets = new Map(variants.map(variant => {
 const storedTabs = { panes: [{ id: 'main', tabs: [{ path: 'README.md', preview: false, viewMode }], activePath: 'README.md' }], layout: { kind: 'leaf', pane: 'main' }, focusedPaneId: 'main' }
 const initialUi = { sidebar: { docsExpanded: false }, chrome: { sidebarOpen: true, sidebarView: 'files' }, tabs: { '.workspace': storedTabs } }
 const content = '# Startup benchmark\n\nThis example document is ready to edit.\n'
-const auth = { authenticated: true, email: 'benchmark@example.test', accountId: 'benchmark-account', role: 'owner', mustChangePassword: false, displayName: 'Benchmark', avatarDataUrl: null, capabilities: { filesRead: true, filesWrite: true, agent: true, terminal: false, serverFiles: false, collaboration: false, chat: false, git: true, database: false, desktop: true, nativeBrowser: false } }
+const auth = { authenticated: true, email: 'benchmark@example.test', accountId: 'benchmark-account', role: 'owner', mustChangePassword: false, displayName: 'Benchmark', avatarDataUrl: null, capabilities: { filesRead: true, filesWrite: true, agent: true, terminal: false, serverFiles: false, collaboration: false, git: true, database: false, desktop: true, nativeBrowser: false } }
 const workspace = { path: '/example', workspaceScopeVersion: 1, projects: [], docs: 'docs', docsPath: '/example/docs', hasProject: true }
 const staticCache = new Map()
 const waits = ms => new Promise(resolve => setTimeout(resolve, ms))

@@ -7,7 +7,6 @@ import { useAccountTheme } from '../hooks/use-account-theme'
 import { useRootProjectTabs } from '../hooks/use-root-project-tabs'
 import { useRefreshTasks } from '../hooks/use-refresh-tasks'
 import { useMewcatNotifications } from '../hooks/use-mewcat-notifications'
-import { useChatNotifications } from '../hooks/use-chat-notifications'
 import { applyFontPreferences, loadFontPreferences, saveFontPreferences } from '../utils/fontPreferences'
 import { loadMewcatSkin, saveMewcatSkin } from '../utils/mewcatSkin'
 import { deferredComponent } from '../components/deferred-component'
@@ -33,7 +32,6 @@ function useAccountServices(auth: AuthStatus) {
   const [mewcatSkin, setMewcatSkin] = useState(loadMewcatSkin)
   const projects = useRootProjectTabs(auth.role !== 'guest', track)
   useMewcatNotifications(capabilities.system, auth.email)
-  useChatNotifications(capabilities.chat, auth.email)
   useEffect(() => { applyFontPreferences(fontPreferences); saveFontPreferences(fontPreferences) }, [fontPreferences])
   useEffect(() => { saveMewcatSkin(mewcatSkin) }, [mewcatSkin])
   const value = useMemo(() => ({ role: auth.role, capabilities, themeSettings, setThemeSettings, fontPreferences, setFontPreferences, mewcatSkin, setMewcatSkin,

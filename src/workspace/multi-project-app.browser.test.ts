@@ -14,7 +14,7 @@ const origin = 'http://multi-project-app.test'
 
 async function fixtureBundle() {
   const source = `import React from'react';import{createRoot}from'react-dom/client';import App from${JSON.stringify(sourcePath('App.tsx'))};import{I18nProvider}from${JSON.stringify(sourcePath('i18n.tsx'))};
-    const auth={authenticated:true,email:'integration@test',role:'owner',mustChangePassword:false,displayName:'Integration',avatarDataUrl:null,capabilities:{filesRead:true,filesWrite:true,agent:true,terminal:true,git:true,collaboration:false,database:false,chat:false,system:false,nativeBrowser:true,serverFiles:false,schedules:false}};
+    const auth={authenticated:true,email:'integration@test',role:'owner',mustChangePassword:false,displayName:'Integration',avatarDataUrl:null,capabilities:{filesRead:true,filesWrite:true,agent:true,terminal:true,git:true,collaboration:false,database:false,chat:true,system:false,nativeBrowser:true,serverFiles:false,schedules:false}};
     function Fixture(){const [current,setCurrent]=React.useState(auth);window.setCapabilities=changes=>setCurrent(value=>({...value,capabilities:{...value.capabilities,...changes}}));return <I18nProvider><App auth={current} refreshing={false} onLoggedOut={()=>{}} onRequestLogin={()=>{}} onProfileChanged={()=>{}}/></I18nProvider>}
     window.editorMounts={};window.editorUnmounts={};createRoot(document.getElementById('root')).render(<Fixture/>);`
   const editorStub = `import React from'react';export function EditorPane(props){const tab=props.pane.tabs.find(tab=>tab.id===props.pane.activeTabId)??props.pane.tabs.find(tab=>tab.path===props.pane.activePath),root=props.workspace?.path;React.useEffect(()=>{window.editorMounts[root]=(window.editorMounts[root]??0)+1;return()=>{window.editorUnmounts[root]=(window.editorUnmounts[root]??0)+1}},[]);return <div data-test-editor-root={root} style={{display:'flex',height:'100%'}}>{tab&&<textarea aria-label={'Editor '+root} value={tab.content} onFocus={props.onFocus} onChange={event=>props.onChangeContent(tab.path,event.target.value,props.pane.id,tab.id)}/>}</div>}`
@@ -134,6 +134,29 @@ async function installApp(page: Page, fixture: Awaited<ReturnType<typeof fixture
   return { errors, consoleErrors, requests, contents, saves, commandReads, scopes, saveStarted, saveCompleted,
     holdAlphaSave: () => { holdSave = true }, releaseSave: () => { holdSave = false; releaseSave?.() } }
 }
+
+test('legacy member chat preferences and capability do not restore a panel or fetch messages', { timeout: 30_000 }, async t => {
+  const fixture = await bundleOnce(), browser = await connectTestBrowser()
+  t.after(() => browser.close())
+  for (const width of [390, 1440]) {
+    const page = await browser.newPage({ viewport: { width, height: 800 } })
+    const { errors, requests } = await installApp(page, fixture, ['/alpha'], {
+      'mew:mobile-foreground-panel:/alpha': 'chat',
+      'mew:mobile-dock-order': JSON.stringify(['chat', 'editor', 'sidebar']),
+      'mew:shortcuts': JSON.stringify({ toggleChat: 'Alt+J' }),
+    })
+    try {
+      await page.goto(origin)
+      await page.locator('[data-dock-item="editor"]').first().waitFor()
+      await page.keyboard.press('Alt+c')
+      await page.keyboard.press('Alt+j')
+      await paint(page)
+      assert.equal(await page.locator('[data-dock-item="chat"], [data-workspace-panel="chat"]').count(), 0)
+      assert.equal(requests.some(request => request.includes('/api/chat')), false)
+      assert.deepEqual(errors, [])
+    } finally { await page.close() }
+  }
+})
 
 test('mobile project selector shows only dots while the catalog module loads', { timeout: 30_000 }, async t => {
   const fixture = await bundleOnce(), browser = await connectTestBrowser()

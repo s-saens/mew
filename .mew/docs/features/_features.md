@@ -1,8 +1,8 @@
 ---
 title: "Feature home"
 created: "2026-09-18"
-updated: "2026-11-05"
-description: "A document home linking Mew feature areas to documents covering individual requirements, detailed behavior, implementation, and acceptance criteria. Explains the feature document management criteria used in Documents after removal of the feature panel and Android emulator gateway."
+updated: "2026-11-25"
+description: "A document home linking Mew feature areas to documents covering individual requirements, detailed behavior, implementation, and acceptance criteria. Explains the feature document management criteria used in Documents after removal of the feature panel, member chat, and Android emulator gateway."
 상위파일: "../MOC.md"
 ---
 
@@ -18,7 +18,7 @@ An entry point for reading each feature's requirements, detailed behavior, imple
 
 - [Git and change history](git-history/MOC.md) · [Overview](git-history/_git-history.md)
 
-- [Collaboration·Comments·Chat](collaboration-comments-chat/MOC.md) · [Overview](collaboration-comments-chat/_collaboration-comments-chat.md)
+- [Collaboration and Comments](collaboration-comments-chat/MOC.md) · [Overview](collaboration-comments-chat/_collaboration-comments-chat.md)
 
 - [Terminals·Agents·Automation](terminals-agents-automation/MOC.md) · [Overview](terminals-agents-automation/_terminals-agents-automation.md)
 
@@ -57,8 +57,6 @@ An entry point for reading each feature's requirements, detailed behavior, imple
 - [Feature-Based Development·Markdown Documents](terminals-agents-automation/feature-driven-development-and-markdown-documents.md)
 
 - [Existing DB·External Postgres References](document-databases/existing-database-and-external-postgres-references.md)
-
-- [Group Chat·DM·Read Receipts](collaboration-comments-chat/group-chat-direct-messages-and-read-status.md)
 
 - [Run CLI Commands in Conversations](terminals-agents-automation/cli-commands-in-conversations.md)
 
@@ -127,7 +125,7 @@ An entry point for reading each feature's requirements, detailed behavior, imple
 
 - [Current project Git operations panel](git-history/project-git-work-panel.md)
 
-- [Collaboration·Comments·Chat](collaboration-comments-chat/_collaboration-comments-chat.md)
+- [Collaboration and Comments](collaboration-comments-chat/_collaboration-comments-chat.md)
 
 - [Interface·Accounts·Operations](appearance-accounts-operations/_appearance-accounts-operations.md)
 

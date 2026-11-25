@@ -113,7 +113,6 @@ test('새 파일은 에디터·사이드바에서만 생성하고 패널의 빈 
     createElement('section', { 'data-workspace-panel': 'editor' }, createElement('textarea')),
     createElement('section', { 'data-workspace-panel': 'sidebar', 'data-sidebar': true }, createElement('textarea'), createElement('div', { 'data-blank': 'sidebar' })),
     createElement(Panel, { kind: 'agent' }), createElement(Panel, { kind: 'terminal' }), createElement(Panel, { kind: 'browser' }), createElement(Panel, { kind: 'unhandled', handles: false }),
-    createElement('section', { 'data-workspace-panel': 'chat' }, createElement('textarea')),
     createElement('div', { role: 'dialog' }, createElement('textarea')),
   )))
   const stop = captureAppTabShortcuts({ closeEditorTab: () => {}, create: (_event, kind, target) => actions.push(`${target.closest<HTMLElement>('[data-workspace-panel]')!.dataset.workspacePanel}:${kind}`) })
@@ -125,7 +124,7 @@ test('새 파일은 에디터·사이드바에서만 생성하고 패널의 빈 
     assert.equal(event.defaultPrevented, true)
   }
   try {
-    for (const kind of ['editor', 'sidebar', 'agent', 'terminal', 'browser', 'unhandled', 'chat']) {
+    for (const kind of ['editor', 'sidebar', 'agent', 'terminal', 'browser', 'unhandled']) {
       const input = host.querySelector<HTMLElement>(`[data-workspace-panel="${kind}"] textarea`)!
       input.focus()
       press(input)

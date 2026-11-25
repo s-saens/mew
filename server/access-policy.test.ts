@@ -10,10 +10,13 @@ import { WebSocket } from 'ws'
 import { FEATURES, defaultCapabilities, normalizeFeatureOverrides, type AccessSettings } from '../shared/access-policy.ts'
 import type { RequestAuth } from './reqAuth.ts'
 
-test('retired Android and port preview grants are discarded', () => {
-  assert.equal(FEATURES.some(feature => String(feature) === 'android'), false)
-  assert.equal(Object.hasOwn(defaultCapabilities('owner'), 'android'), false)
-  assert.deepEqual(normalizeFeatureOverrides({ android: true, portPreview: false, browser: true }), {})
+test('retired Android, port preview, and member chat grants are discarded', () => {
+  const overrides = { android: true, portPreview: false, browser: true, chat: true }
+  for (const feature of Object.keys(overrides)) {
+    assert.equal(FEATURES.some(activeFeature => activeFeature === feature), false)
+    assert.equal(Object.hasOwn(defaultCapabilities('owner'), feature), false)
+  }
+  assert.deepEqual(normalizeFeatureOverrides(overrides), {})
 })
 
 test('account capabilities and canonical file rules are enforced across HTTP and live collaboration', { timeout: 30_000 }, async () => {
@@ -56,6 +59,24 @@ test('account capabilities and canonical file rules are enforced across HTTP and
     for (const [route, method] of [['/android/status', 'GET'], ['/android-url?url=http://localhost:8080', 'GET'], ['/android/commands/emulator/run', 'POST']]) {
       assert.equal((await request(route, method, undefined, 'owner')).status, 404, route)
     }
+    const chatFile = path.join(DATA_DIR, 'chat.json')
+    const legacyChat = JSON.stringify({
+      version: 2, messages: [{ id: 'old-message', author: owner.email, time: 1, text: 'Historical message' }], reads: {},
+    })
+    fs.writeFileSync(chatFile, legacyChat)
+    for (const account of ['owner', 'member']) {
+      assert.equal((await request('/chat', 'GET', undefined, account)).status, 404)
+      assert.equal((await request('/chat', 'POST', { text: 'New message' }, account)).status, 404)
+      assert.equal((await request('/chat', 'DELETE', { conversation: 'group' }, account)).status, 404)
+      assert.equal((await request('/chat/read', 'POST', { conversation: 'group' }, account)).status, 404)
+    }
+    assert.equal((await request('/admin/access/feature', 'PUT', { subject: member.email, feature: 'chat', enabled: true }, 'owner')).status, 400)
+    const mention = `@${owner.email} Please review this note.`
+    const comment = await request('/comments', 'POST', { path: 'public/readme.md', anchor: { text: 'visible needle', prefix: '', line: 1 }, text: mention })
+    assert.equal(comment.status, 200)
+    const comments = await (await request('/comments?path=public/readme.md')).json() as { threads: { comments: { text: string }[] }[] }
+    assert.equal(comments.threads[0]?.comments[0]?.text, mention)
+    assert.equal(fs.readFileSync(chatFile, 'utf8'), legacyChat)
     for (const account of ['member', 'guest']) {
       assert.equal((await request('/agent-runtimes/codex/models', 'GET', undefined, account)).status, 403)
       assert.equal((await request('/git/github-auth', 'GET', undefined, account)).status, 403)

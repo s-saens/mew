@@ -21,7 +21,7 @@ registerHooks({
   },
 })
 const { captureCommentShortcut } = await import('./comment-shortcut.ts')
-const { getBinding, setBinding, resetBinding, registerKeyboardCapture } = await import('@mew/shortcuts')
+const { getBinding, getBindings, setBinding, resetBinding, registerKeyboardCapture } = await import('@mew/shortcuts')
 
 function surface(kind = 'hotview') {
   const panel = document.createElement('div')
@@ -45,7 +45,7 @@ function press(target: Element, init: KeyboardEventInit = {}) {
 
 test('Ctrl/Cmd+Shift+C consumes the file editor event in capture before editor and browser handlers', () => {
   assert.equal(getBinding('addComment'), 'Ctrl+Shift+C')
-  assert.equal(getBinding('toggleChat'), 'Ctrl+Alt+J', 'changing the default leaves saved user preferences intact')
+  assert.equal(Object.hasOwn(getBindings(), 'toggleChat'), false, 'saved chat bindings do not appear in the active shortcuts')
   const view = surface()
   let opened = 0
   let propagated = 0

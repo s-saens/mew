@@ -7,7 +7,7 @@ import ts from 'typescript'
 import { Window } from 'happy-dom'
 
 const win = new Window({ url: 'https://localhost' })
-for (const key of ['window', 'document', 'navigator', 'localStorage', 'HTMLElement', 'Element', 'SVGElement', 'Event', 'CustomEvent', 'ResizeObserver', 'MutationObserver']) {
+for (const key of ['window', 'document', 'location', 'navigator', 'localStorage', 'HTMLElement', 'Element', 'SVGElement', 'Event', 'CustomEvent', 'ResizeObserver', 'MutationObserver']) {
   Object.defineProperty(globalThis, key, { value: (win as unknown as Record<string, unknown>)[key], configurable: true })
 }
 Object.defineProperty(globalThis, 'requestAnimationFrame', { value: win.requestAnimationFrame.bind(win), configurable: true })
@@ -71,7 +71,7 @@ test('header receives actionable notices without a cat; cat channel and visual p
   assert.ok(trigger)
   assert.equal(badge(), null)
   await act(async () => store.publishMewcatNotice({ key: 'ui-error', kind: 'error', level: 'danger', source: 'Codex', target: { tabId: 'tab', cwd: '/work' } }))
-  assert.equal(cat.element.querySelector('[role="status"]'), null)
+  assert.equal(document.body.querySelector('[role="status"]'), null)
   assert.equal(badge()!.textContent, '1')
   assert.equal(trigger.getAttribute('aria-label'), 'Menu')
   const dialog = await openHistory()
@@ -81,9 +81,9 @@ test('header receives actionable notices without a cat; cat channel and visual p
   assert.equal(badge(), null)
   await act(async () => store.publishMewcatNotice({ key: 'ui-memory', kind: 'memory', level: 'warning', source: '95%', target: 'system' }))
   const activeCat = await mount(h(ui.MewcatNotifications, { hasCat: true }))
-  assert.ok(activeCat.element.querySelector('[role="status"]'))
+  assert.ok(document.body.querySelector('[role="status"]'))
   await act(async () => store.setNotificationPreferences({ mewcat: false }))
-  assert.equal(activeCat.element.querySelector('[role="status"]'), null)
+  assert.equal(document.body.querySelector('[role="status"]'), null)
   assert.equal(badge()!.textContent, '1', 'the menu retains the same queue when the cat channel is disabled')
   await act(async () => store.setNotificationPreferences({ visual: false }))
   assert.equal(badge(), null)
@@ -132,7 +132,7 @@ test('approval focus defaults on, can be disabled immediately and keeps the Mewp
   const approval = { key: 'focus-approval', kind: 'permission', level: 'warning', source: 'Codex', target } as const
   await act(async () => store.publishMewcatNotice(approval))
   assert.deepEqual(opened, [target])
-  assert.match(cat.element.textContent!, /needs your approval/)
+  assert.match(document.body.querySelector('[role="status"]')?.textContent ?? '', /needs your approval/)
   assert.equal(cat.element.querySelector('aside'), null)
   const toggle = settings.element.querySelector('input[aria-label="Open agent tab when approval is needed"]') as HTMLInputElement
   assert.equal(toggle.checked, true)
@@ -141,9 +141,9 @@ test('approval focus defaults on, can be disabled immediately and keeps the Mewp
   assert.equal(JSON.parse(localStorage.getItem(store.NOTIFICATION_KEY)!).autoOpenApproval, false)
   await act(async () => store.publishMewcatNotice({ ...approval, key: 'focus-disabled' }))
   assert.equal(opened.length, 1, 'disabled auto focus preserves the current task')
-  assert.match(cat.element.textContent!, /needs your approval/)
+  assert.match(document.body.querySelector('[role="status"]')?.textContent ?? '', /needs your approval/)
   await act(async () => { store.resolveMewcatNotice('focus-approval'); store.resolveMewcatNotice('focus-disabled') })
-  assert.equal(cat.element.querySelector('[role="status"]'), null)
+  assert.equal(document.body.querySelector('[role="status"]'), null)
   window.removeEventListener(store.OPEN_NOTICE_EVENT, listen)
   await delivery.close(); await settings.close(); await cat.close()
 })
@@ -176,17 +176,17 @@ test('OS delivery requires permission, preference and an inactive window; payloa
   assert.equal(FakeNotification.sent.length, 1)
   assert.ok(!JSON.stringify(FakeNotification.sent[0]).includes('SECRET'))
   assert.equal(FakeNotification.sent[0].options.silent, true)
-  await act(async () => store.publishMewcatNotice({ key: 'desktop-chat', kind: 'chat', level: 'success', source: 'PRIVATE sender@example.test', target: 'chat', chatConversation: 'sender@example.test' }))
+  await act(async () => store.publishMewcatNotice({ key: 'desktop-agent', kind: 'complete', level: 'success', source: 'PRIVATE project name', target: { tabId: 'agent-tab', cwd: '/private/project' } }))
   assert.equal(FakeNotification.sent.length, 2)
-  assert.equal(FakeNotification.sent[1].title, 'mew · New chat message')
-  assert.ok(!JSON.stringify(FakeNotification.sent[1]).includes('sender@example.test'))
+  assert.equal(FakeNotification.sent[1].title, 'mew · All queued agent work is complete')
+  assert.ok(!JSON.stringify(FakeNotification.sent[1]).includes('/private/project'))
   const opened: unknown[] = []
-  const onOpen = (event: Event) => opened.push((event as CustomEvent).detail.chatConversation)
+  const onOpen = (event: Event) => opened.push((event as CustomEvent).detail.target)
   window.addEventListener(store.OPEN_NOTICE_EVENT, onOpen)
   const previousFocus = window.focus
   window.focus = () => {}
   await act(async () => FakeNotification.sent[1].onclick?.())
-  assert.deepEqual(opened, ['sender@example.test'])
+  assert.deepEqual(opened, [{ tabId: 'agent-tab', cwd: '/private/project' }])
   assert.equal(FakeNotification.sent[1].closed, true)
   window.focus = previousFocus
   window.removeEventListener(store.OPEN_NOTICE_EVENT, onOpen)

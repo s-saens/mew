@@ -123,7 +123,7 @@ export function MobileKeyBar({
     }
   }, [placement])
   return (
-    // z-20 — 전체 화면 오버레이(사이드바·채팅·에이전트·터미널)는 z-30이다. 같은 z-30으로 두면
+    // z-20 — 전체 화면 오버레이(사이드바·에이전트·터미널)는 z-30이다. 같은 z-30으로 두면
     // DOM 순서상 에디터가 사이드바보다 뒤라 보조키가 사이드바 위에 떠 버린다
     <HoverTipLayer className="contents">
       <div ref={barRef} data-mobile-key-bar data-keep-keyboard={floating ? undefined : ''} className={floating

@@ -1,7 +1,7 @@
 import { scopedBrowserStorage } from '@mew/ui/browser-storage-scope'
 import { defaultDockTree, dockIds, normalizeDock, pruneDock, type DockKind, type DockNode, type DockState } from './dock-layout.ts'
 
-export const layoutPanels = ['sidebar', 'editor', 'agent', 'terminal', 'git', 'memo', 'tasks', 'debugger', 'browser', 'chat'] as const
+export const layoutPanels = ['sidebar', 'editor', 'agent', 'terminal', 'git', 'memo', 'tasks', 'debugger', 'browser'] as const
 export type LayoutPanel = typeof layoutPanels[number]
 export type PopupRect = { x: number; y: number; width: number; height: number }
 export type LayoutSnapshot = {
@@ -135,10 +135,6 @@ export function layoutIconRects(value: LayoutSnapshot): (PopupRect & { role: 'ch
   const rects: ReturnType<typeof layoutIconRects> = [{ x: 1, y: 1, width: 62, height: 4, role: 'chrome' }, { x: 1, y: 7, width: 3, height: 40, role: 'chrome' }]
   let x = 6, width = 57
   if (layout.open.sidebar) { const w = Math.min(18, layout.sidebarWidth / 1200 * 57); rects.push({ x, y: 7, width: w, height: 40, role: 'panel' }); x += w + 2; width -= w + 2 }
-  if (layout.open.chat) {
-    const w = Math.min(width * .4, 12)
-    rects.push({ x: x + width - w, y: 7, width: w, height: 40, role: 'panel' }); width -= w + 2
-  }
   const visible = new Set(layout.dock.groups.filter(group => layout.open[group.kind] && !(group.kind in layout.tools && layout.tools[group.kind as 'memo' | 'tasks'] === 'popup')).map(group => group.id))
   const walk = (node: DockNode | null, rect: PopupRect) => {
     if (!node) return

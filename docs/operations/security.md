@@ -24,7 +24,7 @@ Roles are guest &lt; member &lt; manager &lt; owner and define **feature default
 | --- | --- | --- | --- | --- |
 | View files and edit contents | Allowed paths only | Allowed | Allowed | Allowed |
 | File creation, deletion, renaming, uploads, and history | Blocked | Allowed | Allowed | Allowed |
-| DB, collaborative editing, comments, and chat | Blocked | Allowed | Allowed | Allowed |
+| DB, collaborative editing, and comments | Blocked | Allowed | Allowed | Allowed |
 | Agents, terminals, and localhost app access | Blocked | Blocked | Allowed | Allowed |
 | Server file explorer, Git workbench, system, and scheduled tasks | Blocked | Blocked | Allowed | Allowed |
 | Registered projects, My Projects, managed creation, existing-folder linking, and shared icons | Blocked | Allowed | Allowed | Allowed |
@@ -47,7 +47,7 @@ Git operations run with the requester's feature and project access permissions a
 
 ## Guest boundaries
 
-The owner configures guest rules in **Account Management → File and Folder Permissions**. These rules apply to all visitors who are not logged in. Folder permissions are inherited by descendants, so check for separate allow rules on descendants when stopping sharing. File creation, deletion, renaming, history, shell access, DB access, collaborative editing, and chat are not allowed.
+The owner configures guest rules in **Account Management → File and Folder Permissions**. These rules apply to all visitors who are not logged in. Folder permissions are inherited by descendants, so check for separate allow rules on descendants when stopping sharing. File creation, deletion, renaming, history, shell access, DB access, and collaborative editing are not allowed.
 
 Inaccessible projects and files are hidden from the tree and search. presence also provides only paths accessible to the viewing account, and the total active session count and user and device lists are sent only to logged-in users. Public connection IDs are separate from authentication sessions.
 
@@ -104,13 +104,9 @@ The default listening address is loopback (`127.0.0.1`). Check the exposure scop
 
 The current distribution does not support running the app in a container. Do not expose it on the assumption that a container isolates shell access. Installation and application of changes follow [native server deployment](../deployment/native.md), and boundaries for each connection type follow the [access model](access-model.md).
 
-## Chat and direct messages (DMs)
-
-The chat screen shows only conversations you participate in, but **administrators who can read server files can also read other people's DMs.** Conversations are stored in plaintext on the server, so do not leave content that must be hidden from accounts with shell or server file permissions. Read receipts retain each user's last viewing time.
-
-Only the most recent 500 lines are retained across group chats and DMs combined. Older conversations are deleted when this limit is exceeded, so a high volume of group chat messages can also cause DMs to be deleted. Guests cannot view or send chat messages.
-
 ## Stored data
+
+Earlier installations may still have a plaintext `chat.json` in `MEW_DATA_DIR`. Mew leaves that file in place when it removes member chat. Restrict access to the file and its backups because they may contain private messages. See the [member-chat removal decision](../../.mew/docs/decisions/0215-remove-member-chat.md).
 
 Restrict access to server data and backups, including accounts, sessions, permission rules, and conversations, and do not commit them to the repository. Locations and settings follow [environment configuration](../configuration/environment.md), and backup and recovery scope follows [server deployment](../deployment/native.md#4-updates-backups-and-failure-checks). OS user access must be restricted separately from file permissions.
 

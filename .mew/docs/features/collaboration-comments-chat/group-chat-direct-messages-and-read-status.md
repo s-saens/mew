@@ -1,20 +1,26 @@
 ---
 id: "mew-collaboration-chat"
 parent: "mew-collaboration"
-title: "Group chat, DMs, and read receipts"
-status: "needs-fix"
+title: "Removed member chat, DMs, and read receipts"
+status: "removed"
 created: "2026-09-18"
-updated: "2026-11-05"
+updated: "2026-11-25"
 status_hash: "3044869fecf2142055b3c8efdd3a51053186e282981a1bed5e342a14f6bbb8ae"
-files:
-  - src/components/ChatPanel.tsx
-  - server/chat.ts
+files: []
 commits: []
-description: "Dock access to group rooms and DMs with aligned message bubbles, recipient notifications, read receipts, and file references. Covers notification navigation, owner-only history deletion, permissions, DM delivery boundaries, and the preserved needs-fix user assessment."
+description: "Records removal of group chat, DMs, read receipts, and member-chat notifications. Preserves the pre-removal requirements, verification, and needs-fix assessment for historical reference."
 상위파일:
   - "MOC.md"
   - "_collaboration-comments-chat.md"
 ---
+
+## Removal
+
+[ADR 0215](../../decisions/0215-remove-member-chat.md) retired member chat. It records the removed interfaces and treatment of existing data.
+
+## Former feature contract
+
+The sections below describe the retired implementation and its last recorded assessment.
 
 ## Requirements
 
@@ -56,7 +62,7 @@ description: "Dock access to group rooms and DMs with aligned message bubbles, r
 
 ### Detailed contracts
 
-- [Collaboration guide](../../../../docs/guides/collaboration.md) · [Chat storage and delivery contract](../../development/collaboration.md)
+- [Collaboration guide](../../../../docs/guides/collaboration.md) · [Historical chat storage and delivery decision](../../history/decisions/0050-mew-chat-dm-and-read-receipts.md)
 
 <!-- mew:implementation:start -->
 ## Implementation details

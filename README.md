@@ -44,7 +44,7 @@ See changed files and commit history without leaving the workspace. Open a diff,
 
 ### Work together, or connect from your phone
 
-Edit documents together, leave comments, chat, and share documents with guests. Account roles and file permissions control access. On a phone, switch between the editor and tools with the bottom dock.
+Edit documents together, leave comments, and share documents with guests. Account roles and file permissions control access. On a phone, switch between the editor and tools with the bottom dock.
 
 <p>
   <img src="docs/assets/screenshots/mobile.png" width="300" alt="Mew on a phone showing the Atlas Web launch plan and bottom dock">

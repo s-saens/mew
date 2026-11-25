@@ -134,7 +134,6 @@ const SearchPanel = deferredComponent(async () => ({ default: (await import('./c
 type AgentPanelModule = typeof import('./components/AgentPanel.tsx')
 const agentPanelPreparation = createDeferredModulePreparation<AgentPanelModule>(250)
 const AgentPanel = deferredComponent(async () => ({ default: (await agentPanelPreparation.prepare(() => import('./components/AgentPanel'))).AgentPanel }), null, { suspend: false })
-const ChatPanel = deferredComponent(async () => ({ default: (await import('./components/ChatPanel')).ChatPanel }))
 const FileHistoryModal = deferredComponent(async () => ({ default: (await import('./components/FileHistoryModal')).FileHistoryModal }), null)
 const GitPanel = deferredComponent(async () => ({ default: (await import('./components/git-panel')).GitPanel }), null)
 const TermButtonBar = deferredComponent(async () => ({ default: (await import('./components/TermButtonBar')).TermButtonBar }), null)
@@ -379,16 +378,11 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   const [settingsMewcatHost, setSettingsMewcatHost] = useState<HTMLDivElement | null>(null)
   const [sidebarDockHost, setSidebarDockHost] = useState<HTMLDivElement | null>(null)
   if (gitOpen) gitMounted.current = true
-  // 멤버 채팅 창(Alt+C)은 채팅 기능 권한을 따른다.
-  const [chatOpen, setChatOpen] = useState(false)
-  const [chatConversationRequest, setChatConversationRequest] = useState<{ conversation: string }>()
-  useEffect(() => { setChatOpen(false); setChatConversationRequest(undefined) }, [authEmail, caps.chat, api])
   // 모바일 보조창은 종류별 예외 없이 이 스택 하나로 전면 순서와 뒤로가기 순서를 공유한다.
   // 새 패널을 WORKSPACE_PANEL_IDS에 넣으면 아래 registry가 빠진 연결을 타입 오류로 알려 준다.
   const [mobilePanelStack, setMobilePanelStack] = useState<WorkspacePanelId[]>(() =>
     WORKSPACE_PANEL_IDS.filter((panel) => {
       if (panel === 'sidebar') return sidebarOpen
-      if (panel === 'chat') return chatOpen
       if (panel === 'agent') return agentOpen
       if (panel === 'terminal') return terminalOpen
       if (panel === 'git') return gitOpen
@@ -437,7 +431,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
 
   const workspacePanelOpen = useMemo(() => ({
     sidebar: sidebarOpen,
-    chat: chatOpen,
     agent: agentOpen,
     terminal: terminalOpen,
     git: gitOpen,
@@ -445,10 +438,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     memo: memoOpen,
     debugger: debuggerOpen,
     browser: browserOpen,
-  } satisfies Record<WorkspacePanelId, boolean>), [sidebarOpen, chatOpen, agentOpen, terminalOpen, gitOpen, debuggerOpen, browserOpen, memoOpen, tasksOpen])
+  } satisfies Record<WorkspacePanelId, boolean>), [sidebarOpen, agentOpen, terminalOpen, gitOpen, debuggerOpen, browserOpen, memoOpen, tasksOpen])
   const workspacePanelSetters = useMemo(() => ({
     sidebar: setSidebarOpen,
-    chat: setChatOpen,
     agent: setAgentOpen,
     terminal: setTerminalOpen,
     git: setGitOpen,
@@ -530,7 +522,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   // docs 탭을 꾹 누르면 뜨는 폴더 가져오기/내보내기 창 — owner 전용
   const [docsSettingsOpen, setDocsSettingsOpen] = useState(false)
   const [documentGraphOpen, setDocumentGraphOpen] = useState(false)
-  // 채팅 멘션·에이전트 답변의 파일 링크 — 다른 프로젝트면 옮긴 다음 렌더에서 파일과 줄을 연다
+  // 에이전트 답변의 파일 링크 — 다른 프로젝트면 옮긴 다음 렌더에서 파일과 줄을 연다
   const [pendingOpen, setPendingOpen] = useState<{ project: string; path: string; line: number | null; options?: { preview?: boolean; forceNewTab?: boolean; replaceActive?: boolean } } | null>(null)
   const [serverFileExplorerOpen, setServerFileExplorerOpen] = useState(false)
   const [tocOpen, setTocOpen] = useState(() => scopedBrowserStorage().getItem(viewStorageKey(TOC_KEY)) !== '0')
@@ -955,10 +947,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       const notice = (event as CustomEvent<MewcatNotice>).detail
       if (notice.target === 'updates' && caps.system) setUpdatesOpen(true)
       else if (notice.target === 'system' && caps.system) setSysStatsOpen(true)
-      else if (notice.target === 'chat' && caps.chat) {
-        setChatConversationRequest({ conversation: notice.chatConversation ?? 'group' })
-        openWorkspacePanel('chat')
-      }
       else if (notice.target && typeof notice.target === 'object' && caps.agent) {
         const target = notice.target
         const workspace = target.workspacePath ?? target.cwd
@@ -969,7 +957,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
     window.addEventListener(OPEN_NOTICE_EVENT, open)
     return () => window.removeEventListener(OPEN_NOTICE_EVENT, open)
-  }, [caps.system, caps.agent, caps.chat, projectUiPath, rootProjectPath, canOpenProjects, openRootProject, openWorkspacePanel, api, active])
+  }, [caps.system, caps.agent, projectUiPath, rootProjectPath, canOpenProjects, openRootProject, active])
 
   const openSidebarProject = useCallback(async (scope: string, path: string) => {
     if (!canOpenProjects || !rootProjectPath || projectOpeningRef.current) return
@@ -1203,7 +1191,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     open: { ...workspacePanelOpen, editor: editorOpen }, sidebarWidth,
     tools: toolPresentation, popups: { memo: loadFloatingRect(popupKey('memo')), tasks: loadFloatingRect(popupKey('tasks')) },
   })
-  const permitted: Record<WorkspacePanelId, boolean> = { sidebar: caps.filesRead, chat: caps.chat, agent: caps.agent, terminal: canUseTerminal, git: caps.git, debugger: canDebug && !!auth.email && !!rootProjectPath, browser: canOpenBrowser, tasks: false, memo: caps.collaboration && !!auth.email }
+  const permitted: Record<WorkspacePanelId, boolean> = { sidebar: caps.filesRead, agent: caps.agent, terminal: canUseTerminal, git: caps.git, debugger: canDebug && !!auth.email && !!rootProjectPath, browser: canOpenBrowser, tasks: false, memo: caps.collaboration && !!auth.email }
   const layoutFactory = factoryLayout(captureLayout())
   for (const panel of WORKSPACE_PANEL_IDS) layoutFactory.open[panel] &&= permitted[panel]
   const applyLayoutPreset = (next: LayoutSnapshot) => {
@@ -1238,7 +1226,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       close: () => closeWorkspacePanel('sidebar'),
       onEscape: () => { sidebarSearchCancelRef.current?.() },
     },
-    chat: { open: chatOpen, close: () => closeWorkspacePanel('chat') },
     terminal: { open: terminalOpen, close: () => closeWorkspacePanel('terminal') },
     agent: { open: agentOpen, close: () => closeWorkspacePanel('agent') },
     git: { open: gitOpen, close: () => closeWorkspacePanel('git') },
@@ -1279,8 +1266,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       activeTabbedSurfaceRef.current = mobileForegroundPanel
     } else if (mobileForegroundPanel === 'sidebar') {
       activeTabbedSurfaceRef.current = 'sidebar'
-    } else if (mobileForegroundPanel === 'chat') {
-      lastPanelRef.current = 'chat'
     }
   }, [mobileForegroundPanel, api, isDesktop])
   useEffect(() => {
@@ -1302,14 +1287,10 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
   useEffect(() => {
     if (sidebarOpen) activeTabbedSurfaceRef.current = 'sidebar'
   }, [sidebarOpen, api])
-  useEffect(() => {
-    if (chatOpen) lastPanelRef.current = 'chat'
-  }, [chatOpen, api])
 
   const mobileKeyboardOpen = useMobileKeyboard()
   const mobileDockPanels: MobileDockPanel[] = ['sidebar', 'editor']
   if (caps.agent) mobileDockPanels.push('agent')
-  if (caps.chat && !isGuest) mobileDockPanels.push('chat')
   if (caps.terminal) mobileDockPanels.push('terminal')
   if (caps.git) mobileDockPanels.push('git')
   if (canOpenBrowser) mobileDockPanels.push('browser')
@@ -1321,7 +1302,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     const closeFocused = isDesktop() && toggle && focusedDockPanel === panel
     dockRef.current?.restore()
     if (panel === 'memo') setMemoFocusSignal(value => value + 1)
-    if (panel !== 'memo' && panel !== 'debugger' && panel !== 'browser' && panel !== 'chat') activeTabbedSurfaceRef.current = panel
+    if (panel !== 'memo' && panel !== 'debugger' && panel !== 'browser') activeTabbedSurfaceRef.current = panel
     if (panel === 'editor') {
       if (closeFocused && editorOpen) {
         setEditorOpen(false)
@@ -1460,7 +1441,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     const savedMobileForeground = projectUiPath && !isDesktop() ? loadMobileForegroundPanel(projectUiPath) : null
     const restoredOpen: Record<WorkspacePanelId, boolean> = {
       sidebar: typeof chrome.sidebarOpen === 'boolean' ? chrome.sidebarOpen : defaults.sidebarOpen,
-      chat: chatOpen, browser: browserOpen, agent: defaults.agentOpen, terminal: defaults.terminalOpen,
+      browser: browserOpen, agent: defaults.agentOpen, terminal: defaults.terminalOpen,
       git: defaults.gitOpen, tasks: false, memo: false, debugger: false,
     }
     setTocOpen(typeof chrome.tocOpen === 'boolean' ? chrome.tocOpen : defaults.tocOpen)
@@ -1488,7 +1469,7 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
     }
     chromeStateLoadedScopeRef.current = deviceLayoutScope
     chromeStateRestorePendingRef.current = deviceLayoutScope
-  }, [deviceLayoutRestored, deviceLayoutScope, compact, isDesktop, loadMobileForegroundPanel, viewStorageKey, browserOpen, canDebug, caps, auth.email, chatOpen, isGuest, projectUiPath,
+  }, [deviceLayoutRestored, deviceLayoutScope, compact, isDesktop, loadMobileForegroundPanel, viewStorageKey, browserOpen, canDebug, caps, auth.email, isGuest, projectUiPath,
     workspaceUi.chrome, workspaceUiLoaded, workspacePanelSetters, focusedPaneId, tabsHydrated, api])
 
   useEffect(() => {
@@ -1658,20 +1639,14 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
         // 받을 창이 없어도 여기서 삼킨다 — 안 그러면 브라우저 기본 Ctrl+L(주소창)로 샌다
         e.preventDefault()
         // 열려 있는 보조창이 하나도 없으면 쓸 곳이 없으니 그대로 끝낸다
-        const target = pickRefTarget(lastPanelRef.current, { agent: agentOpen, terminal: terminalOpen, chat: chatOpen })
+        const target = pickRefTarget(lastPanelRef.current, { agent: agentOpen, terminal: terminalOpen })
         if (!target) return
         const lines = range.start === range.end ? `${range.start}` : `${range.start}-${range.end}`
-        // 화면에 쓸 글자(text)와 구조(project·path)를 함께 싣는다 — 터미널·에이전트는 text를 그대로
-        // 타이핑하고, 채팅 창은 project·path로 파일 멘션 토큰을 만든다. target이 자기 것인 창만 받는다
         window.dispatchEvent(
           new CustomEvent('mew:insert-ref', {
-            detail: { target, text: `${activeRelativePath}:${lines} `, project: activeFile.project, path: activeRelativePath },
+            detail: { target, text: `${activeRelativePath}:${lines} ` },
           }),
         )
-      } else if (matchesShortcut(e, getBinding('toggleChat'))) {
-        if (!caps.chat) return
-        e.preventDefault()
-        toggleWorkspacePanel('chat')
       } else if (matchesShortcut(e, getBinding('toggleAgent'))) {
         if (!caps.agent) return
         e.preventDefault()
@@ -1710,9 +1685,9 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
       window.removeEventListener('keydown', handleKeyDown)
     }
     // 보조창 열림 상태는 Ctrl+L이 어디로 보낼지 고를 때 읽는다 — 닫힌 창으로 보내지 않게 최신 값이어야 한다
-  }, [active, saveCurrentTab, closeTab, activePath, activeTab, activeRelativePath, activeFile.path, activeFile.project, tabs, setActivePath, caps, canUseTerminal, rootProjectPath, auth.email, focusedEditor, isGuest, canOpenProjects, project, sidebarOpen, chatOpen, agentOpen, terminalOpen, mobilePanelStack, openWorkspacePanel, docsExpanded, sidebarCreate, toggleWorkspacePanel, switchCurrentWindowTabRight, switchCurrentWindowTabLeft, api, focusedPaneId])
+  }, [active, saveCurrentTab, closeTab, activePath, activeTab, activeRelativePath, activeFile.path, activeFile.project, tabs, setActivePath, caps, canUseTerminal, rootProjectPath, auth.email, focusedEditor, isGuest, canOpenProjects, project, sidebarOpen, agentOpen, terminalOpen, mobilePanelStack, openWorkspacePanel, docsExpanded, sidebarCreate, toggleWorkspacePanel, switchCurrentWindowTabRight, switchCurrentWindowTabLeft, api, focusedPaneId])
 
-  /** 채팅 멘션·에이전트 로컬 링크 — 같은 mew의 알맞은 프로젝트와 문서 탭으로 연다. */
+  /** 에이전트 로컬 링크 — 같은 mew의 알맞은 프로젝트와 문서 탭으로 연다. */
   const openMentionedFile = useCallback(
     (target: string, path: string, line: number | null = null, options?: { preview?: boolean; forceNewTab?: boolean; replaceActive?: boolean }) => {
       // 에디터는 모바일 보조창 스택의 한 항목이 아니다. 파일을 여는 순간에는 패널을 닫지
@@ -2256,28 +2231,6 @@ function EditorApp({ auth, refreshing, onLoggedOut, onRequestLogin, onProfileCha
           {memoMounted.current && <SharedMemo session={memoSession} open={memoOpen} />}
         </DockPanel>}
         </DockWorkspace>
-
-        {/* 채팅 창 — 에이전트·터미널과 같은 오른쪽 붙임 칸. 모바일에서도 프로젝트 탭 아래에서만 열린다. */}
-        {chatOpen && caps.chat && (
-          <div
-            data-workspace-panel="chat"
-          onPointerDownCapture={() => bringWorkspacePanelToFront('chat')}
-            className={`fixed inset-x-0 top-10 bottom-0 flex workspace-wide:static workspace-wide:z-auto workspace-wide:w-[22rem] workspace-wide:shrink-0 ${mobilePanelLayer('chat')}`}
-          >
-            <div className="hidden w-1.5 shrink-0 border-l border-edge workspace-wide:block" aria-hidden="true" />
-            <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-                <ChatPanel
-                  authEmail={authEmail}
-                  authDisplayName={auth.displayName}
-                  conversationRequest={chatConversationRequest}
-                project={project}
-                tree={tree}
-                onOpenFile={openMentionedFile}
-                onClose={() => closeWorkspacePanel('chat')}
-              />
-            </div>
-          </div>
-        )}
 
         </>}
       </div>

@@ -1,4 +1,4 @@
-export const MOBILE_DOCK_ORDER = ['sidebar', 'editor', 'agent', 'terminal', 'git', 'debugger', 'browser', 'memo', 'chat'] as const
+export const MOBILE_DOCK_ORDER = ['sidebar', 'editor', 'agent', 'terminal', 'git', 'debugger', 'browser', 'memo'] as const
 export type MobileDockPanel = typeof MOBILE_DOCK_ORDER[number]
 export type DockDirection = -1 | 1
 export const MOBILE_DOCK_ORDER_KEY = 'mew:mobile-dock-order'

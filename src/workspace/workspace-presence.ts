@@ -66,7 +66,7 @@ export class WorkspacePresence {
       if (message.type === 'permissions') for (const view of this.views.values()) view.tree()
     } else if (message.type === 'editor-tabs' || message.type === 'agent-tabs') {
       if (typeof message.workspacePath === 'string') window.dispatchEvent(new CustomEvent(`mew:${message.type}-changed`, { detail: { workspacePath: message.workspacePath } }))
-    } else if (message.type === 'chat' || message.type === 'comments') {
+    } else if (message.type === 'comments') {
       window.dispatchEvent(new CustomEvent('mew:signal', { detail: message }))
     }
   }

@@ -24,7 +24,7 @@ The current public installation uses Linux, macOS, or WSL 2 on Windows. See [CLI
 | Open folders, switch projects, browse files, use Git, and manage tasks | [Projects and Files](projects.md) |
 | Edit and autosave Markdown, code, tables, attachments, and PDFs | [Editor](editor.md) |
 | Connect Documents, set default instructions, and automatically guide agents | [Project Settings](project-setup.md) |
-| Collaborative editing, comments, mentions, chat, and guest sharing | [Collaboration and Sharing](collaboration.md) |
+| Collaborative editing, comments, mentions, and guest sharing | [Collaboration and Sharing](collaboration.md) |
 | Search and replace file names and contents | [Search](../configuration/search.md) |
 
 ## Execution and automation

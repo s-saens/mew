@@ -4,11 +4,11 @@ parent: "mew-settings"
 title: "Panel Layout, Mobile, and State Restoration"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-07"
+updated: "2026-11-25"
 status_hash: "018bca32e486b43c386b29de3e2087d6d1447fae6a33abc99d745367947a9382"
 files: ["src/components/tool-presentation-toggle.tsx", "src/components/SettingsModal.tsx", "src/hooks/use-refresh-tasks.ts", "src/hooks/usePresence.ts", "src/components/project-loading-overlay.tsx", "src/App.tsx", "src/components/DockWorkspace.tsx", "src/components/EditorPane.tsx", "src/components/TabBar.tsx", "src/components/AgentPanel.tsx", "src/components/mobile-dock.tsx", "src/components/layout-presets.tsx", "src/utils/layout-presets.ts", "server/layout-icon-cli.ts", "src/utils/mobile-dock.ts", "src/hooks/use-mobile-keyboard.ts", "src/hooks/use-mobile-panel-swipe.ts", "src/hooks/useTabs.ts", "server/userUiState.ts"]
 commits: []
-description: "Panel docking, mobile gestures, safe areas, presets, and account/device restoration for single-project mode. Separates tab synchronization from geometry and links optional multi-project workspaces and their independent board state."
+description: "Panel docking, maximization, mobile gestures, safe areas, presets, and account/device restoration for single-project mode. Separates tab synchronization from geometry and links optional multi-project workspaces and their independent board state."
 상위파일:
   - "MOC.md"
   - "_appearance-accounts-operations.md"
@@ -115,7 +115,7 @@ The desktop behavior below is **single-project mode**. The optional **multi-proj
 - On desktop, double-clicking a panel's move handle maximizes that panel; double-clicking the same handle again or pressing Esc restores it. Maximization is a temporary display state and does not change the saved split layout. Git, notes, and tasks use the same shared handle.
 - Double-clicking an agent or terminal tab's title, icon, or blank space opens name editing; F2 and right-click Rename remain available. Document tabs retain their existing preview-pinning behavior and do not maximize the panel.
 - Expand the selected panel's tab bar and content together across the work area, including the file explorer area, and hide and disable interaction with other panels' tab bars and content and floating note and task popups.
-- The selected tab bar spans the full width at the top of the work area, while the project header remains. During maximization, hide the side dock, document/file explorer, file explorer toggle, and chat, preventing visibility and pointer and keyboard interaction. On restoration, restore their previous open states, layouts, and input content unchanged.
+- The selected tab bar spans the full width at the top of the work area, while the project header remains. During maximization, hide the side dock, document/file explorer, and file explorer toggle, preventing visibility and pointer and keyboard interaction. On restoration, restore their previous open states, layouts, and input content unchanged.
 - Maximizing, restoring, and switching targets do not remount sessions.
 - Detailed exit conditions and mobile boundaries follow [Work Panel Layout](../../development/ui-workspace-layout.md#workspace-panel-layout).
 

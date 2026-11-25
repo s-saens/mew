@@ -1,20 +1,20 @@
 ---
 id: "mew-collaboration"
 parent: null
-title: "Collaboration, Comments, and Chat"
+title: "Collaboration and Comments"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-09-25"
+updated: "2026-11-25"
 status_hash: "c467eec96fbbe77a22a73235dd9ca07e031e047903b5f5404f8107946648cb73"
 files: []
 commits: []
-description: "A parent feature document grouping shared memo, real-time collaborative editing, comments, mentions, group chats, DMs, participants, and connection history. Provides subfeature scopes and links to detailed contracts and distinguishes ownership of individual implementations and verification."
+description: "A parent feature document grouping shared memo, real-time collaborative editing, comments, mentions, participants, and connection history. Provides subfeature scopes and links to detailed contracts and distinguishes ownership of individual implementations and verification."
 상위파일: "../_features.md"
 ---
 
 ## Requirements
 
-- Provide collaborative editing and conversations between people within file and account permissions.
+- Provide collaborative editing and document discussions within file and account permissions.
 
 - Select the work scope and related implementation in the child features.
 - Check each detailed contract even when changing multiple child features.
@@ -25,7 +25,6 @@ description: "A parent feature document grouping shared memo, real-time collabor
 - [Shared Notes](shared-notes.md)
 - [View Participants·Active Sessions](participants-and-active-sessions.md)
 - [Comments·Replies·Member Mentions](comments-replies-and-member-mentions.md)
-- [Group Chat·DM·Read Receipts](group-chat-direct-messages-and-read-status.md)
 
 ### Detailed contracts
 

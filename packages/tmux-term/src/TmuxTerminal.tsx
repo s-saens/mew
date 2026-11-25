@@ -515,7 +515,7 @@ export function TmuxTerminal({
     })
 
     // 에디터에서 누른 Ctrl+L의 `경로:줄` 참조 — 호스트 앱이 **마지막으로 연 보조창**을 골라 target을
-    // 실어 보낸다. 터미널 차례일 때만 셸 입력으로 받아 적는다(에이전트·채팅 창이 같은 이벤트를 나눠 쓴다)
+    // 실어 보낸다. 터미널 차례일 때만 셸 입력으로 받아 적는다(에이전트 창과 같은 이벤트를 나눠 쓴다)
     const onInsertRef = (e: Event) => {
       const detail = (e as CustomEvent<{ target?: string; text: string }>).detail
       if (detail.target !== insertRefTargetRef.current) return

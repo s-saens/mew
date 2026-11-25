@@ -1,8 +1,8 @@
 ---
 title: "UI overlays, selection controls, and menus"
-description: "Shared popup positioning, workspace zoom controls, custom selection, layering, viewport-level toasts and agent errors, dismissal, and action menus. Defines History-guard handoffs in normal and fullscreen views, settings, deferred dialogs, keyboard/touch behavior, and focus boundaries."
+description: "Shared popup positioning, workspace zoom controls, custom selection, layering, viewport-level toasts and agent errors, dismissal, and action menus. Defines History-guard handoffs in normal and fullscreen views, settings, the compact workspace menu, deferred dialogs, keyboard/touch behavior, and focus boundaries."
 created: "2026-11-03"
-updated: "2026-11-09"
+updated: "2026-11-25"
 상위파일: "ui-contracts.md"
 ---
 
@@ -165,7 +165,7 @@ Validation: `server/action-menu-horizontal-ui.test.ts` checks rendering the same
 
 A separate, untitled section at the top of the menu contains the workspace zoom controls, before the account and other actions. Minus and plus adjust the interface from 50% to 200% in preset steps; selecting the percentage resets it to 100%. The browser stores the choice locally and restores it before the first application render. The setting applies to this Mew page and is independent of browser zoom and editor-local font resizing.
 
-Tools contains Remote Browser, Server File Explorer (`Alt+E`), and Scheduled Tasks (`Alt+S`), filtered by capabilities. Mew contains Updates (`Ctrl+U`), owner-only Mewlink, and Settings (`Ctrl+,`). The redundant Commit, system resources, chat, database, and retired Android entries are absent. System resources remain in the top bar; database actions follow the [database feature contract](../features/document-databases/document-databases-and-catalog.md). Notification content follows the [header notification contract](ui-recovery-feedback.md#header-notifications).
+Tools contains Remote Browser, Server File Explorer (`Alt+E`), and Scheduled Tasks (`Alt+S`), filtered by capabilities. Mew contains Updates (`Ctrl+U`), owner-only Mewlink, and Settings (`Ctrl+,`). The redundant Commit, system resources, database, and retired Android entries are absent. System resources remain in the top bar; database actions follow the [database feature contract](../features/document-databases/document-databases-and-catalog.md). Notification content follows the [header notification contract](ui-recovery-feedback.md#header-notifications).
 
 Preserve portals, visual viewport/mobile Dock boundaries, internal scrolling, arrow-key and Home/End navigation that skips disabled items, and focus restoration. Selection, Esc, Tab, Back, and outside presses dismiss the menu. Individual notification acknowledgment keeps it open. Pressing another top menu button immediately switches menus; other outside presses do not activate underlying controls. `server/workspace-menu-ui.test.ts` checks groups, density, previews, acknowledgment, history, avatar fallback, themes, four locales, and 320/390/1100px bounds. `server/action-menu-ui.test.ts` retains shared primitive coverage.
 
