@@ -1,7 +1,7 @@
 ---
 title: "Agent Runtime Settings"
-description: "Guides users through the runtime picker and its settings dialog to install a runtime, sign in, configure execution, or remove an installation. Covers update terminals, provider prerequisites, subscriptions, and model, effort, and permission defaults."
-updated: "2026-11-18"
+description: "Guides users through runtime installation, row warnings and errors, update terminals, provider sign-in, execution settings, and runtime removal. Covers provider prerequisites, subscriptions, and session defaults."
+updated: "2026-11-25"
 상위파일:
   - "../../.mew/docs/MOC.md"
   - "MOC.md"
@@ -20,7 +20,9 @@ Select the gear beside a runtime to open its settings.
 | **Advanced execution settings** | Edit the executable, arguments, and environment variables supported by the runtime. Select **Save** to apply your edits to new sessions. |
 | **Management** | Reset saved execution settings or uninstall the runtime. Each action asks for confirmation. |
 
-Select **Install** or **Update** in a runtime row. The action changes to a terminal icon as the job starts. Open it to see progress and the result. Closing the popup leaves the job running. Use **Retry** after a failure. After installation finishes, select the runtime to open a conversation.
+Select **Install** or **Updates** in a runtime row. Once the job starts, use the terminal icon to see progress and the result. Closing the popup leaves the job running. Use **Retry** after a failure. After installation finishes, select the runtime to open a conversation.
+
+Select an orange **!** for warning details or a red **!** for error details. For example, a warning can explain how to restore the default executable when the saved executable is missing.
 
 The runtime picker loads independently of update checks. Updates require system permission, and opening an update terminal requires terminal permission. Each update runs individually and checks whether the agent is running. Codex and Claude update their host CLIs through these actions. Bundled ACP connectors update with Mew. See [Updates](../deployment/native.md#unified-updates-for-installed-dependencies-and-agents).
 

@@ -1497,6 +1497,7 @@ export const uiMessages = {
   "코드 전송": ["Send code","发送代码","コードを送信"],
   "로그인 확인 중…": ["Checking sign-in…","正在检查登录…","ログインを確認中…"],
   "오류 상세 보기": ["View error details","查看错误详情","エラー詳細を表示"],
+  "경고 상세 보기": ["View warning details","查看警告详情","警告の詳細を表示"],
   "{p0} 사진 미리보기": ["{p0} image preview","{p0} 图片预览","{p0} の画像プレビュー"],
   "동영상 미리보기": ["Video preview","视频预览","動画プレビュー"],
   "{p0} 동영상 미리보기": ["{p0} video preview","{p0} 视频预览","{p0} の動画プレビュー"],

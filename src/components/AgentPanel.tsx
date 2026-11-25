@@ -1456,7 +1456,7 @@ function RuntimePicker({ canViewSessions, onSelect, onSelectSet }: { canViewSess
               const busy = installation.installing === runtime.id || status?.installing === true
               const { ref, ...handleProps } = drag.getItemProps(index)
               return (
-                <div key={runtime.id} ref={ref} data-runtime-id={runtime.id} className="relative isolate flex min-h-8 flex-wrap items-center gap-2 rounded-md border border-edge bg-surface px-2 py-0.5 sm:min-h-10 sm:px-2.5 sm:py-1.5">
+                <div key={runtime.id} ref={ref} data-runtime-id={runtime.id} className="relative isolate flex min-h-8 items-center gap-2 rounded-md border border-edge bg-surface px-2 py-0.5 sm:min-h-10 sm:px-2.5 sm:py-1.5">
                   <button
                     type="button"
                     aria-label={runtime.label}
@@ -1485,8 +1485,8 @@ function RuntimePicker({ canViewSessions, onSelect, onSelectSet }: { canViewSess
                   </button>
                   <span className="pointer-events-none relative flex h-6 w-6 shrink-0 items-center justify-center text-ink-secondary"><runtime.Glyph /></span>
                   <div className="pointer-events-none relative min-w-0 flex-1 truncate text-sm text-ink">{runtime.label}</div>
-                  <RuntimeInstallAction runtimeId={runtime.id} label={runtime.label} status={status} {...installation} />
-                  <RuntimeUpdateAction runtimeId={runtime.id} runtimeLabel={runtime.label} installed={status?.installed === true} canViewSessions={canViewSessions} updates={updates} />
+                  <RuntimeUpdateAction runtimeId={runtime.id} runtimeLabel={runtime.label} installed={status?.installed === true}
+                    canViewSessions={canViewSessions} updates={updates} installation={{ status, ...installation }} />
                   {index < 9 && <kbd aria-hidden="true" className="pointer-events-none relative text-xs tabular-nums text-ink-muted">{index + 1}</kbd>}
                   <div className="relative shrink-0"><RuntimeSettingsButton runtimeId={runtime.id} label={runtime.label} /></div>
                 </div>

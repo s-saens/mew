@@ -4,6 +4,10 @@ import { HoverTipLayer } from '@mew/ui'
 import { useWorkspaceApi } from '../api/workspace-api-context'
 import { uiText } from '@mew/ui/i18n-core'
 import type { UpdatesStatus } from '../../shared/updates'
+import type { AgentRuntimeStatus } from '../api/client'
+import { canInstallRuntime, type useRuntimeInstall } from '../hooks/use-runtime-install'
+import { RuntimeInstallAction } from './RuntimeInstallProgress'
+import { RuntimeIssueTip } from './runtime-issue-tip'
 import { SessionTerminalPopup } from './SessionTerminalPopup'
 
 const updateStateLabels = { queued: '대기 중', running: '업데이트 중…', succeeded: '완료', failed: '실패' } as const
@@ -37,33 +41,38 @@ export function useRuntimeUpdates(active: boolean) {
   return { status, starting, error, start }
 }
 
-export function RuntimeUpdateAction({ runtimeId, runtimeLabel, installed, canViewSessions, updates }: {
+export function RuntimeUpdateAction({ runtimeId, runtimeLabel, installed, canViewSessions, updates, installation }: {
   runtimeId: string
   runtimeLabel: string
   installed: boolean
   canViewSessions: boolean
   updates: ReturnType<typeof useRuntimeUpdates>
+  installation?: { status?: AgentRuntimeStatus | null } & ReturnType<typeof useRuntimeInstall>
 }) {
   const [openedSession, setOpenedSession] = useState<string | null>(null)
   const id = `${runtimeId === 'codex' || runtimeId === 'claude' ? 'cli' : 'agent'}:${runtimeId}`
   const item = updates.status?.items.find(row => row.id === id && row.category === 'agent')
   const job = updates.status?.job.items.find(row => row.id === id)
-  const session = item?.session ?? job?.session ?? null
+  const session = (job ? job.session : item?.session) ?? null
   const starting = updates.starting === id
   const busy = !!updates.starting || !!updates.status?.job.running
   const running = starting || !!updates.status?.job.running && (job?.state === 'queued' || job?.state === 'running')
   const error = running ? null : updates.error?.id === id ? updates.error.message : job?.state === 'failed' ? job.error : null
-  const canUpdate = installed && item?.available && item.canUpdate && (job?.state !== 'succeeded' || updates.status?.checkedAt !== 0)
-  const showTerminal = canViewSessions && (running || !!session)
+  const installing = installation?.installing === runtimeId || !!installation?.status?.installing
+  const canUpdate = installed && !installing && item?.available && item.canUpdate && (job?.state !== 'succeeded' || updates.status?.checkedAt !== 0)
+  const canInstall = canInstallRuntime(installation?.status)
+  const failedSession = job?.state === 'failed' && !!job.session
+  const showTerminal = canViewSessions && (running || !!session && !installing && !canInstall && (!canUpdate || failedSession))
   const mainDisabled = showTerminal ? !session || starting : busy
   const label = item?.label ?? runtimeLabel
   const actionText = uiText(error ? '다시 시도' : '업데이트')
   const popupState = job?.session === openedSession ? job?.state : undefined
 
-  if (openedSession && (!canViewSessions || openedSession !== session)) setOpenedSession(null)
+  if (openedSession && (!showTerminal || openedSession !== session)) setOpenedSession(null)
 
-  if (!showTerminal && !canUpdate && !running && !error) return null
   return <>
+    {installation && <RuntimeInstallAction runtimeId={runtimeId} label={runtimeLabel} {...installation}
+      hideOutput={canUpdate || showTerminal || running} />}
     {(showTerminal || canUpdate || running) && <HoverTipLayer className="relative flex shrink-0 items-center">
       <button
         type="button"
@@ -83,8 +92,8 @@ export function RuntimeUpdateAction({ runtimeId, runtimeLabel, installed, canVie
       </> : running ? uiText('업데이트 중…') : actionText}</button>
       {showTerminal && canUpdate && !running && <button type="button" disabled={busy} className={actionClass} onClick={() => updates.start(id)}>{actionText}</button>}
     </HoverTipLayer>}
-    {error && <div role="alert" className="relative order-last max-h-24 w-full min-w-0 basis-full select-text overflow-auto whitespace-pre-wrap wrap-anywhere text-xs text-danger">{error}</div>}
-    {canViewSessions && openedSession && openedSession === session && <SessionTerminalPopup
+    {error && <RuntimeIssueTip tone="danger" message={error} />}
+    {showTerminal && openedSession && openedSession === session && <SessionTerminalPopup
       key={openedSession}
       title={label}
       session={openedSession}

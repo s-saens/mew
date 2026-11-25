@@ -1,9 +1,14 @@
 import { useRef, useState } from 'react'
 import { uiText } from '@mew/ui/i18n-core'
+import type { AgentRuntimeStatus } from '../api/client'
 import { useWorkspaceApi } from '../api/workspace-api-context'
 import { cachedAgentRuntimes, refreshAgentRuntimes, updateAgentRuntimesCache } from '../utils/agentPickerCache'
 
 export type InstallFailure = { id: string; message: string }
+
+export function canInstallRuntime(status?: AgentRuntimeStatus | null) {
+  return !!status?.installable && !status.installed && !status.installBlocker
+}
 
 export function useRuntimeInstall() {
   const { installAgentRuntime } = useWorkspaceApi()

@@ -4,11 +4,11 @@ parent: "mew-agents"
 title: "AI runtime installation, authentication, and execution settings"
 status: "implemented"
 created: "2026-09-18"
-updated: "2026-11-18"
+updated: "2026-11-25"
 status_hash: "ce50d3fa70fce93520dfd200e419db9b718cebd2b370a52a9250e624fc80aed1"
-files: ["src/components/RuntimeInstallProgress.tsx", "src/components/AgentPanel.tsx", "src/components/RuntimeSettingsModal.tsx", "src/components/RuntimeLaunchSettings.tsx", "src/components/agentRuntimes.tsx", "server/agentRuntimes.ts", "server/agentRuntimeInstall.ts", "server/agentDefaults.ts"]
+files: ["src/components/RuntimeInstallProgress.tsx", "src/components/runtime-update-actions.tsx", "src/components/runtime-issue-tip.tsx", "src/hooks/use-runtime-install.ts", "src/components/AgentPanel.tsx", "src/components/RuntimeSettingsModal.tsx", "src/components/RuntimeLaunchSettings.tsx", "src/components/agentRuntimes.tsx", "server/agentRuntimes.ts", "server/agentRuntimeInstall.ts", "server/agentDefaults.ts"]
 commits: []
-description: "Defines runtime installation, update terminals, and the settings dialog for readiness, account access, advanced execution settings, and management. Covers failed attempts, provider-specific installers, host CLI updates, and model, effort, and permission defaults."
+description: "Defines runtime picker warnings and errors, terminal access after installation or update starts, and settings for readiness, account access, advanced execution, and management. Covers failed attempts, provider-specific installers, host CLI updates, and session defaults."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -36,11 +36,11 @@ description: "Defines runtime installation, update terminals, and the settings d
 <!-- mew:implementation:start -->
 ## Implementation details
 
-- The runtime picker renders before the separate update check completes. Installed rows offer available, automatically supported individual updates. Codex and Claude map to their host CLI updates, including supported official standalone Codex installations. The update action becomes a terminal button when a session starts. It stays available after completion while the session exists. The [update contract](../appearance-accounts-operations/application-updates-and-operations.md) owns version discovery, session access, and execution.
+- The runtime picker renders before the separate update check completes. Installed rows offer available, automatically supported individual updates. Codex and Claude map to their host CLI updates, including supported official standalone Codex installations. An available update takes precedence over a retained terminal from a previous completed run. The terminal action becomes usable when the current update session exists. A failed update can offer **Retry** alongside its terminal. The [update contract](../appearance-accounts-operations/application-updates-and-operations.md) owns version discovery, session access, and execution.
 
 - Installation starts a server-side command and replaces the install action with a terminal button. The read-only popup polls output approximately once per second, follows new output, and preserves the scroll position while the user reads earlier output. Closing it leaves the attempt running. The picker stays open after installation so the user can inspect the result or select the installed runtime. Failed attempts retain their output and offer a retry.
 - The server acknowledges background starts independently of installer completion. Attempt-specific reads return the outcome of the accepted installation even if a client connection is interrupted. The server keeps the latest attempt and its last 12,000 characters per runtime in memory. A retry replaces that attempt. See [ADR 0188](../../decisions/0188-agent-runtime-installation-attempts.md).
-- Presence checks follow the executable selected for launch. If an account’s saved executable is missing and the default is installed, the picker directs the user to the executable setting. Saving or resetting settings refreshes the open runtime list. The [runtime guide](../../../../docs/configuration/agent-runtimes.md) lists provider and host prerequisites.
+- Runtime rows show warnings and errors as inline exclamation icons. Activate the orange warning or red error icon to open its details. Presence checks follow the executable selected for launch. If an account’s saved executable is missing and the default is installed, the warning directs the user to the executable setting. Saving or resetting settings refreshes the open runtime list. The [runtime guide](../../../../docs/configuration/agent-runtimes.md) lists provider and host prerequisites.
 
 - Runtime settings open on **Overview**, which shows installation status and available actions to install the runtime and access its provider account. Codex and Claude distinguish the bundled connector from the CLI that runs sessions. Supported account queries show the identity and plan directly. Login and logout actions reflect the reported authentication state.
 - **Advanced execution settings** holds editable launch options. Switching tabs preserves edits while the dialog is open. Save becomes available after an edit and applies changes to new sessions. Clearing an executable or arguments restores the default. Removing an environment variable preserves the other masked values.

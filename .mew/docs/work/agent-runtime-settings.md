@@ -1,8 +1,8 @@
 ---
 title: "Agent runtime settings improvements"
-description: "Records the runtime settings dialog redesign, launch overrides, environment variable removal, management actions, runtime status synchronization, and local verification."
+description: "Records the runtime settings redesign, launch overrides, management actions, runtime status synchronization, and the inline runtime picker notices and terminal actions, with verification."
 created: "2026-11-17"
-updated: "2026-11-18"
+updated: "2026-11-25"
 ---
 
 # Agent runtime settings improvements
@@ -28,3 +28,11 @@ The previous dialog put install, login, reset, and uninstall actions on the same
 All 20 focused tests passed. Browser checks at 360px and 1100px covered keyboard navigation, stable tab positions, pending edits across tabs, reset and uninstall confirmations, and the separate Codex connector and CLI statuses. At 360px the Save button stayed within the viewport after ten environment rows were added. The suite also covered account actions, installation progress, updates, settings storage, and shared translations. The browser tests used mocked provider APIs.
 
 The local build passed, including TypeScript, and lint passed with warnings. The project-wide localization check flagged Korean UI literals outside the runtime settings changes. The documentation checker validated descriptions and reported the same 39 broken links as before the edits. Live provider operations and physical-device checks remain unverified.
+
+## Runtime picker notices and terminal actions on 2026-11-25
+
+Warnings and errors now open from colored exclamation icons in the runtime row, keeping long messages from changing the list height. When a new update is available, the picker offers the update action first. The terminal button becomes usable once the job has a session. See the [runtime picker contract](../features/terminals-agents-automation/ai-runtime-installation-authentication-and-settings.md#implementation-details).
+
+An isolated copy of committed main with the task changes passed `npm run build`, including TypeScript. The 11 focused tests passed, covering desktop and mobile warnings, update and install transitions, terminal access, settings, and translations using mocked APIs. Lint passed with existing warnings. Additional new-tab shortcut, Kimi registry, and repository-wide localization checks also failed on the baseline. The documentation checker validated the wiki descriptions and reported 39 existing link errors in the shared checkout. Whitespace validation passed.
+
+The running Mew instance at `127.0.0.1:5000` served the new UI entry point and the reachable agent panel and runtime settings bundles. All returned HTTP 200 and matched local `dist` assets by SHA-256. The server process stayed running throughout the check. Provider installations and physical-device checks remain unverified.
