@@ -8,7 +8,7 @@ updated: "2026-11-25"
 status_hash: "ce50d3fa70fce93520dfd200e419db9b718cebd2b370a52a9250e624fc80aed1"
 files: ["src/components/RuntimeInstallProgress.tsx", "src/components/runtime-update-actions.tsx", "src/components/runtime-issue-tip.tsx", "src/hooks/use-runtime-install.ts", "src/components/AgentPanel.tsx", "src/components/RuntimeSettingsModal.tsx", "src/components/RuntimeLaunchSettings.tsx", "src/components/agentRuntimes.tsx", "server/agentRuntimes.ts", "server/agentRuntimeInstall.ts", "server/agentDefaults.ts"]
 commits: []
-description: "Defines runtime picker warnings and errors, terminal access after installation or update starts, and settings for readiness, account access, advanced execution, and management. Covers failed attempts, provider-specific installers, host CLI updates, and session defaults."
+description: "Defines runtime picker warnings and errors, terminal actions during installation and update, and removal of the update terminal action on success. Covers failed attempts, provider-specific installers, runtime settings, and session defaults."
 상위파일:
   - "MOC.md"
   - "_terminals-agents-automation.md"
@@ -36,7 +36,7 @@ description: "Defines runtime picker warnings and errors, terminal access after 
 <!-- mew:implementation:start -->
 ## Implementation details
 
-- The runtime picker renders before the separate update check completes. Installed rows offer available, automatically supported individual updates. Codex and Claude map to their host CLI updates, including supported official standalone Codex installations. An available update takes precedence over a retained terminal from a previous completed run. The terminal action becomes usable when the current update session exists. A failed update can offer **Retry** alongside its terminal. The [update contract](../appearance-accounts-operations/application-updates-and-operations.md) owns version discovery, session access, and execution.
+- The runtime picker renders before the separate update check completes. Installed rows offer available, automatically supported individual updates. Codex and Claude map to their host CLI updates, including supported official standalone Codex installations. The terminal action becomes usable when the current update session exists and disappears from the row on success. An open popup stays available to show the result. A failed update can offer **Retry** alongside its terminal. To reopen retained output after success, use the [update screen](../appearance-accounts-operations/application-updates-and-operations.md#execution-and-session-viewing).
 
 - Installation starts a server-side command and replaces the install action with a terminal button. The read-only popup polls output approximately once per second, follows new output, and preserves the scroll position while the user reads earlier output. Closing it leaves the attempt running. The picker stays open after installation so the user can inspect the result or select the installed runtime. Failed attempts retain their output and offer a retry.
 - The server acknowledges background starts independently of installer completion. Attempt-specific reads return the outcome of the accepted installation even if a client connection is interrupted. The server keeps the latest attempt and its last 12,000 characters per runtime in memory. A retry replaces that attempt. See [ADR 0188](../../decisions/0188-agent-runtime-installation-attempts.md).

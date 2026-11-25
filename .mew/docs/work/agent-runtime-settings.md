@@ -1,6 +1,6 @@
 ---
 title: "Agent runtime settings improvements"
-description: "Records the runtime settings redesign, launch overrides, management actions, runtime status synchronization, and the inline runtime picker notices and terminal actions, with verification."
+description: "Records the runtime settings redesign, launch overrides, management actions, inline picker notices, and removal of the terminal action after update success, with verification."
 created: "2026-11-17"
 updated: "2026-11-25"
 ---
@@ -36,3 +36,5 @@ Warnings and errors now open from colored exclamation icons in the runtime row, 
 An isolated copy of committed main with the task changes passed `npm run build`, including TypeScript. The 11 focused tests passed, covering desktop and mobile warnings, update and install transitions, terminal access, settings, and translations using mocked APIs. Lint passed with existing warnings. Additional new-tab shortcut, Kimi registry, and repository-wide localization checks also failed on the baseline. The documentation checker validated the wiki descriptions and reported 39 existing link errors in the shared checkout. Whitespace validation passed.
 
 The running Mew instance at `127.0.0.1:5000` served the new UI entry point and the reachable agent panel and runtime settings bundles. All returned HTTP 200 and matched local `dist` assets by SHA-256. The server process stayed running throughout the check. Provider installations and physical-device checks remain unverified.
+
+The follow-up removes the picker terminal action on update success. An open popup shows the result, and the Updates screen retains access to the session. Six Chromium tests passed across the picker, installation, and Updates screen with mocked APIs. TypeScript and the production build passed. Lint reported existing warnings. The documentation checker validated descriptions and reported 39 existing link errors. The running instance served the new entry assets and AgentPanel bundle with HTTP 200 and matching SHA-256 checksums. No provider update was run for verification.

@@ -125,7 +125,7 @@ test('runtime updates load independently and run only the matching available upd
   } finally { await browser.close() }
 })
 
-test('runtime update turns into terminal access and keeps failed and completed sessions available', { timeout: 60_000 }, async t => {
+test('runtime update keeps the failed terminal action and hides it on success', { timeout: 60_000 }, async t => {
   const fixture = await pickerFixture({ retainedInstall: true })
   const browser = await connectTestBrowser()
   t.after(() => browser.close())
@@ -158,9 +158,8 @@ test('runtime update turns into terminal access and keeps failed and completed s
           status = { ...status, checkedAt: 0, job: { running: true, items: [{ id, state: 'queued', error: null }] } }
           return route.fulfill({ json: status })
         }
-        const completed: UpdatesStatus = { ...status, checkedAt: 0, job: { running: false, items: [{ id, state: 'succeeded', error: null, session }] } }
-        status = { ...completed, checkedAt: 2, items: [{ ...candidate, available: false, canUpdate: false, current: candidate.latest, session }] }
-        return route.fulfill({ json: completed })
+        status = { ...status, checkedAt: 0, job: { running: true, items: [{ id, state: 'running', error: null, session }] } }
+        return route.fulfill({ json: status })
       }
       if (route.request().method() === 'DELETE') { deletes++; return route.fulfill({ json: { ok: true } }) }
       return route.fulfill({ contentType: 'text/html', body: fixture })
@@ -236,19 +235,26 @@ test('runtime update turns into terminal access and keeps failed and completed s
       assert.equal(await popup.count(), 0)
       await retry.click()
       await terminal.click()
+      await output.waitFor()
+      status = {
+        checkedAt: 2,
+        items: [{ ...candidate, available: false, canUpdate: false, current: candidate.latest, session }],
+        job: { running: false, items: [{ id, state: 'succeeded', error: null, session }] },
+      }
       await popup.getByRole('status').filter({ hasText: '완료' }).waitFor()
       assert.equal(await output.getAttribute('data-session'), session)
+      assert.equal(await terminal.count(), 0)
+      assert.equal(await installTerminal.count(), 0)
       assert.equal(await row.getByRole('button', { name: '업데이트', exact: true }).count(), 0)
       await popup.getByRole('button', { name: '닫기', exact: true }).click()
 
       await closePicker.click()
       status = { ...status, job: { running: false, items: [{ id: 'cli:codex', state: 'succeeded', error: null }] } }
+      const refreshed = page.waitForResponse(response => response.url().endsWith('/api/updates/status'))
       await openPicker.click()
-      await terminal.click()
-      assert.equal(await output.getAttribute('data-session'), session)
-      await popup.getByRole('button', { name: '닫기', exact: true }).click()
-      await page.getByRole('button', { name: 'remove cursor executable' }).click()
-      assert.equal(await terminal.isEnabled(), true)
+      await refreshed
+      await installTerminal.waitFor({ state: 'hidden' })
+      assert.equal(await terminal.count(), 0, 'the previous session stays hidden after another update')
       assert.deepEqual(requests, [[id], [id]])
       assert.equal(deletes, 0)
       assert.deepEqual(pageErrors, [])

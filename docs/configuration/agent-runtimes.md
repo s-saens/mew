@@ -20,7 +20,7 @@ Select the gear beside a runtime to open its settings.
 | **Advanced execution settings** | Edit the executable, arguments, and environment variables supported by the runtime. Select **Save** to apply your edits to new sessions. |
 | **Management** | Reset saved execution settings or uninstall the runtime. Each action asks for confirmation. |
 
-Select **Install** or **Updates** in a runtime row. Once the job starts, use the terminal icon to see progress and the result. Closing the popup leaves the job running. Use **Retry** after a failure. After installation finishes, select the runtime to open a conversation.
+Select **Install** or **Updates** in a runtime row. Once the job starts, use the terminal icon to see progress and the result. Closing the popup leaves the job running. Use **Retry** after a failure. After an update succeeds, the terminal icon disappears from the row. You can still read the result in an open popup or reopen the logs from the **Updates** screen. After installation finishes, select the runtime to open a conversation.
 
 Select an orange **!** for warning details or a red **!** for error details. For example, a warning can explain how to restore the default executable when the saved executable is missing.
 

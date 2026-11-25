@@ -62,17 +62,18 @@ export function RuntimeUpdateAction({ runtimeId, runtimeLabel, installed, canVie
   const canUpdate = installed && !installing && item?.available && item.canUpdate && (job?.state !== 'succeeded' || updates.status?.checkedAt !== 0)
   const canInstall = canInstallRuntime(installation?.status)
   const failedSession = job?.state === 'failed' && !!job.session
-  const showTerminal = canViewSessions && (running || !!session && !installing && !canInstall && (!canUpdate || failedSession))
+  const showTerminal = canViewSessions && (running || failedSession && !installing && !canInstall)
+  const popupSession = canViewSessions && openedSession === session ? openedSession : null
   const mainDisabled = showTerminal ? !session || starting : busy
   const label = item?.label ?? runtimeLabel
   const actionText = uiText(error ? '다시 시도' : '업데이트')
   const popupState = job?.session === openedSession ? job?.state : undefined
 
-  if (openedSession && (!showTerminal || openedSession !== session)) setOpenedSession(null)
+  if (openedSession && !popupSession) setOpenedSession(null)
 
   return <>
     {installation && <RuntimeInstallAction runtimeId={runtimeId} label={runtimeLabel} {...installation}
-      hideOutput={canUpdate || showTerminal || running} />}
+      hideOutput={canUpdate || running || !installing && installed && !!(job || item?.session)} />}
     {(showTerminal || canUpdate || running) && <HoverTipLayer className="relative flex shrink-0 items-center">
       <button
         type="button"
@@ -93,10 +94,10 @@ export function RuntimeUpdateAction({ runtimeId, runtimeLabel, installed, canVie
       {showTerminal && canUpdate && !running && <button type="button" disabled={busy} className={actionClass} onClick={() => updates.start(id)}>{actionText}</button>}
     </HoverTipLayer>}
     {error && <RuntimeIssueTip tone="danger" message={error} />}
-    {showTerminal && openedSession && openedSession === session && <SessionTerminalPopup
-      key={openedSession}
+    {popupSession && <SessionTerminalPopup
+      key={popupSession}
       title={label}
-      session={openedSession}
+      session={popupSession}
       running
       canStop={false}
       statusNote={popupState && uiText(updateStateLabels[popupState])}
