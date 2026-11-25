@@ -1,8 +1,8 @@
 ---
 title: "Mew.run homepage and Mewlink entry"
-description: "Design and implemented contract for the deployed Mew homepage: frosted surfaces, product-led composition, content, accessibility, delivery ownership, and acceptance criteria for the separate link.mew.run sign-in entry."
+description: "Design and implementation contract for the Mew homepage, including frosted surfaces, navigation logo contrast, product content, accessibility, and the separate link.mew.run sign-in entry."
 created: "2026-11-11"
-updated: "2026-11-11"
+updated: "2026-11-25"
 ---
 
 # Mew.run homepage and Mewlink entry
@@ -62,6 +62,8 @@ The homepage performs no central account request and loads no dashboard, connect
 At 390px, stack the hero and offset note, preserve 44px primary touch targets, and fit the screenshot without horizontal page scrolling. At 768px, allow a quieter two-column composition where content fits. At 1440px, use the full product visual with a bounded reading width. Also inspect a narrow 320px viewport.
 
 Provide a skip link, semantic landmarks, one H1, sequential headings, descriptive link text, visible keyboard focus, sufficient contrast, and reduced-motion support. Page zoom remains available. Images have intrinsic dimensions to prevent layout shifts; fonts have fallbacks. Decorative surfaces and diagrams are hidden from assistive technology.
+
+The navigation logo uses dark strokes on the light glass surface in both system color schemes. The browser tab icon follows the browser's color scheme.
 
 ## Delivery and project ownership
 

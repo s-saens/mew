@@ -1,11 +1,19 @@
 ---
 title: "Mew.run homepage and Mewlink subdomain work"
-description: "Records the design-first homepage and Mewlink origin split, local verification, the authorized production deployment and domain/DNS checks, clean source packaging, and remaining authenticated-login, host-runtime, and native-device limits."
+description: "Records the design-first homepage and Mewlink origin split, production verification, and the locally verified navigation logo contrast fix. Includes remaining authenticated-login, host-runtime, and native-device limits."
 created: "2026-11-11"
-updated: "2026-11-11"
+updated: "2026-11-25"
 ---
 
 # Mew.run homepage and Mewlink subdomain work
+
+## 2026-11-25 navigation logo contrast
+
+The shared SVG favicon rendered white under a dark device preference while the homepage navigation stayed light. The header now applies a dark treatment to the logo. The [homepage contract](../features/mew-run-homepage.md#responsive-and-accessibility-requirements) defines the expected contrast.
+
+The Chromium regression failed on the original styles and passed with the fix at 320, 390, 768, and 1440px under both color schemes. The browser test also checks that the workspace screenshot loads at its declared aspect ratio, which accommodates the current higher-resolution image. Both builds, the central type check, and three homepage Worker tests passed. Lint passed with warnings. The documentation check passed metadata validation and reported the same 39 missing links as before the change.
+
+Verification was local. The production homepage remains on the deployed version.
 
 ## Purpose and design
 
