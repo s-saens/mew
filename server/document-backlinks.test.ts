@@ -6,6 +6,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { DocumentBacklinkIndex } from './document-backlinks.ts'
 import { DocumentLinkIndex } from './document-link-index.ts'
+import { DocumentLinkStorage } from './document-link-storage.ts'
 import { DocumentGraphIndex } from './document-graph.ts'
 
 test('graph and backlinks share parses; real links, cross-project paths and parent exclusion', async t => {
@@ -94,4 +95,46 @@ test('backlinks exclude worktree copies and resolve wiki names within an explici
   const opened = await index.read(path.join(worktree, 'pages', 'target.md'), [worktree], () => true)
   assert.deepEqual(opened.documents.map(document => document.path), [path.join(worktree, 'references', 'source.md')], '워크트리를 명시적 루트로 열면 해당 문서의 위키 링크를 판정한다')
   assert.equal(opened.skipped, 0)
+})
+
+test('backlinks reuse SQLite parses after reopening and check file changes and access', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-backlinks-sqlite-'))
+  const target = path.join(root, 'target.md'), source = path.join(root, 'source.md')
+  const database = path.join(root, 'index', 'links.sqlite')
+  const first = new DocumentLinkStorage(database), reopened = new DocumentLinkStorage(database)
+  t.after(async () => {
+    first.close()
+    reopened.close()
+    await fs.rm(root, { recursive: true, force: true })
+  })
+  await fs.writeFile(target, 'Target')
+  await fs.writeFile(source, '[target](target.md)')
+  assert.deepEqual((await new DocumentBacklinkIndex(undefined, first).read(target, [root], () => true)).documents.map(doc => doc.path), [source])
+  first.close()
+
+  const index = new DocumentBacklinkIndex(undefined, reopened)
+  const reads = t.mock.method(fs, 'readFile')
+  assert.deepEqual((await index.read(target, [root], file => file !== source)).documents, [])
+  assert.deepEqual((await index.read(target, [root], () => true)).documents.map(doc => doc.path), [source])
+  assert.equal(reads.mock.callCount(), 0, 'reopening the index does not reread unchanged Markdown bodies')
+
+  await fs.writeFile(source, 'No links')
+  assert.deepEqual((await index.read(target, [root], () => true)).documents, [])
+  assert.deepEqual(reads.mock.calls.map(call => call.arguments[0]), [source])
+})
+
+test('backlinks still parse Markdown when the SQLite cache cannot open', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mew-backlinks-no-cache-'))
+  const target = path.join(root, 'target.md'), source = path.join(root, 'source.md')
+  const storage = new DocumentLinkStorage(path.join(target, 'links.sqlite'))
+  t.after(async () => {
+    storage.close()
+    await fs.rm(root, { recursive: true, force: true })
+  })
+  await fs.writeFile(target, 'Target')
+  await fs.writeFile(source, '[target](target.md)')
+
+  const result = await new DocumentBacklinkIndex(undefined, storage).read(target, [root], () => true)
+  assert.deepEqual(result.documents.map(doc => doc.path), [source])
+  assert.equal(result.skipped, 0)
 })

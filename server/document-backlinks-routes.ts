@@ -3,13 +3,17 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { DocumentLinkIndex } from './document-link-index.ts'
 import { DocumentBacklinkIndex } from './document-backlinks.ts'
+import { DocumentLinkStorage } from './document-link-storage.ts'
+import { DATA_DIR } from './dataDir.ts'
 import { authOf, requireFeature } from './reqAuth.ts'
 import { canUse, fileAccess } from './access-policy.ts'
 import { DEFAULT_PROJECT, WORKSPACE_PROJECT, isDeniedSegment, listProjects, pathsForWorkspace, resolveProjectPath, workspaceContext, workspacePaths } from './paths.ts'
 import { readRootProjects } from './userUiState.ts'
 
 export function createDocumentBacklinksRouter(links = new DocumentLinkIndex()): express.Router {
-  const router = express.Router(), index = new DocumentBacklinkIndex(links)
+  const router = express.Router()
+  const storage = new DocumentLinkStorage(path.join(DATA_DIR, 'document-links', 'v1.sqlite'))
+  const index = new DocumentBacklinkIndex(links, storage)
   router.get('/docs/backlinks', requireFeature('filesRead'), async (req, res) => {
     try {
       const auth = authOf(req), active = workspacePaths.root
