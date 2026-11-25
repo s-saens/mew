@@ -1,11 +1,19 @@
 ---
 title: "Mew.run homepage and Mewlink subdomain work"
-description: "Records the design-first homepage and Mewlink origin split, production verification, and the locally verified navigation logo contrast fix. Includes remaining authenticated-login, host-runtime, and native-device limits."
+description: "Records the design-first homepage and Mewlink origin split, production verification, and local verification of the curl-first setup guide, Mewlink steps, and theme switch. Includes remaining authenticated-login, host-runtime, and native-device limits."
 created: "2026-11-11"
 updated: "2026-11-25"
 ---
 
 # Mew.run homepage and Mewlink subdomain work
+
+## 2026-11-25 setup guide and theme switch
+
+The homepage now presents a curl-first installation panel and three Mewlink connection steps beneath the hero. The GitHub release lists the versioned shell installer and matching runtimes. The homepage labels curl as a release preview and points to source setup for regular use. The [homepage contract](../features/mew-run-homepage.md) defines the guide and theme behavior, and [ADR 0216](../decisions/0216-homepage-local-controls.md) records the decision to allow the local controls script.
+
+Both builds, the central type check, and three Worker tests passed. Two Chromium tests verified four viewport widths, system themes, keyboard theme switching, persistence after reload, exact clipboard contents, the JavaScript-disabled guide, and the offline preview. The 320px guide was inspected in both themes. Lint passed with warnings. Documentation metadata passed and the link check reported the same 39 missing targets as before.
+
+Verification was local. No installer execution, physical-device setup, or production deployment was performed.
 
 ## 2026-11-25 navigation logo contrast
 

@@ -63,16 +63,16 @@ Mew runs on **Linux or macOS**, including **WSL 2 on Windows**. Choose one insta
 
 | Route | Run it from | Command |
 | --- | --- | --- |
-| 1. npm | A computer with Node.js 24 and npm; CMD or PowerShell on Windows | `npx mew-ide` |
-| 2. curl | An existing WSL 2 Ubuntu terminal, Linux, or macOS | The one-line command below |
+| 1. curl (release preview) | An existing WSL 2 Ubuntu terminal, Linux, or macOS | The one-line command below |
+| 2. npm | A computer with Node.js 24 and npm; CMD or PowerShell on Windows | `npx mew-ide` |
 | 3. Source | A terminal with the [platform prerequisites](docs/guides/getting-started-en.md#install-from-source) | Clone the repository, then `./mew setup` |
 
-**The npm package, curl installer release assets, and clean-platform acceptance are pending. Use source installation until publication.** [Release status](.mew/docs/operations/cli-release.md).
+**The curl installer is available as a release preview. npm publication and clean-platform acceptance are pending. Use source installation for regular setup.** [Release status](.mew/docs/operations/cli-release.md).
 
 The curl route installs a private Node runtime and Mew without requiring npm or Git first:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-saens/mew/main/install.sh | bash
+curl -fsSL https://github.com/s-saens/mew/releases/download/mew-cli-v0.1.5/install.sh | bash
 ```
 
 Both prebuilt routes prepare Postgres, use default settings, run Mew in the background, and register login startup. On Windows, npm prepares a dedicated WSL environment; curl runs inside the WSL distribution you already opened. The browser opens administrator creation, usually at `http://localhost:5000`. Browser prerequisites may require OS authorization. [Prebuilt installation details](docs/guides/getting-started-en.md#run-with-one-command-after-the-first-release).

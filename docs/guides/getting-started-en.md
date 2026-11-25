@@ -18,11 +18,11 @@ Choose one route:
 
 | Route | Prerequisites | Continue with |
 | --- | --- | --- |
-| 1. npm | Node.js 24 and npm; Windows starts in CMD or PowerShell | [Run `npx mew-ide`](#run-with-one-command-after-the-first-release) |
-| 2. curl | Bash, curl, and an existing WSL 2 Ubuntu/Linux/macOS terminal | [Run the shell installer](#install-with-curl-after-the-first-release) |
+| 1. curl (release preview) | Bash, curl, and an existing WSL 2 Ubuntu/Linux/macOS terminal | [Run the shell installer](#install-with-curl-after-the-first-release) |
+| 2. npm | Node.js 24 and npm; Windows starts in CMD or PowerShell | [Run `npx mew-ide`](#run-with-one-command-after-the-first-release) |
 | 3. Source | Git and the platform's build prerequisites | [Clone and run setup](#install-from-source) |
 
-**The initial npm package, curl installer release assets, matching runtimes, and clean-platform acceptance remain pending. Until publication, use source installation.** [Release status](../../.mew/docs/operations/cli-release.md).
+**The curl installer and matching runtimes are available as a release preview. npm publication and clean-platform acceptance remain pending. Use source installation for regular setup.** [Release status](../../.mew/docs/operations/cli-release.md).
 
 ### Run with one command (after the first release)
 
@@ -49,7 +49,7 @@ For existing source data on POSIX, stop the old server and pass `--data-dir /pat
 Open your existing **WSL 2 Ubuntu terminal**, a Linux terminal, or macOS Terminal and run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/s-saens/mew/main/install.sh | bash
+curl -fsSL https://github.com/s-saens/mew/releases/download/mew-cli-v0.1.5/install.sh | bash
 ```
 
 The script downloads a checksum-pinned private Node runtime and the matching standalone Mew launcher into your user directory. You do not install npm, clone the repository, or compile Mew first. It then follows the same default configuration, managed Postgres, background execution, browser administrator creation, and remote-access popup as the npm route. Browser preparation may require sudo or other OS authorization.
